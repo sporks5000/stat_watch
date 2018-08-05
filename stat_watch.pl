@@ -5,11 +5,15 @@
 
 use Cwd 'abs_path';
 use File::Temp 'tempfile';
+use POSIX 'strftime';
 
 my $b_verbose;
 my @v_dirs;
 my @v_ignore;
 my @v_rignore;
+my $d_backup;
+my $b_backup;
+my @v_backupr;
 my @v_star_ignore;
 my @v_temp_ignore;
 my @v_temp_rignore;
@@ -17,6 +21,12 @@ my @v_temp_star_ignore;
 my $f_output;
 my $fh_output;
 my $v_format;
+my $f_log;
+my $b_test_log;
+my $fh_log;
+
+my $v_retention_min_days = 4;
+my $v_retention_max_copies = 7;
 
 #===================#
 #== Report Output ==#
@@ -53,7 +63,7 @@ sub fn_check_file {
 	return 1;
 }
 
-sub fn_get_stats {
+sub fn_stat_watch {
 ### Stat every file in the directory, then dive into directories
 ### $_[0] is the directory in question
 	my $v_dir = $_[0];
@@ -91,7 +101,7 @@ sub fn_get_stats {
 				}
 			}
 			for my $_dir (@dirs) {
-				fn_get_stats($_dir);
+				fn_stat_watch($_dir);
 			}
 		}
 	}
@@ -129,7 +139,7 @@ sub fn_diff {
 			chomp($_line);
 			my @v_line = split( m/ -- /, $_line );
 			$ref_diff->{$v_file}->{$v_first}->{'line'} = $_line;
-			$ref_diff->{$v_file}->{$v_first}->{'ctime'} = = pop(@v_line);
+			$ref_diff->{$v_file}->{$v_first}->{'ctime'} = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'mtime'} = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'size'} = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'group'} = pop(@v_line);
@@ -162,12 +172,16 @@ sub fn_diff {
 		my $html_details = "<b>'" . $v_file . "'</b>\n<br><table><tbody>";
 		if ( ! exists $ref_diff->{$v_file}->{'<'} ) {
 			### This file is new
+			my $v_dir = substr( $ref_diff->{$v_file}->{'>'}->{'perms'}, 0, 1 );
 			push( @v_new, "'" . $v_file . "'" );
 			$details .= "     Status:       New\n     M-time:       " . $ref_diff->{$v_file}->{'>'}->{'mtime'} . "\n     C-time:       " . $ref_diff->{$v_file}->{'>'}->{'ctime'} . "\n     File Size:    " . $ref_diff->{$v_file}->{'>'}->{'size'} . " bytes\n     Permissions:  " . $ref_diff->{$v_file}->{'>'}->{'perms'} . "\n     Owner:        " . $ref_diff->{$v_file}->{'>'}->{'owner'} . "\n     Group:        " . $ref_diff->{$v_file}->{'>'}->{'group'} . "\n";
 			$html_details .= '<tr><th>Status</th><th>M-time</th><th>C-time</th><th>File Size</th><th>Permissions</th><th>Owner</th><th>Group</th></tr>' . "\n";
 			$html_details .= '<tr><td>New</td><td>' . $ref_diff->{$v_file}->{'>'}->{'mtime'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'ctime'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'size'}. ' bytes</td><td>' . $ref_diff->{$v_file}->{'>'}->{'perms'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'owner'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'group'} . '</td></tr>' . "\n";
-			if ( substr( $ref_diff->{$v_file}->{'>'}->{'perms'}, 0, 1 ) ne "d" ) {
+			if ( $v_dir ne "d" ) {
 				push( @v_files2, $v_file );
+			}
+			if ( $v_dir ne "d" && $b_backup ) {
+				fn_backup_file($v_file, $d_backup);
 			}
 		} elsif ( ! exists $ref_diff->{$v_file}->{'>'} ) {
 			### This file was removed
@@ -255,7 +269,9 @@ sub fn_diff {
 			}
 			$details .= $details2;
 			$html_details .= '<tr>' . $html_details3 . $html_details1 . "</tr>\n<tr>" . $html_details4 . $html_details2 . "</tr>\n";
-			
+			if ( $v_dir ne "d" && $b_backup ) {
+				fn_backup_file($v_file, $d_backup);
+			}
 		}
 		$v_details .= $details . "\n";
 		$v_html_details .= $html_details . '</tbody></table><br>' . "\n";
@@ -336,8 +352,13 @@ sub fn_diff_check_lines {
 ### Check lines in a file to see if the match the ignore lists. If not, output them to a file
 ### Prune timestamps from directories so they don't cause false positives
 ### $_[0] is the file we're reading from and $_[1] is the file handle that we're printing to
+### If there is no $_[1] specified, an array of results will be returned instead
 	my $f_read = $_[0];
-	my $fh_write = $_[1];
+	my $fh_write;
+	my @v_lines;
+	if ( $_[1] ) {
+		$fh_write = $_[1];
+	}
 	if ( open( my $fh_read, "<", $f_read ) ) {
 		my $v_processing;
 		while (<$fh_read>) {
@@ -345,20 +366,119 @@ sub fn_diff_check_lines {
 			if ( $_line =~ m/^Processing:/ ) {
 				$v_processing = substr( (split( m/'/, $_line, 2 ))[1], 0, -2 );
 				fn_check_strings( $v_processing );
-				print $fh_write $_line;
 			} else {
 				if ( ! $v_processing ) {
-					print STDERR "File \"$f_read\" does not appear to be a get_stats file\n";
+					print STDERR "File \"$f_read\" does not appear to be a stat_watch file\n";
 					exit 1;
 				}
 				my $v_file = substr( (split(/'([^']+)$/, $_line))[0], 1 );
 				if ( fn_check_file($v_file) ) {
-					print $fh_write $_line;
+					if ($fh_write) {
+						print $fh_write $_line;
+					} else {
+						push( @v_lines, $_line ) ;
+					}
 				}
 			}
 		}
 	}
+	if ( ! $fh_write ) {
+		return @v_lines;
+	}
 }
+
+#======================#
+#== Backing up Files ==#
+#======================#
+
+sub fn_backup_initial {
+### Given a stat_watch report, backup the files within that match the "BackupR" command strings
+### $_[0] is the report
+	my $v_file = $_[0];
+	my @v_lines = fn_diff_check_lines($v_file);
+	for my $_line (@v_lines) {
+		my $v_file = substr( (split(/'([^']+)$/, $_line))[0], 1 );
+		fn_backup_file($v_file, $d_backup);
+	}
+}
+
+sub fn_check_retention {
+### Given the name of a backedup file, check to ensure that there aren't old copies that exceed the retention limits
+	my $v_file = $_[0];
+	my @v_dirs = split( m/\//, $v_file );
+	my $v_name = pop(@v_dirs);
+	my $v_dir = join( '/', @v_dirs );
+	my @v_files;
+	if ( opendir my $fh_dir, $v_dir ) {
+		my @files = readdir $fh_dir;
+		closedir $fh_dir;
+		for my $_file (@files) {
+			if ( $_file =~ m/^\Q$v_name\E_[0-9]+$/ ) {
+				push( @v_files, $_file );
+			}
+		}
+	}
+	### Sort the matching file in reverse, then skip over the retention count. delete anything after that point that's too old
+	@v_files = sort {$b cmp $a} @v_files;
+	my $v_count = $v_retention_max_copies + 1;
+	while ( defined $v_files[$v_count] ) {
+		my $v_stamp = (split( m/_/, $v_files[$v_count] ))[-1];
+		if ( (time() - $v_stamp) > (86400 * $v_retention_min_days) ) {
+			fn_log('Removing backed-up file "' . $v_files[$v_count] . '"' . "\n");
+			unlink( $v_dir . "/" . $v_files[$v_count] );
+		}
+		$v_count++;
+	}
+}
+
+sub fn_backup_file {
+### Check to make sure that a file matches the desired regex, then make a copy of the file
+### $_[0] is the file we're copying, $_[1] is the backup directory
+	my $v_file = $_[0];
+	my $d_backup = $d_backup;
+	if ( $_[1] ) {
+		$d_backup = $_[1];
+	}
+	my $b_continue;
+	if ( ! -f $v_file ) {
+		return;
+	}
+	for my $_string (@v_backupr) {
+		if ( $v_file =~ m/$_string/ ) {
+			$b_continue = 1;
+			last;
+		}
+	}
+	if ($b_continue) {
+		my @v_dirs = split( m/\//, $v_file );
+		shift(@v_dirs); ### this will have been empty
+		my $v_name = pop(@v_dirs);
+		for my $_dir (@v_dirs) {
+			$d_backup .= "/" . $_dir;
+			if ( ! -d $d_backup ) {
+				mkdir( $d_backup );
+				chmod( 0700, $d_backup );
+			}
+		}
+		if ( -d $d_backup ) {
+			$d_backup .= "/" . $v_name . "_" . time();
+			`cp -a "$v_file" "$d_backup" 2> /dev/null`;
+			if ( -f $d_backup ) {
+				if ($b_verbose) {
+					print STDERR "'" . $v_file . "' -> '" . $d_backup . "'\n";
+				}
+				fn_log("Backed up file \"" . $v_file . "\"\n");
+				fn_check_retention( $d_backup .= "/" . $v_name );
+				return 1;
+			}
+		}
+		if ($b_verbose) {
+			print STDERR "Failed to backup file \"" . $v_file . "\"\n";
+		}
+	}
+}
+
+##### The ability to give a file name as an argument and restore that file
 
 #================================#
 #== Processing the ignore file ==#
@@ -379,6 +499,9 @@ sub fn_get_ignore {
 			if ( $_line =~ m/^R\s*[^\s]/ ) {
 				$_line =~ s/^R\s*//;
 				push( @v_rignore, $_line );
+			} elsif ( $_line =~ m/^BackupR\s*[^\s]/ ) {
+				$_line =~ s/^BackupR\s*//;
+				push( @v_backupr, qr/$_line/ );
 			} else {
 				### There are no instances where double slashes will be necessary in file names. Get rid of them.
 				$_line =~ s/\/\/+/\//g;
@@ -395,6 +518,20 @@ sub fn_get_ignore {
 				} elsif ( $_line =~ m/^Include\s*\// ) {
 					$_line =~ s/^Include\s*//;
 					fn_get_ignore( $_line );
+				} elsif ( $_line =~ m/^BackupD\s*\// ) {
+					$_line =~ s/^BackupD\s*//;
+					$d_backup = $_line;
+				} elsif ( $_line =~ m/^BackupMD\s*[0-9]/ ) {
+					$_line =~ s/^BackupMD\s*//;
+					$_line =~ s/[^0-9].*$//;
+					$v_retention_min_days = $_line;
+				} elsif ( $_line =~ m/^BackupMC\s*[0-9]/ ) {
+					$_line =~ s/^BackupMC\s*//;
+					$_line =~ s/[^0-9].*$//;
+					$v_retention_max_copies = $_line;
+				} elsif ( $_line =~ m/^Log\s*\// ) {
+					$_line =~ s/^Log\s*//;
+					$f_log = $_line;
 				}
 			}
 		}
@@ -443,6 +580,26 @@ sub fn_sort_prep {
 		$fh_output = STDOUT;
 		return 0;
 	}
+}
+
+#=============#
+#== Logging ==#
+#=============#
+
+sub fn_log {
+	if (! $f_log) {
+		return;
+	}
+	if (! $b_test_log) {
+		if ( open( $fh_log, ">>", $f_log ) ) {
+			$b_test_log = 1;
+		} else {
+			undef $f_log;
+		}
+	}
+	my $v_stamp = strftime '%Y-%m-%d %T %z', localtime;
+	chomp($_[0]);
+	print $fh_log $v_stamp . " - " . $_[0] . "\n";
 }
 
 #========================#
@@ -531,19 +688,19 @@ exit 0;
 sub fn_help {
 my $v_message =  <<'EOF';
 
-get_stats.pl - a script for finding and reporting changes in files and directories
+stat_watch.pl - a script for finding and reporting changes in files and directories
 
 
 USAGE
 
-./get_stats.pl --record [DIRECTORY] ([DIRECTORY 2] ...)
+./stat_watch.pl --record [DIRECTORY] ([DIRECTORY 2] ...)
     - outputs stat data for all of the files under the directory specified (you probably want to redirect this output to a file)
     - The "-v" or "--verbose" flag can be used to have the directories output to STDERR
     - The "-i" or "--ignore" or "--include" flag can be used to specify an ignore/include file
     - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
     - This is the default functionality. Technically the "--record" flag is not necessary
 
-./get_stats.pl --diff [FILE 1] [FILE 2]
+./stat_watch.pl --diff [FILE 1] [FILE 2]
     - Show a diff of the two files
     - The "-i" or "--ignore" or "--include" flag can be used to specify an ignore/include file
     - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
@@ -551,9 +708,15 @@ USAGE
         - "diff" causes the output to be in standard diff format
         - "text" separates out what has changed and how, and outputs in plain text format
         - "html" separates out what has changed and how, and outputs in html format
+    - The "--backup" flag will result in files being backed up. "BackupD" and "BackupR" lines must be set in the include file for this to be successful
 
-./get_stats.pl --help
-./get_stats.pl -h
+./stat_watch.pl --backup [FILE]
+    - The file must be a stat_watch report file
+    - The "-i" or "--ignore" or "--include" flag can be used to specify an ignore/include file
+    - The include file must have "BackupD" and "BackupR" command strings present
+
+./stat_watch.pl --help
+./stat_watch.pl -h
     - Outputs this information
 
 
@@ -567,10 +730,15 @@ Default Usage:
 
 Control Strings:
     - Lines beginning with the following control strings have special meaning: 
-        - "*" - Pass over all files and directories whose full path begins with the following string
+        - "*" - Pass over all files and directories whose full path begins with the string that follows
         - "R" - Pass over all files and directories that match the following perl interpreted regex
-        - "I" - Add the following file or directory to the list of files and directories to be checked (as if it was listed at the command line)
+        - "I" - Add the following file or directory to the list of files and directories to be checked (as if it was listed at the command line). Has no effect with "--diff"
         - "Include" - Interpret the contents of the following file as if it was listed at the command line as an include/ignore file
+        - "BackupR" - If a file matches the regular expression that follows, and the appropriate flags are set, they will be backed up
+        - "BackupD" - This specifies the directory to backup files to
+        - "BackupMD" - A number specified here will set the minumum number of days a backed up file should be kept
+        - "BackupMC" - A number here will set the maximum number of copies of a file that should be backed up (after the minumum retention has been met)
+        - "Log" - Placing a full path to a file after this will tell stat_watch where to log
     - Control strings can have any amount of whitespace before or after them on the line. It will not be interpreted.
     - Any line matching a directory will result in that directory and all files and subdirectories it contains being passed over
 
@@ -596,7 +764,7 @@ exit 0;
 
 ### Process all of the universal arguments first
 my @args;
-while ( exists $ARGV[0] ) {
+while ( defined $ARGV[0] ) {
 	my $v_arg = shift( @ARGV );
 	if ( $v_arg =~ m/^-[a-zA-Z0-9][a-zA-Z0-9]+$/ ) {
 	### If there's a string of single character arguments, break them up and process them separately
@@ -614,13 +782,13 @@ while ( exists $ARGV[0] ) {
 		fn_help();
 		exit 0;
 	} elsif ( $v_arg eq "-i" || $v_arg eq "--ignore" || $v_arg eq "--include" ) {
-		if ( exists $ARGV[0] ) {
+		if ( defined $ARGV[0] ) {
 			fn_get_ignore( shift( @ARGV ) );
 		} else {
 			print STDERR 'Argument "' . $v_arg . '" must be followed by a file name' . "\n";
 		}
 	} elsif ( $v_arg eq "--output" || $v_arg eq "-o" ) {
-		if ( exists $ARGV[0] ) {
+		if ( defined $ARGV[0] ) {
 			$f_output = shift( @ARGV );
 		} else {
 			print STDERR 'Argument "' . $v_arg . '" must be followed by a file name' . "\n";
@@ -640,25 +808,30 @@ while ( exists $ARGV[0] ) {
 }
 
 ### Process the commandline arguments
-if ( exists $args[0] && $args[0] eq "--diff" ) {
+if ( defined $args[0] && $args[0] eq "--diff" ) {
 ### The part where we diff output files
 	shift( @args );
 	my @v_files;
-	while ( exists $args[0] ) {
+	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
 		if ( $v_arg eq "--format" || $v_arg eq "-f" ) {
-			if ( exists $args[0] ) {
+			if ( defined $args[0] ) {
 				$v_format = shift( @args );
 			} else {
 				print STDERR 'Argument "' . $v_arg . '" must be followed by "diff", "text", or "html"' . "\n";
 			}
+		} elsif ( $v_arg eq "--backup" ) {
+			$b_backup = 1;
 		} elsif ( -e $v_arg ) {
 			push( @v_files, $v_arg );
 		}
 	}
-	if ( ! exists $v_files[-1] || ! exists $v_files[-2] || ! -r $v_files[-1] || ! -r $v_files[-2] ) {
+	if ( ! defined $v_files[-1] || ! defined $v_files[-2] || ! -r $v_files[-1] || ! -r $v_files[-2] ) {
 		print STDERR "With \"--diff\", must specify two files\n";
 		exit 1;
+	}
+	if ( ! $d_backup || ! -d $d_backup || ! -w $d_backup || ! @v_backupr ) {
+		$b_backup = 0;
 	}
 	if ( $v_format ne "diff" && $v_format ne "text" && $v_format ne "html" ) {
 		$v_format = "text";
@@ -668,9 +841,30 @@ if ( exists $args[0] && $args[0] eq "--diff" ) {
 	if ($b_close) {
 		close $fh_output;
 	}
-} elsif ( exists $args[0] && ($args[0] eq "--record" || substr($args[0],0,2) ne "--") ) {
+} elsif ( defined $args[0] && $args[0] eq "--backup" ) {
+### Backup files from "--report" output.
+	my $v_file;
+	while ( defined $args[0] ) {
+		my $v_arg = shift( @args );
+		if ( -e $v_arg ) {
+			$v_file = $v_arg;
+		}
+	}
+	if ( ! $d_backup || ! @v_backupr ) {
+		print STDERR "The include file must have \"BackupD\" and \"BackupR\" command strings present\n";
+		exit 1;
+	} elsif ( ! -d $d_backup || ! -w $d_backup ) {
+		print STDERR "The backup directory does not exist or is not writable\n";
+		exit 1;
+	}
+	my $b_close = fn_sort_prep();
+	if ($b_close) {
+		close $fh_output;
+	}
+	fn_backup_initial($v_file);
+} elsif ( defined $args[0] && ($args[0] eq "--record" || substr($args[0],0,2) ne "--") ) {
 ### The part where we capture the stats of files
-	while ( exists $args[0] ) {
+	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
 		if ( -e $v_arg ) {
 			push( @v_dirs, $v_arg );
@@ -693,7 +887,8 @@ if ( exists $args[0] && $args[0] eq "--diff" ) {
 	for my $_dir ( @v_dirs ) {
 		print $fh_output "Processing: '" . $_dir . "'\n";
 		fn_check_strings( $_dir );
-		fn_get_stats( $_dir );
+		fn_log("Running a report for directory '" . $_dir . "'\n");
+		fn_stat_watch( $_dir );
 	}
 	### Close the output file
 	if ($b_close) {
