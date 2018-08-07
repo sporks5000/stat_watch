@@ -2,6 +2,9 @@
 
 f_PERL_SCRIPT="stat_watch.pl"
 d_WORKING="stat_watch"
+### Set a one in 20 chance of us pruning old backups
+v_PRUNE_MAX=20
+v_PRUNE_CHANCE=1
 
 ### Find out where we are and make sure that stat_watch.pl is here too
 v_PROGRAMDIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -24,7 +27,7 @@ USAGE
 
 ./$v_PROGRAMNAME
     - Asks the user key questions in order to create a Stat Watch job to watch and backup key user files
-    - By default, this will backup files that end with the following: .php, .php4, .php5, .pl, .pm, .py, .js, .css, .htm, .html, .htaccess, .htpasswd, .sh
+    - By default, this will enable backup for files that end with the following: .php, .php4, .php5, .pl, .pm, .py, .js, .css, .htm, .html, .htaccess, .htpasswd, .sh
     - What files are being checked and what files are being backed up can be modified by editing the .job file that this script creates
 
 ./$v_PROGRAMNAME --run [FILE]
@@ -38,7 +41,9 @@ USAGE
 
 OTHER DETAILS
 
-For a better understanding of what functions are available under $f_PERL_SCRIPT, run "$v_PROGRAMDIR/$f_PERL_SCRIPT --help" for more information.
+1) A list of jobs created by this script will be stored in the file "$v_PROGRAMDIR/.$d_WORKING/wrap_jobs_created".
+
+2) For a better understanding of what functions are available under $f_PERL_SCRIPT, run "$v_PROGRAMDIR/$f_PERL_SCRIPT --help" for more information.
 
 
 FEEDBACK
@@ -64,6 +69,12 @@ if [[ "$1" == "--run" ]]; then
 	fi
 	v_DIR="$( echo "$f_JOB_FILE" | rev | cut -d "/" -f2- | rev )"
 	v_EXPIRE="$( egrep "^\s*Expire" "$f_JOB_FILE" | sed "s/^[[:blank:]]*Expire[[:blank:]]*//;s/[[:blank:]]*$//" )"
+	### Create a directory to stand as an indicator that a job is running
+	mkdir "$v_DIR"/"$v_NAME"_run 2> /dev/null || v_EXIT=true
+	if [[ $v_EXIT == true ]]; then
+		echo "An existing iteration of this job is already running"
+		exit
+	fi
 	if [[ -n $v_EXPIRE && $( echo "$v_EXPIRE" | egrep -c "^[0-9]+$" ) -gt 0 ]]; then
 	### If the job was set to expire, see if we still need to run it
 		if [[ $( date +%s ) -gt $v_EXPIRE ]]; then
@@ -74,6 +85,7 @@ if [[ "$1" == "--run" ]]; then
 				rm -rf "$v_DIR"/backup_"$v_NAME"
 				rm -f "$f_JOB_FILE"
 			fi
+			rmdir "$v_DIR"/"$v_NAME"_run
 			exit
 		fi
 	fi
@@ -92,7 +104,8 @@ if [[ "$1" == "--run" ]]; then
 			stat -c '%Y' "$f_JOB_FILE" > "$v_DIR"/"$v_NAME"_stamp
 		fi
 		v_STAMP="$( date +%s )"
-		"$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --diff -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> /dev/null
+		"$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --diff --no-check-retention -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> /dev/null
+		mv -f "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_files.txt
 		if [[ $( wc -l "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt | cut -d " " -f1 ) -lt 2 ]]; then
 			rm -f "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt
 		else
@@ -110,8 +123,12 @@ if [[ "$1" == "--run" ]]; then
 				) | mail -s "Stat Watch - File changes on $(hostname)" $v_EMAIL
 			fi
 		fi
-		mv -f "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_files.txt
+		if [[ $(( $v_PRUNE_CHANCE + RANDOM % $v_PRUNE_MAX )) -le $v_PRUNE_CHANCE ]]; then
+		### Determine whether or not we're purning old backups
+			"$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --prune -i "$f_JOB_FILE"
+		fi
 	fi
+	rmdir "$v_DIR"/"$v_NAME"_run
 	exit
 fi
 
@@ -184,34 +201,47 @@ fi
 ### Create the relevant files
 mkdir -p "$v_DIR"/backup_"$v_NAME"
 touch $v_DIR/$v_NAME.log
-cat << EOF > "$v_DIR"/"$v_NAME".job
+f_JOB_FILE="$v_DIR/$v_NAME".job
+cat << EOF > "$f_JOB_FILE"
+### This file created by $v_PROGRAMNAME
 I $v_MONITOR
 BackupD $v_DIR/backup_$v_NAME
+### back up the following extensions: .php, .php4, .php5, .pl, .pm, .py, .js, .css, .htm, .html, .htaccess, .htpasswd, .sh
 BackupR \.(p(hp(4|5|7)?|[lym])|js|css|ht(ml?|access|passwd)|sh)$
 BackupMD 7
 BackupMC 4
 Log $v_DIR/$v_NAME.log
 
-### These lines added by $v_PROGRAMNAME
+### These lines specific to the functionality of $v_PROGRAMNAME
 Name $v_NAME
 EOF
 if [[ -n $v_EMAIL ]]; then
-	echo "Email $v_EMAIL" >> "$v_DIR/$v_NAME.job"
+	echo "Email $v_EMAIL" >> "$f_JOB_FILE"
 fi
 if [[ $v_EXPIRE == true ]]; then
-	echo "Expire $( date --date="now + 45 days" +%s )" >> "$v_DIR"/"$v_NAME".job
+	echo "Expire $( date --date="now + 45 days" +%s )" >> "$f_JOB_FILE"
 fi
+
+### Log that the job was created by this script
 echo "$( date +%Y-%m-%d" "%T" "%z ) - Job \"$f_JOB_FILE\" created by $v_PROGRAMNAME" >> "$v_DIR"/"$v_NAME".log
+
+### Create a working directory and a file to document jobs created
+mkdir -p $v_PROGRAMDIR/."$d_WORKING"
+f_TEMP=$( mktemp )
+egrep -v "^$f_JOB_FILE - Created " "$v_PROGRAMDIR"/."$d_WORKING"/wrap_jobs_created > "$f_TEMP" 2> /dev/null
+echo "$f_JOB_FILE - Created $( date +%Y-%m-%d" "%T" "%z )" >> "$f_TEMP"
+mv -f "$f_TEMP" "$v_PROGRAMDIR"/."$d_WORKING"/wrap_jobs_created
 
 ### Output text telling the user what next steps they need to take
 echo
-echo -e "A job file has been created at \"\e[92m$v_DIR/$v_ACCOUNT.job\e[0m\""
+echo -e "A job file has been created at \"\e[92m$f_JOB_FILE\e[0m\""
 echo "Run \"$v_PROGRAMDIR/$f_PERL_SCRIPT --help\" for further information on how it can be edited to suit your needs"
 echo "Once you have that file organized as you need it, run the following command:"
 echo
-echo "$v_PROGRAMDIR/$v_PROGRAMNAME --run $v_DIR/$v_ACCOUNT.job"
+echo "$v_PROGRAMDIR/$v_PROGRAMNAME --run \"$f_JOB_FILE\""
 echo
 echo "Then add the following line to root's crontab (adjusting times if necessary):"
 echo
-echo "$(( 1 + RANDOM % 58 )) */2 * * * $v_PROGRAMDIR/$v_PROGRAMNAME --run $v_DIR/$v_ACCOUNT.job > /dev/null 2>&1"
+### set a random minute from 1 to 59 for the cron job to run
+echo "$(( 1 + RANDOM % 58 )) */2 * * * $v_PROGRAMDIR/$v_PROGRAMNAME --run "$f_JOB_FILE" > /dev/null 2>&1"
 echo

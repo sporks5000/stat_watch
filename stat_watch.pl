@@ -38,6 +38,10 @@ my @v_backupr;
 my @v_backup_plus;
 my $v_retention_min_days = 7;
 my $v_retention_max_copies = 4;
+my $b_retention = 1;
+
+### Other
+my @v_time_minus;
 
 #===================#
 #== Report Output ==#
@@ -177,7 +181,7 @@ sub fn_diff {
 	my $v_html_details = '';
 	my @v_files = sort {$a cmp $b} keys(%{ $ref_diff });
 	my @v_files2;
-	for my $v_file (@v_files) {
+	DIFF_FILE: for my $v_file (@v_files) {
 		my $details = "'" . $v_file . "'" . "\n";
 		my $html_details = "<b>'" . $v_file . "'</b>\n<br><table><tbody>";
 		if ( ! exists $ref_diff->{$v_file}->{'<'} ) {
@@ -213,6 +217,7 @@ sub fn_diff {
 			my $html_details3 = '';
 			my $html_details4 = '';
 			my $b_owner;
+			my $b_not_stamps;
 			my $b_stamps;
 			my $v_mention;
 			my $b_list;
@@ -227,6 +232,7 @@ sub fn_diff {
 					push( @v_files2, $v_file );
 					$b_list = 1;
 				}
+				$b_not_stamps = 1;
 			}
 			if ( $ref_diff->{$v_file}->{'<'}->{'perms'} ne $ref_diff->{$v_file}->{'>'}->{'perms'} ) {
 				$b_owner = 1;
@@ -255,10 +261,18 @@ sub fn_diff {
 				$html_details1 .= '<th>Group</th>';
 				$html_details2 .= '<td>' . $ref_diff->{$v_file}->{'>'}->{'group'} . '</td>';
 			}
-			if ( $v_mention || (substr( $ref_diff->{$v_file}->{'<'}->{'perms'}, 0, 1 ) ne "d" || $v_dir ne "d") ) {
-			### This will prevent us from capturing directories that just have timestamp changes	
+			if ( $v_mention ) {
+				### If we've seen a difference so far, do nothing so we can move forward
+			} elsif ( substr( $ref_diff->{$v_file}->{'<'}->{'perms'}, 0, 1 ) eq "d" || $v_dir eq "d" ) {
+				### If it dasn't been mentioned, and it's a directory, move forward
+				next DIFF_FILE;
 			} else {
-				next;
+				for my $_string (@v_time_minus){
+					if ( $v_file eq $_string ) {
+						### if this file is listed for us to ignore stamps, go on to the next file
+						next DIFF_FILE;
+					}
+				}
 			}
 			if ( $ref_diff->{$v_file}->{'<'}->{'mtime'} ne $ref_diff->{$v_file}->{'>'}->{'mtime'} ) {
 				$b_stamps = 1;
@@ -371,7 +385,7 @@ sub fn_diff {
 }
 
 sub fn_diff_check_lines {
-### Check lines in a stat_watch report to see if the file described matches the ignore lists. If not, output them to a file
+### Check lines in a Stat Watch report to see if the file described matches the ignore lists. If not, output them to a file
 ### Prune timestamps from directories so they don't cause false positives
 ### $_[0] is the file handle (already open) that we're printing to; if $_[0] is undef, an array of results will be returned instead
 ### $_[1] is the number of characters to ignore from the beginning of each line
@@ -395,7 +409,7 @@ sub fn_diff_check_lines {
 					fn_check_strings( $v_processing );
 				} elsif ( substr( $v_line, 0, 2 ) eq "'/" ) {
 					if ( ! $v_processing ) {
-						print STDERR "File \"$f_read\" does not appear to be a stat_watch file\n";
+						print STDERR "File \"$f_read\" does not appear to be a Stat Watch file\n";
 						exit 1;
 					}
 					my $v_file = substr( (split(/'([^']+)$/, $v_line))[0], 1 );
@@ -422,7 +436,7 @@ sub fn_diff_check_lines {
 				fn_check_strings( $v_processing );
 			} elsif ( substr( $v_line, 0, 2 ) eq "'/" ) {
 				if ( ! $v_processing ) {
-					print STDERR "Input does not appear to be from a stat_watch file\n";
+					print STDERR "Input does not appear to be from a Stat Watch file\n";
 					exit 1;
 				}
 				my $v_file = substr( (split(/'([^']+)$/, $v_line))[0], 1 );
@@ -447,7 +461,7 @@ sub fn_diff_check_lines {
 #======================#
 
 sub fn_backup_initial {
-### Given a stat_watch report, backup the files within that match the "BackupR" and "Backup+" command strings
+### Given a Stat Watch report, backup the files within that match the "BackupR" and "Backup+" command strings
 ### $_[0] is the report
 	my $v_file = $_[0];
 	my @v_lines = fn_diff_check_lines(undef, undef, 1, $v_file);
@@ -460,7 +474,7 @@ sub fn_backup_initial {
 
 sub fn_check_retention {
 ### Given the name of a backed-up file, check to ensure that there aren't old copies that exceed the retention limits
-### $_[0] is the full path to that backed-up file
+### $_[0] is the full path to that file in the backup directory, but with the trailing underscore and timestamp removed
 	my $v_file = $_[0];
 	my @v_dirs = split( m/\//, $v_file );
 	my $v_name = pop(@v_dirs);
@@ -477,6 +491,40 @@ sub fn_check_retention {
 			unlink( $v_file );
 		}
 		$v_count++;
+	}
+}
+
+sub fn_prune_backups {
+### This is the main function that's run with the "--prune" option
+### $_[0] is the backup directory
+	my $v_dir = $_[0];
+	if ($b_verbose) {
+		print STDERR "Directory: " . $v_dir . "\n";
+	}
+	if ( -e $v_dir && -d $v_dir ) {
+		### Open the directory and get a file list
+		if ( opendir my $fh_dir, $v_dir ) {
+			my @files = readdir $fh_dir;
+			closedir $fh_dir;
+			my @dirs;
+			for my $_file (@files) {
+				if ( -d $_file && ! -l $_file && $_file ne "." && $_file ne ".." ) {
+					push( @dirs, $_file );
+				}
+				$_file =~ s/_[0-9]+$//;
+			}
+			@files = fn_uniq(@files);
+			for my $_file (@files) {
+				if ( $_file ne "." && $_file ne ".." ) {
+					$_file = $v_dir . "/" . $_file;
+					fn_check_retention($_file);
+				}
+			}
+			for my $_dir (@dirs) {
+			### For each of the directories we found, go through RECURSIVELY!
+				fn_stat_watch($_dir);
+			}
+		}
 	}
 }
 
@@ -538,7 +586,9 @@ sub fn_backup_file {
 					print STDERR "'" . $v_file . "' -> '" . $d_backup . "'\n";
 				}
 				fn_log("Backed up file \"" . $v_file . "\"\n");
-				fn_check_retention( $d_backup .= "/" . $v_name );
+				if ($b_retention) {
+					fn_check_retention( $d_backup .= "/" . $v_name );
+				}
 				return 1;
 			}
 		}
@@ -581,7 +631,7 @@ sub fn_compare_backup {
 	my $v_name = pop(@v_dirs);
 	my @v_files = fn_list_backups($v_name, $v_dir);
 	if (@v_files) {
-		@v_files = sort {$a cmp $b} @v_files;
+		@v_files = sort {$b cmp $a} @v_files;
 		### Since I don't anticipate this needing to be human readable, there's no reason to use the stat binary
 		my $v_line1;
 		my $v_line2;
@@ -732,8 +782,10 @@ sub fn_get_ignore {
 				### Where to log actions
 					$_line =~ s/^Log\s*//;
 					$f_log = $_line;
-				} else {
-##### There are files that we want to be notified if the contents change, but they are regularly touched by a script, so timestamps don't matter. Let's find a way to accomidate this
+				} elsif ( $_line =~ m/^Time-\s*\// ) {
+				### Specify a file that we should be unconcerned about changes to the timestamps
+					$_line =~ s/^Time-\s*//;
+					push(@v_time_minus, $_line);
 				}
 			}
 		}
@@ -847,6 +899,21 @@ sub fn_log {
 #== Helper Subroutines ==#
 #========================#
 
+sub fn_uniq {
+### Given an array, reduce the array to unique elements
+### @_ is the array
+	my @v_array = @_;
+	my %v_hash;
+	for my $v_item (@v_array) {
+		$v_hash{$v_item} = 1;
+	}
+	my @v_array2;
+	for my $v_item (keys(%v_hash)) {
+		push( @v_array2,$v_item );
+	}
+	return @v_array2;
+}
+
 sub fold_print {
 ### Given a message to print to the terminal, line-break that message at word breaks
 ### $_[0] is the message; $_[1] is the number of columns to use if columns can't be determined.
@@ -952,17 +1019,24 @@ USAGE
         - "text" separates out what has changed and how, and outputs in plain text format
         - "html" separates out what has changed and how, and outputs in html format
     - The "--backup" flag will result in files being backed up. "BackupD" and "BackupR" or "Backup+" lines must be set in the include file for this to be successful
+    - The "--no-check-retention" flag mean that when creating backups, existing files will not be checked for retention. This is optimal if you're regularly running this script with the "--prune" flag
 
 ./stat_watch.pl --backup [FILE]
-    - The file must be a stat_watch report file
-    - The "-i" or "--ignore" or "--include" flag can be used to specify an ignore/include file
-    - The include file must have "BackupD" and "BackupR" or "Backup+" command strings present
+    - Create backups of files specified using a Stat Watch report file and the settings within an ignore/include file
+    - The file must be a Stat Watch report file
+    - The "-i" or "--ignore" or "--include" flag must be used to specify an ignore/include file and that file must have "BackupD" and "BackupR" or "Backup+" command strings present
     - If you modify the "BackupR" or "Backup+" settings and re-run "--backup", it will compare stats of existing backups and only save files that are different / not present
         - However, files that are no longer matched will not be removed
 
 ./stat_watch.pl --list [FILE]
     - This will list the available backups for a specific file
-    - It is not necessary to specify an includde file, stat_watch will check all directories that it has ever backed up to in hopes of giving the most comprehensive answer possible.
+    - It is not necessary to specify an includde file, Stat Watch will check all directories that it has ever backed up to in hopes of giving the most comprehensive answer possible.
+
+./stat_watch.pl --prune [FILE]
+    - Go through the backup directory and remove files older files
+    - The file must be a Stat Watch report file
+    - The "-i" or "--ignore" or "--include" flag must be used to specify an ignore/include file and that file must have "BackupD" string present
+    - Any files outside of the range specified by the "BackupMD" and "BackupMC" command strings will be removed
 
 ./stat_watch.pl --help
 ./stat_watch.pl -h
@@ -972,26 +1046,28 @@ USAGE
 REGARDING THE IGNORE/INCLUDE FILE
 
 Default Usage:
-    - Any line beginning with the full path to a file or directory (Beginning with "/") will result in that file or directory (and all files within) being passed over
+    - All files or directories need to be referred to by full path (Beginning with "/") unless specified otherwise
+    - Any line beginning with a file or directory will result in that file or directory (and all files within) being passed over
     - You can include any amount of whitespace at the start or end of a line, it will not be interpreted
-    - Special characters don't need to be escaped
+    - Spaces and special characters don't need to be quoted or escaped
     - All other lines that don't match this or the control strings described below will be ignored.
 
 Control Strings:
     - Lines beginning with the following control strings have special meanings and can be declared multiple times: 
         - "*" - Pass over all files and directories whose full path begins with the string that follows
-        - "R" - Pass over all files and directories that match the following perl interpreted regex
+        - "R" - Pass over all files and directories that match the following Perl interpreted regex
         - "I" - Add the following file or directory to the list of files and directories to be checked (as if it was listed at the command line). Has no effect with "--diff"
         - "Include" - Interpret the contents of the following file as if it was listed at the command line as an include/ignore file
         - "BackupR" - If a file matches the regular expression that follows, and the appropriate flags are set, they will be backed up
-        - "Backup+" - A file with this full path will be backed up
+        - "Backup+" - In any instance where there are changes to the following file, it will be backed up
+        - "Time-" - Stat changes to this file will not be reported if the only change is to mtime or ctime
     - Lines beginning with the following control strings have special meanings, but only the last declaration will be interpreted:
-        - "BackupD" - This specifies the directory to backup files to
+        - "BackupD" - This specifies the directory to backup files to. The directory must already exist and be writable, or Stat Watch will error out
         - "BackupMD" - A number specified here will set the minumum number of days a backed up file should be kept
         - "BackupMC" - A number here will set the maximum number of copies of a file that should be backed up (after the minumum retention has been met)
-        - "Log" - Placing a full path to a file after this will tell stat_watch where to log
+        - "Log" - Placing a full path to a file after this will tell Stat Watch where to log
     - Control strings can have any amount of whitespace before or after them on the line. It will not be interpreted.
-    - Any line matching a directory will result in that directory and all files and subdirectories it contains being passed over
+    - For "*" or "R", any line matching a directory will result in that directory and all files and subdirectories it contains being passed over
 
 Other Rules:
     - Any line that doesn't match what's described above will be ignored
@@ -1003,8 +1079,8 @@ REGARDING BACKUPS
 
 When do backups occur?
     - For backups to occur, you must have an include/ignore file that contains lines with the control characters "BackupD" and "BackupR" or "Backup+"
-    - When stat_watch is run in "--backup" mode, all files matching the "BackupR" or "Backup+" lines will have their file type, permissions, user, group, size, and mtime checked against the most recent backup (if any). If any of these are different, the file will be backed up
-    - When stat_watch is run in "--diff" mode, any files with changes to their file type, permissions, user, group, size, mtime, or ctime will be backed up
+    - When Stat Watch is run in "--backup" mode, all files matching the "BackupR" or "Backup+" lines will have their file type, permissions, user, group, size, and mtime checked against the most recent backup (if any). If any of these are different, the file will be backed up
+    - When Stat Watch is run in "--diff" mode, any files with changes to their file type, permissions, user, group, size, mtime, or ctime will be backed up
     - Changing the "BackupR" or "Backup+" lines and then running "--diff" without running "--backup" WILL NOT cause matching files to be backed up (until "--diff" recognizes that a change has happened)
 
 When are backups pruned?
@@ -1085,6 +1161,8 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			} else {
 				print STDERR 'Argument "' . $v_arg . '" must be followed by "text" or "html"' . "\n";
 			}
+		} elsif ( $v_arg eq "--no-check-retention" ) {
+			$b_retention = 0;
 		} elsif ( $v_arg eq "--backup" ) {
 			$b_backup = 1;
 		} elsif ( -e $v_arg ) {
@@ -1135,6 +1213,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			$v_file = $v_arg;
 		}
 	}
+	$b_retention = 0;
 	if ( ! $d_backup || (! @v_backupr && ! @v_backup_plus) ) {
 		print STDERR "The include file must have \"BackupD\" and \"BackupR\" or \"Backup+\" command strings present\n";
 		exit 1;
@@ -1146,7 +1225,13 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	if ($b_close) {
 		close $fh_output;
 	}
+	fn_log("Checking to see if there are files that need to be backed up '" . $d_backup . "'\n");
 	fn_backup_initial($v_file);
+} elsif ( defined $args[0] && $args[0] eq "--prune" ) {
+	if ($d_backup) {
+		fn_log("Pruning old backups from directory '" . $d_backup . "'\n");
+		fn_prune_backups($d_backup);
+	}
 } elsif ( defined $args[0] && ($args[0] eq "--record" || substr($args[0],0,2) ne "--") ) {
 ### The part where we capture the stats of files
 	while ( defined $args[0] ) {
