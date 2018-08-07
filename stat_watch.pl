@@ -134,33 +134,21 @@ sub fn_diff {
 ### $_[0] is the first file, and $_[1] is the second file
 	my $f_diff1 = $_[0];
 	my $f_diff2 = $_[1];
-	### Weed out ignored lines, then do a diff
-	my @v_diff;
-	{
-		(my $fh_diff1_temp, my $f_diff1_temp) = tempfile();
-		fn_diff_check_lines( $f_diff1, $fh_diff1_temp );
-		(my $fh_diff2_temp, my $f_diff2_temp) = tempfile();
-		fn_diff_check_lines( $f_diff2, $fh_diff2_temp );
-		my $diff1_temp = $f_diff1_temp;
-		$diff1_temp =~ s/'/'\\''/;
-		my $diff2_temp = $f_diff2_temp;
-		$diff2_temp =~ s/'/'\\''/;
-		if ( $v_format eq "diff" ) {
-			print $fh_output `diff '$diff1_temp' '$diff2_temp' 2> /dev/null`;
-			return;
-		} else {
-			@v_diff = `diff '$diff1_temp' '$diff2_temp' 2> /dev/null`;
-		}
-	}
+	### Make the file names quote safe
+	my $diff1_temp = $f_diff1;
+	$diff1_temp =~ s/'/'\\''/;
+	my $diff2_temp = $f_diff2;
+	$diff2_temp =~ s/'/'\\''/;
+	my @v_diff = `diff '$diff1_temp' '$diff2_temp' 2> /dev/null`;
+	@v_diff = fn_diff_check_lines( undef, 2, undef, @v_diff );
 	### Separate out just the file names from the diff
 	my $ref_diff;
 	for my $_line (@v_diff) {
 		my $v_first = substr( $_line, 0, 1 );
-		my $v_file = substr((split(/'([^']+)$/, $_line))[0], 3);
 		if ( $v_first eq ">" || $v_first eq "<" ) {
+			my $v_file = substr((split(/'([^']+)$/, $_line))[0], 3);
 			chomp($_line);
 			my @v_line = split( m/ -- /, $_line );
-			$ref_diff->{$v_file}->{$v_first}->{'line'} = $_line;
 			$ref_diff->{$v_file}->{$v_first}->{'ctime'} = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'mtime'} = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'size'} = pop(@v_line);
@@ -232,7 +220,7 @@ sub fn_diff {
 			if ( $ref_diff->{$v_file}->{'<'}->{'size'} ne $ref_diff->{$v_file}->{'>'}->{'size'} ) {
 				push( @v_size, "'" . $v_file . "'" . $v_mention );
 				$v_mention = " (Also listed above)";
-				$details2 .= "     File Size:    " . $ref_diff->{$v_file}->{'<'}->{'size'} . "bytes -> " . $ref_diff->{$v_file}->{'>'}->{'size'} . "bytes\n";
+				$details2 .= "     File Size:    " . $ref_diff->{$v_file}->{'<'}->{'size'} . " bytes -> " . $ref_diff->{$v_file}->{'>'}->{'size'} . " bytes\n";
 				$html_details1 .= '<th>File Size</th>';
 				$html_details2 .= '<td>' . $ref_diff->{$v_file}->{'>'}->{'size'} . ' bytes</td>';
 				if ( $v_dir ne "d" && ! $b_list ) {
@@ -372,8 +360,8 @@ sub fn_diff {
 		$v_details2 .= "\n";
 		$v_html_details2 .= "<br>\n";
 	}
-	$v_details = $v_details2 . "SPECIFICS FOR EACH FILE:\n\n" . $v_details;
-	$v_html_details = $v_html_details2 . "<h2>Specifics for each File:</h2>\n" . $v_html_details;
+	$v_details = $v_details2 . "\nSPECIFICS FOR EACH FILE:\n\n" . $v_details;
+	$v_html_details = $v_html_details2 . "<br><h2>Specifics for each File:</h2>\n" . $v_html_details;
 	##### @v_files2 contains a list of everything new or changed in case I want to run a malware scan against them.
 	if ( $v_format eq "text" ) {
 		print $fh_output $v_details;
@@ -385,40 +373,72 @@ sub fn_diff {
 sub fn_diff_check_lines {
 ### Check lines in a stat_watch report to see if the file described matches the ignore lists. If not, output them to a file
 ### Prune timestamps from directories so they don't cause false positives
-### $_[0] is the file we're reading from and $_[1] is the file handle that we're printing to
-### If there is no $_[1] specified, an array of results will be returned instead
-	my $f_read = $_[0];
-	my $fh_write;
-	my @v_lines;
-	if ( $_[1] ) {
-		$fh_write = $_[1];
-	}
-	if ( open( my $fh_read, "<", $f_read ) ) {
-		my $v_processing;
-		while (<$fh_read>) {
-			my $_line = $_;
-			if ( $_line =~ m/^Processing:/ ) {
-				### Each time we see a processing line, we have to re-do the ignore strings to make sur ethat we're not ignoring something  we shouldn't
-				$v_processing = substr( (split( m/'/, $_line, 2 ))[1], 0, -2 );
-				fn_check_strings( $v_processing );
-			} else {
-				if ( ! $v_processing ) {
-					print STDERR "File \"$f_read\" does not appear to be a stat_watch file\n";
-					exit 1;
-				}
-				my $v_file = substr( (split(/'([^']+)$/, $_line))[0], 1 );
-				if ( fn_check_file($v_file) ) {
-					if ($fh_write) {
-						print $fh_write $_line;
-					} else {
-						push( @v_lines, $_line ) ;
+### $_[0] is the file handle (already open) that we're printing to; if $_[0] is undef, an array of results will be returned instead
+### $_[1] is the number of characters to ignore from the beginning of each line
+### $_[2] is 1 if we're reading from a file, and 0 if we're reading from an array
+### $_[3] is the filename or the array
+	my $fh_write = shift(@_);
+	my $v_prune = ( shift(@_) || 0 );
+	my $b_file = ( shift(@_) || 0 );
+	my @v_lines_out;
+	if ($b_file) {
+		my $f_read = shift(@_);
+		if ( open( my $fh_read, "<", $f_read ) ) {
+			my $v_processing;
+			while (<$fh_read>) {
+				my $v_line = substr($_, $v_prune);
+				my $v_start = substr($_, 0, $v_prune);
+				if ( $v_line =~ m/^Processing:/ ) {
+					### Each time we see a processing line, we have to re-do the ignore strings to make sure that we're not ignoring something we shouldn't
+					$v_processing = substr( (split( m/'/, $v_line, 2 ))[1], 0, -2 );
+					$v_processing =~ s/' - [0-9]+$//;
+					fn_check_strings( $v_processing );
+				} elsif ( substr( $v_line, 0, 2 ) eq "'/" ) {
+					if ( ! $v_processing ) {
+						print STDERR "File \"$f_read\" does not appear to be a stat_watch file\n";
+						exit 1;
+					}
+					my $v_file = substr( (split(/'([^']+)$/, $v_line))[0], 1 );
+					if ( fn_check_file($v_file) ) {
+						if ($fh_write) {
+							print $fh_write $v_start . $v_line;
+						} else {
+							push( @v_lines_out, $v_start . $v_line ) ;
+						}
 					}
 				}
 			}
 		}
+	} else {
+		my @v_lines_in = @_;
+		my $v_processing;
+		for my $_line (@v_lines_in) {
+			my $v_line = substr($_line, $v_prune);
+			my $v_start = substr($_line, 0, $v_prune);
+			if ( $v_line =~ m/^Processing:/ ) {
+				### Each time we see a processing line, we have to re-do the ignore strings to make sure that we're not ignoring something we shouldn't
+				$v_processing = substr( (split( m/'/, $v_line, 2 ))[1], 0, -2 );
+				$v_processing =~ s/' - [0-9]+$//;
+				fn_check_strings( $v_processing );
+			} elsif ( substr( $v_line, 0, 2 ) eq "'/" ) {
+				if ( ! $v_processing ) {
+					print STDERR "Input does not appear to be from a stat_watch file\n";
+					exit 1;
+				}
+				my $v_file = substr( (split(/'([^']+)$/, $v_line))[0], 1 );
+				if ( fn_check_file($v_file) ) {
+					if ($fh_write) {
+						print $fh_write $v_start . $v_line;
+					} else {
+						push( @v_lines_out, $v_start . $v_line ) ;
+					}
+				}
+			}
+		}
+
 	}
 	if ( ! $fh_write ) {
-		return @v_lines;
+		return @v_lines_out;
 	}
 }
 
@@ -430,7 +450,7 @@ sub fn_backup_initial {
 ### Given a stat_watch report, backup the files within that match the "BackupR" and "Backup+" command strings
 ### $_[0] is the report
 	my $v_file = $_[0];
-	my @v_lines = fn_diff_check_lines($v_file);
+	my @v_lines = fn_diff_check_lines(undef, undef, 1, $v_file);
 	for my $_line (@v_lines) {
 		my $v_file = substr( (split(/'([^']+)$/, $_line))[0], 1 );
 		chomp($v_file);
@@ -450,10 +470,11 @@ sub fn_check_retention {
 	@v_files = sort {$b cmp $a} @v_files;
 	my $v_count = $v_retention_max_copies + 1;
 	while ( defined $v_files[$v_count] ) {
+		my $v_file = $v_dir . "/" . $v_files[$v_count];
 		my $v_stamp = (split( m/_/, $v_files[$v_count] ))[-1];
 		if ( (time() - $v_stamp) > (86400 * $v_retention_min_days) ) {
-			fn_log('Removing backed-up file "' . $v_files[$v_count] . '"' . "\n");
-			unlink( $v_dir . "/" . $v_files[$v_count] );
+			fn_log("Removing backed-up file '" . $v_file . "'\n");
+			unlink( $v_file );
 		}
 		$v_count++;
 	}
@@ -472,7 +493,7 @@ sub fn_backup_file {
 		$b_check = $_[2];
 	}
 	my $b_continue;
-	if ( ! -f $v_file ) {
+	if ( ! -f $v_file && ! -l $v_file ) {
 		return;
 	}
 	for my $_string (@v_backup_plus) {
@@ -510,13 +531,9 @@ sub fn_backup_file {
 			}
 			$d_backup .= "/" . $v_name . "_" . time();
 			### When ever running a command with backticks, we need to make sure arguments we're passing to it are quote safe:
-			my $file_temp = $v_file;
-			$file_temp =~ s/'/'\\''/;
-			my $backup_temp = $d_backup;
-			$backup_temp =~ s/'/'\\''/;
-			`cp -a '$file_temp' '$backup_temp' 2> /dev/null`;
+			system( "cp", "-a", $v_file, $d_backup );
 			### Test if the files was successfully copied
-			if ( -f $d_backup ) {
+			if ( -f $d_backup || -l $d_backup ) {
 				if ($b_verbose) {
 					print STDERR "'" . $v_file . "' -> '" . $d_backup . "'\n";
 				}
@@ -566,8 +583,19 @@ sub fn_compare_backup {
 	if (@v_files) {
 		@v_files = sort {$a cmp $b} @v_files;
 		### Since I don't anticipate this needing to be human readable, there's no reason to use the stat binary
-		my $v_line1 = join( ' -- ', (stat($v_file))[2,4,5,7,9] );
-		my $v_line2 = join( ' -- ', (stat($v_files[0]))[2,4,5,7,9] );
+		my $v_line1;
+		my $v_line2;
+		my $v_file2 = $v_dir . "/" . $v_files[0];
+		if ( -l $v_file ) {
+			$v_line1 = join( ' -- ', (lstat($v_file))[2,4,5,7,9] );
+		} else {
+			$v_line1 = join( ' -- ', (stat($v_file))[2,4,5,7,9] );
+		}
+		if ( -l $v_file2 ) {
+			$v_line2 = join( ' -- ', (lstat($v_file2))[2,4,5,7,9] );
+		} else {
+			$v_line2 = join( ' -- ', (stat($v_file2))[2,4,5,7,9] );
+		}
 		if ( $v_line1 eq $v_line2 ) {
 			return 1;
 		}
@@ -576,7 +604,7 @@ sub fn_compare_backup {
 }
 
 sub fn_list_file {
-### Given a file anme, list the backups that are available for it
+### Given a file name, list the backups that are available for it
 ### $_[0] is the full path for the file
 	my $v_file = $_[0];
 	my @v_backup_dirs;
@@ -704,6 +732,8 @@ sub fn_get_ignore {
 				### Where to log actions
 					$_line =~ s/^Log\s*//;
 					$f_log = $_line;
+				} else {
+##### There are files that we want to be notified if the contents change, but they are regularly touched by a script, so timestamps don't matter. Let's find a way to accomidate this
 				}
 			}
 		}
@@ -919,7 +949,6 @@ USAGE
     - The "-i" or "--ignore" or "--include" flag can be used to specify an ignore/include file
     - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
     - The "-f" or "--format" flag allows you to choose a number of options for how the details should be output:
-        - "diff" causes the output to be in standard diff format
         - "text" separates out what has changed and how, and outputs in plain text format
         - "html" separates out what has changed and how, and outputs in html format
     - The "--backup" flag will result in files being backed up. "BackupD" and "BackupR" or "Backup+" lines must be set in the include file for this to be successful
@@ -933,9 +962,7 @@ USAGE
 
 ./stat_watch.pl --list [FILE]
     - This will list the available backups for a specific file
-    - The file must be given with its full path
-    - The "-i" or "--ignore" or "--include" flag can be used to specify an ignore/include file
-    - The include file must have a "BackupD" command string present
+    - It is not necessary to specify an includde file, stat_watch will check all directories that it has ever backed up to in hopes of giving the most comprehensive answer possible.
 
 ./stat_watch.pl --help
 ./stat_watch.pl -h
@@ -978,6 +1005,7 @@ When do backups occur?
     - For backups to occur, you must have an include/ignore file that contains lines with the control characters "BackupD" and "BackupR" or "Backup+"
     - When stat_watch is run in "--backup" mode, all files matching the "BackupR" or "Backup+" lines will have their file type, permissions, user, group, size, and mtime checked against the most recent backup (if any). If any of these are different, the file will be backed up
     - When stat_watch is run in "--diff" mode, any files with changes to their file type, permissions, user, group, size, mtime, or ctime will be backed up
+    - Changing the "BackupR" or "Backup+" lines and then running "--diff" without running "--backup" WILL NOT cause matching files to be backed up (until "--diff" recognizes that a change has happened)
 
 When are backups pruned?
     - Every time a file is backed up, the directory is checked afterward for other backups of the same file
@@ -1055,7 +1083,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			if ( defined $args[0] ) {
 				$v_format = shift( @args );
 			} else {
-				print STDERR 'Argument "' . $v_arg . '" must be followed by "diff", "text", or "html"' . "\n";
+				print STDERR 'Argument "' . $v_arg . '" must be followed by "text" or "html"' . "\n";
 			}
 		} elsif ( $v_arg eq "--backup" ) {
 			$b_backup = 1;
@@ -1074,7 +1102,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	if ( ! $d_backup || ! -d $d_backup || ! -w $d_backup || (! @v_backupr && ! @v_backup_plus) ) {
 		$b_backup = 0;
 	}
-	if ( $v_format ne "diff" && $v_format ne "text" && $v_format ne "html" ) {
+	if ( $v_format ne "text" && $v_format ne "html" ) {
 		$v_format = "text";
 	}
 	my $b_close = fn_sort_prep();
@@ -1142,9 +1170,12 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	my $b_close = fn_sort_prep();
 	### Process those directories
 	for my $_dir ( @v_dirs ) {
-		print $fh_output "Processing: '" . $_dir . "'\n";
+		print $fh_output "Processing: '" . $_dir . "' - " . time() . "\n";
 		fn_check_strings( $_dir );
-		fn_log("Running a report for directory '" . $_dir . "'\n");
+		if ( -d $_dir ) {
+			### Individual files can be listed as well, but there's no need to log the fact we're looking at those. Just directories will suffice
+			fn_log("Running a report for directory '" . $_dir . "'\n");
+		}
 		fn_stat_watch( $_dir );
 	}
 	fn_log("Finished all reports\n");
