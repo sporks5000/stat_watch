@@ -5,6 +5,7 @@ d_WORKING="stat_watch"
 ### Set a one in 20 chance of us pruning old backups
 v_PRUNE_MAX=20
 v_PRUNE_CHANCE=1
+v_MAX_RUN=3600
 
 ### Find out where we are and make sure that stat_watch.pl is here too
 v_PROGRAMDIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -39,6 +40,17 @@ USAGE
     - Outputs this text
 
 
+CONTROL STRINGS
+
+The help output for "$v_PROGRAMDIR/$f_PERL_SCRIPT" explains a number of control strings that can be used in Stat Watch ignore / include files. $v_PROGRAMNAME checks for a few additional control strings that help regulate how it functions. Read the $f_PERL_SCRIPT help text for full details on how control strings work.
+    - "Name" - This is used to designate the name of the job. Without this set, $v_PROGRAMNAME will not run
+    - "Email" - This is used to designate an email adress (or multiple space separated email addresses) for results to be sent to 
+    - "Expire" - When this is followed by a unix timestamp, the job will stop running after that timestamp is reached, and all associated files (except for the log file) will be deleted fifteen days later
+    - "Max-run" - If a job is started only to find an earlier iteration of itself running, and that earlier iteration has been running for more than this number of seconds, that job will be killed
+    - "Prune-max" - Pruning old backups will occur X out of every Y runs. "Prune-max" designates the "Y".
+    - "Prune-chance" - Pruning old backups will occur X out of every Y runs. "Prune-chance" designates the "X".
+
+
 OTHER DETAILS
 
 1) A list of jobs created by this script will be stored in the file "$v_PROGRAMDIR/.$d_WORKING/wrap_jobs_created".
@@ -51,9 +63,9 @@ FEEDBACK
 Report any errors, unexpected behaviors, comments, or feedback to acwilliams@liquidweb.com
 
 EOF
+#'" in
 exit
-fi
-#'" in 
+fi 
 
 ### Here's the part for if we're running a job
 if [[ "$1" == "--run" ]]; then
@@ -62,19 +74,52 @@ if [[ "$1" == "--run" ]]; then
 		echo "No such file"
 		exit
 	fi
-	v_NAME="$( egrep "^\s*Name" "$f_JOB_FILE" | sed "s/^[[:blank:]]*Name[[:blank:]]*//;s/[[:blank:]]*$//" )"
+	v_NAME="$( egrep "^\s*Name" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Name[[:blank:]]*//;s/[[:blank:]]*$//" )"
 	if [[ -z $v_NAME ]]; then
 		echo "Cannot find name in Job file. Exiting"
 		exit
 	fi
 	v_DIR="$( echo "$f_JOB_FILE" | rev | cut -d "/" -f2- | rev )"
-	v_EXPIRE="$( egrep "^\s*Expire" "$f_JOB_FILE" | sed "s/^[[:blank:]]*Expire[[:blank:]]*//;s/[[:blank:]]*$//" )"
+	v_EXPIRE="$( egrep "^\s*Expire" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Expire[[:blank:]]*//;s/[[:blank:]]*$//" )"
 	### Create a directory to stand as an indicator that a job is running
 	mkdir "$v_DIR"/"$v_NAME"_run 2> /dev/null || v_EXIT=true
 	if [[ $v_EXIT == true ]]; then
-		echo "An existing iteration of this job is already running"
-		exit
+		### This won't be 100% effective, but it should prevent most instances of this running twice at the same time
+		sleep 0.$(( RANDOM % 10 ))
+		v_PID="$( cat "$v_DIR"/"$v_NAME"_run/pid 2> /dev/null )"
+		if [[ -n $v_PID && $( cat /proc/$v_PID/cmdline 2> /dev/null | egrep -c "$v_PROGRAMDIR/$v_PROGRAMNAME" ) -gt 0 ]]; then
+			v_EPOCH="$( cat "$v_DIR"/"$v_NAME"_run/epoch 2> /dev/null )"
+			### heck to see if the job has run for too long
+			v_MAX_RUN2="$( egrep "^\s*Max-run" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Max-run[[:blank:]]*//;s/[[:blank:]]*$//" )"
+			if [[ -n $v_MAX_RUN2 && $( echo "$v_MAX_RUN" | egrep -c "^[0-9]+$" ) -gt 0 ]]; then
+				v_MAX_RUN="$v_MAX_RUN2"
+			fi
+			### Are there reasons to kill the job?
+			v_KILL=false
+			if [[ -z $v_EPOCH ]]; then
+				v_KILL=true
+			elif [[ $( echo "$v_EPOCH" | egrep -c "^[0-9]+$" ) -lt 1 ]]; then
+				v_KILL=true
+			elif [[ $(( $( date +%s ) - $v_EPOCH )) -gt $v_MAX_RUN ]]; then
+				v_KILL=true
+			fi
+			### If so, let's kill it
+			if [[ $v_KILL == true ]]; then
+				kill -9 $v_PID
+				if [[ -n $v_EPOCH || $( echo "$v_EPOCH" | egrep -c "^[0-9]+$" ) -gt 0 ]]; then
+					echo "$( date +%Y-%m-%d" "%T" "%z ) - Job killed after running for $(( $( date +%s ) - $v_EPOCH )) seconds" >> "$v_DIR"/"$v_NAME".log
+				fi
+				rm -rf "$v_DIR"/"$v_NAME"_run
+				echo "Previous job ran too long. Exiting"
+				exit
+			else
+				echo "An existing iteration of this job is already running"
+				exit
+			fi
+		fi
 	fi
+	echo "$$" > "$v_DIR"/"$v_NAME"_run/pid
+	echo "$( date +%s )" > "$v_DIR"/"$v_NAME"_run/epoch
 	if [[ -n $v_EXPIRE && $( echo "$v_EXPIRE" | egrep -c "^[0-9]+$" ) -gt 0 ]]; then
 	### If the job was set to expire, see if we still need to run it
 		if [[ $( date +%s ) -gt $v_EXPIRE ]]; then
@@ -85,7 +130,7 @@ if [[ "$1" == "--run" ]]; then
 				rm -rf "$v_DIR"/backup_"$v_NAME"
 				rm -f "$f_JOB_FILE"
 			fi
-			rmdir "$v_DIR"/"$v_NAME"_run
+			rm -rf "$v_DIR"/"$v_NAME"_run
 			exit
 		fi
 	fi
@@ -110,7 +155,7 @@ if [[ "$1" == "--run" ]]; then
 			rm -f "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt
 		else
 		### If there were changes, check if we have an email address and then send a message to it
-			v_EMAIL="$( egrep "^\s*Email" "$f_JOB_FILE" | sed "s/^[[:blank:]]*Email[[:blank:]]*//;s/[[:blank:]]*$//" )"
+			v_EMAIL="$( egrep "^\s*Email" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Email[[:blank:]]*//;s/[[:blank:]]*$//" )"
 			if [[ -n $v_EMAIL ]]; then
 				( 
 					if [[ -f "$v_DIR"/"$v_NAME"_mesasage.txt ]]; then 
@@ -123,12 +168,23 @@ if [[ "$1" == "--run" ]]; then
 				) | mail -s "Stat Watch - File changes on $(hostname)" $v_EMAIL
 			fi
 		fi
-		if [[ $(( $v_PRUNE_CHANCE + RANDOM % $v_PRUNE_MAX )) -le $v_PRUNE_CHANCE ]]; then
+
+		### Check to see if the user set the prune variables to soemthing different
+		v_PRUNE_MAX2="$( egrep "^\s*Prune-max" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Prune-max[[:blank:]]*//;s/[[:blank:]]*$//" )"
+		if [[ -n $v_PRUNE_MAX2 && $( echo "$v_PRUNE_MAX2" | egrep -c "^[0-9]+$" ) -gt 0 ]]; then
+			v_PRUNE_MAX="$v_PRUNE_MAX2"
+		fi
+		v_PRUNE_CHANCE2="$( egrep "^\s*Prune-chance" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Prune-chance[[:blank:]]*//;s/[[:blank:]]*$//" )"
+		if [[ -n $v_PRUNE_CHANCE2 && $( echo "$v_PRUNE_CHANCE2" | egrep -c "^[0-9]+$" ) -gt 0 ]]; then
+			v_PRUNE_CHANCE="$v_PRUNE_CHANCE2"
+		fi
+
 		### Determine whether or not we're purning old backups
+		if [[ $(( $v_PRUNE_CHANCE + RANDOM % $v_PRUNE_MAX )) -le $v_PRUNE_CHANCE ]]; then
 			"$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --prune -i "$f_JOB_FILE"
 		fi
 	fi
-	rmdir "$v_DIR"/"$v_NAME"_run
+	rm -rf "$v_DIR"/"$v_NAME"_run
 	exit
 fi
 

@@ -42,6 +42,7 @@ my $b_retention = 1;
 
 ### Other
 my @v_time_minus;
+my $b_diff_ctime = 1;
 
 #===================#
 #== Report Output ==#
@@ -286,9 +287,10 @@ sub fn_diff {
 					$b_list = 1;
 				}
 			}
-			if ( $ref_diff->{$v_file}->{'<'}->{'ctime'} ne $ref_diff->{$v_file}->{'>'}->{'ctime'} ) {
+			if ( $b_diff_ctime && $ref_diff->{$v_file}->{'<'}->{'ctime'} ne $ref_diff->{$v_file}->{'>'}->{'ctime'} ) {
 				if (! $b_stamps) {
 					push( @v_stamps, "'" . $v_file . "'" . $v_mention );
+					$v_mention = " (Also listed above)";
 				}
 				$details .= "     C-time:       " . $ref_diff->{$v_file}->{'<'}->{'ctime'} . " -> " . $ref_diff->{$v_file}->{'>'}->{'ctime'} . "\n";
 				$html_details3 .= '<th>C-time</th>';
@@ -297,6 +299,9 @@ sub fn_diff {
 					push( @v_files2, $v_file );
 					$b_list = 1;
 				}
+			}
+			if ( ! $v_mention ) {
+				next DIFF_FILE;
 			}
 			if ( $v_dir ne "d" && $b_backup ) {
 				my $b_backup_success = fn_backup_file($v_file, $d_backup);
@@ -1020,6 +1025,7 @@ USAGE
         - "html" separates out what has changed and how, and outputs in html format
     - The "--backup" flag will result in files being backed up. "BackupD" and "BackupR" or "Backup+" lines must be set in the include file for this to be successful
     - The "--no-check-retention" flag mean that when creating backups, existing files will not be checked for retention. This is optimal if you're regularly running this script with the "--prune" flag
+    - The "--no-ctime" flag tells the script to ignore differences in ctime. This is useful if you're comparing against a restored backup.
 
 ./stat_watch.pl --backup [FILE]
     - Create backups of files specified using a Stat Watch report file and the settings within an ignore/include file
@@ -1163,6 +1169,8 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			}
 		} elsif ( $v_arg eq "--no-check-retention" ) {
 			$b_retention = 0;
+		} elsif ( $v_arg eq "--no--ctime" ) {
+			$b_diff_ctime = 0;
 		} elsif ( $v_arg eq "--backup" ) {
 			$b_backup = 1;
 		} elsif ( -e $v_arg ) {
