@@ -43,6 +43,8 @@ my $b_retention = 1;
 ### Other
 my @v_time_minus;
 my $b_diff_ctime = 1;
+my $b_ignore_on_record;
+my @v_includes;
 
 #===================#
 #== Report Output ==#
@@ -107,7 +109,7 @@ sub fn_stat_watch {
 				} elsif ( $_file ne "." && $_file ne ".." ) {
 					$_file = $v_dir . "/" . $_file;
 					### Make sure that the file doesn't match any of the ignore lists
-					if ( ! fn_check_file($_file) ) {
+					if ( $b_ignore_on_record && ! fn_check_file($_file) ) {
 						next;
 					}
 					### Capture it if it's a directory
@@ -124,6 +126,10 @@ sub fn_stat_watch {
 			}
 			for my $_dir (@dirs) {
 			### For each of the directories we found, go through RECURSIVELY!
+				### Make sure that the file doesn't match any of the ignore lists
+				if ( ! fn_check_file($_dir) ) {
+					next;
+				}
 				fn_stat_watch($_dir);
 			}
 		}
@@ -153,6 +159,7 @@ sub fn_diff {
 		if ( $v_first eq ">" || $v_first eq "<" ) {
 			my $v_file = substr((split(/'([^']+)$/, $_line))[0], 3);
 			chomp($_line);
+			$ref_diff->{$v_file}->{$v_first}->{'line'} = $_line;
 			my @v_line = split( m/ -- /, $_line );
 			$ref_diff->{$v_file}->{$v_first}->{'ctime'} = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'mtime'} = pop(@v_line);
@@ -180,6 +187,7 @@ sub fn_diff {
 	my @v_removed;
 	my $v_details = '';
 	my $v_html_details = '';
+	my $v_diff_details = '';
 	my @v_files = sort {$a cmp $b} keys(%{ $ref_diff });
 	my @v_files2;
 	DIFF_FILE: for my $v_file (@v_files) {
@@ -189,6 +197,7 @@ sub fn_diff {
 			### This file is new
 			my $v_dir = substr( $ref_diff->{$v_file}->{'>'}->{'perms'}, 0, 1 );
 			push( @v_new, "'" . $v_file . "'" );
+			$v_diff_details .= $ref_diff->{$v_file}->{'>'}->{'line'} . "\n";
 			$details .= "     Status:       New\n     M-time:       " . $ref_diff->{$v_file}->{'>'}->{'mtime'} . "\n     C-time:       " . $ref_diff->{$v_file}->{'>'}->{'ctime'} . "\n     File Size:    " . $ref_diff->{$v_file}->{'>'}->{'size'} . " bytes\n     Permissions:  " . $ref_diff->{$v_file}->{'>'}->{'perms'} . "\n     Owner:        " . $ref_diff->{$v_file}->{'>'}->{'owner'} . "\n     Group:        " . $ref_diff->{$v_file}->{'>'}->{'group'} . "\n";
 			my $html_details1 = '<tr><th>Status</th><th>M-time</th><th>C-time</th><th>File Size</th><th>Permissions</th><th>Owner</th><th>Group</th></tr>' . "\n";
 			my $html_details2 = '<tr><td>New</td><td>' . $ref_diff->{$v_file}->{'>'}->{'mtime'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'ctime'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'size'}. ' bytes</td><td>' . $ref_diff->{$v_file}->{'>'}->{'perms'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'owner'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'group'} . '</td></tr>' . "\n";
@@ -207,6 +216,7 @@ sub fn_diff {
 		} elsif ( ! exists $ref_diff->{$v_file}->{'>'} ) {
 			### This file was removed
 			push( @v_removed, "'" . $v_file . "'" );
+			$v_diff_details .= $ref_diff->{$v_file}->{'<'}->{'line'} . "\n";
 			$details .= "     Status:       Removed\n";
 			$html_details .= '<tr><th>Status</th></tr>' . "\n";
 			$html_details .= '<tr><td>Removed</td></tr>' . "\n";
@@ -311,6 +321,7 @@ sub fn_diff {
 					$html_details2 .= '<td>True</td>';
 				}
 			}
+			$v_diff_details .= $ref_diff->{$v_file}->{'<'}->{'line'} . "\n" . $ref_diff->{$v_file}->{'>'}->{'line'} . "\n";
 			$details .= $details2;
 			$html_details .= '<tr>' . $html_details3 . $html_details1 . "</tr>\n<tr>" . $html_details4 . $html_details2 . "</tr>\n";
 		}
@@ -384,6 +395,8 @@ sub fn_diff {
 	##### @v_files2 contains a list of everything new or changed in case I want to run a malware scan against them.
 	if ( $v_format eq "text" ) {
 		print $fh_output $v_details;
+	} elsif ( $v_format eq "diff" ) {
+		print $fh_output $v_diff_details;
 	} else {
 		print $fh_output $v_html_details;
 	}
@@ -732,6 +745,14 @@ sub fn_get_ignore {
 	if ( ! -r $f_ignore ) {
 		print STDERR "Cannot read file \"" . $f_ignore . "\"\n";
 	}
+	### Make sure we don't read a file twice
+	for my $_include (@v_includes) {
+		if ( $f_ignore eq $_include ) {
+			return;
+		}
+	}
+	push( @v_includes, $f_ignore );
+	### Read the include file
 	if ( open( my $fh_read, "<", $f_ignore ) ) {
 		while (<$fh_read>) {
 			my $_line = $_;
@@ -919,6 +940,16 @@ sub fn_uniq {
 	return @v_array2;
 }
 
+sub fn_report_unknown {
+### Given an array of arguments that didn't match known arguments, report those arguments as unknown
+	print STDERR "The following arguments were not recognized:\n";
+	for my $_arg (@_) {
+		print "  '" . $_arg . "'\n";
+	}
+	print "\n";
+	sleep( 2 );
+}
+
 sub fold_print {
 ### Given a message to print to the terminal, line-break that message at word breaks
 ### $_[0] is the message; $_[1] is the number of columns to use if columns can't be determined.
@@ -1010,19 +1041,23 @@ stat_watch.pl - a script for finding and reporting changes in files and director
 USAGE
 
 ./stat_watch.pl --record [DIRECTORY] ([DIRECTORY 2] ...)
-    - outputs stat data for all of the files under the directory specified (you probably want to redirect this output to a file)
+    - Outputs stat data for all of the files under the directory specified (you probably want to use the "-o" flag or redirect output to a file)
     - The "-v" or "--verbose" flag can be used to have the directories output to STDERR
     - The "-i" or "--ignore" or "--include" flag can be used to specify an ignore/include file
     - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
     - This is the default functionality. Technically the "--record" flag is not necessary
+    - The "--ignore-on-record" flag will result in individual files being checked against ignore rules
+        - Otherwise only directories are checked against this rules, and weeding out things to be ignored only occurrs during "--diff"
+        - Use of this flag results in larger file sizes for Stat Watch reports, but generally reduces processing time overall
 
 ./stat_watch.pl --diff [FILE 1] [FILE 2]
-    - Show a diff of the two files
+    - Compare two Stat Watch report files, weed out files that match ignore rules, output information on what has changed
     - The "-i" or "--ignore" or "--include" flag can be used to specify an ignore/include file
     - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
     - The "-f" or "--format" flag allows you to choose a number of options for how the details should be output:
         - "text" separates out what has changed and how, and outputs in plain text format
         - "html" separates out what has changed and how, and outputs in html format
+        - "diff" outputs the lines that were different with "<" and ">" characters to indicate which file they came from. 
     - The "--backup" flag will result in files being backed up. "BackupD" and "BackupR" or "Backup+" lines must be set in the include file for this to be successful
     - The "--no-check-retention" flag mean that when creating backups, existing files will not be checked for retention. This is optimal if you're regularly running this script with the "--prune" flag
     - The "--no-ctime" flag tells the script to ignore differences in ctime. This is useful if you're comparing against a restored backup.
@@ -1073,6 +1108,7 @@ Control Strings:
         - "BackupMC" - A number here will set the maximum number of copies of a file that should be backed up (after the minumum retention has been met)
         - "Log" - Placing a full path to a file after this will tell Stat Watch where to log
     - Control strings can have any amount of whitespace before or after them on the line. It will not be interpreted.
+    - When a file is included via "Include", the entirety of that file will be interpreted before the going on to interpret the next line
     - For "*" or "R", any line matching a directory will result in that directory and all files and subdirectories it contains being passed over
 
 Other Rules:
@@ -1154,6 +1190,7 @@ while ( defined $ARGV[0] ) {
 }
 
 ### Process the commandline arguments
+my @v_unknown;
 if ( defined $args[0] && $args[0] eq "--diff" ) {
 ### The part where we diff output files
 	shift( @args );
@@ -1169,7 +1206,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			}
 		} elsif ( $v_arg eq "--no-check-retention" ) {
 			$b_retention = 0;
-		} elsif ( $v_arg eq "--no--ctime" ) {
+		} elsif ( $v_arg eq "--no-ctime" ) {
 			$b_diff_ctime = 0;
 		} elsif ( $v_arg eq "--backup" ) {
 			$b_backup = 1;
@@ -1179,7 +1216,12 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			} else {
 				$v_file2 = $v_arg;
 			}
+		} else {
+			push ( @v_unknown, $v_arg );
 		}
+	}
+	if (@v_unknown) {
+		fn_report_unknown(@v_unknown);
 	}
 	if ( ! defined $v_file1 || ! defined $v_file2 || ! -r $v_file1 || ! -r $v_file2 ) {
 		print STDERR "With \"--diff\", must specify two files\n";
@@ -1204,7 +1246,12 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		my $v_arg = shift( @args );
 		if ( substr( $v_arg, 0, 1 ) eq "/" ) {
 			$v_file = $v_arg;
+		} else {
+			push ( @v_unknown, $v_arg );
 		}
+	}
+	if (@v_unknown) {
+		fn_report_unknown(@v_unknown);
 	}
 	if ( ! $v_file ) {
 		print STDERR "A file must be given to look for\n";
@@ -1219,7 +1266,12 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		my $v_arg = shift( @args );
 		if ( -e $v_arg ) {
 			$v_file = $v_arg;
+		} else {
+			push ( @v_unknown, $v_arg );
 		}
+	}
+	if (@v_unknown) {
+		fn_report_unknown(@v_unknown);
 	}
 	$b_retention = 0;
 	if ( ! $d_backup || (! @v_backupr && ! @v_backup_plus) ) {
@@ -1236,6 +1288,12 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	fn_log("Checking to see if there are files that need to be backed up '" . $d_backup . "'\n");
 	fn_backup_initial($v_file);
 } elsif ( defined $args[0] && $args[0] eq "--prune" ) {
+	while ( defined $args[0] ) {
+		push ( @v_unknown, shift( @args ) );
+	}
+	if (@v_unknown) {
+		fn_report_unknown(@v_unknown);
+	}
 	if ($d_backup) {
 		fn_log("Pruning old backups from directory '" . $d_backup . "'\n");
 		fn_prune_backups($d_backup);
@@ -1244,9 +1302,17 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 ### The part where we capture the stats of files
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
-		if ( -e $v_arg ) {
+		if ( $v_arg eq "--ignore-on-record" ) {
+			$b_ignore_on_record = 1;
+		} elsif ( -e $v_arg ) {
 			push( @v_dirs, $v_arg );
+		} elsif ( $v_arg eq "--record" ) {
+		} else {
+			push ( @v_unknown, $v_arg );
 		}
+	}
+	if (@v_unknown) {
+		fn_report_unknown(@v_unknown);
 	}
 	if ( ! @v_dirs ) {
 		print STDERR "No directories selected. See \"--help\" for usage\n";

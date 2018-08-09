@@ -2,8 +2,8 @@
 
 f_PERL_SCRIPT="stat_watch.pl"
 d_WORKING="stat_watch"
-### Set a one in 20 chance of us pruning old backups
-v_PRUNE_MAX=20
+### Set a one in 10 chance of us pruning old backups
+v_PRUNE_MAX=10
 v_PRUNE_CHANCE=1
 v_MAX_RUN=3600
 
@@ -35,6 +35,9 @@ USAGE
     - Runs the necessary commands to complete a Stat Watch job, including checking the stats of files, determining th edifferences, and backing up files when necessary
     - FILE is the .job file created by $v_PROGRAMNAME
 
+./$v_PROGRAMNAME --email-test [EMAIL ADDRESS]
+    - Sends a test message to the email address specified so that the end recipient can see an example
+
 ./$v_PROGRAMNAME --help
 ./$v_PROGRAMNAME -h
     - Outputs this text
@@ -49,6 +52,7 @@ The help output for "$v_PROGRAMDIR/$f_PERL_SCRIPT" explains a number of control 
     - "Max-run" - If a job is started only to find an earlier iteration of itself running, and that earlier iteration has been running for more than this number of seconds, that job will be killed
     - "Prune-max" - Pruning old backups will occur X out of every Y runs. "Prune-max" designates the "Y".
     - "Prune-chance" - Pruning old backups will occur X out of every Y runs. "Prune-chance" designates the "X".
+    - "Email-no-changes" - If this command keyword is present, send emails even if there are no changes.
 
 
 OTHER DETAILS
@@ -65,40 +69,38 @@ Report any errors, unexpected behaviors, comments, or feedback to acwilliams@liq
 EOF
 #'" in
 exit
-fi 
-
+elif [[ "$1" == "--run" ]]; then
 ### Here's the part for if we're running a job
-if [[ "$1" == "--run" ]]; then
 	f_JOB_FILE="$2"
 	if [[ ! -f "$f_JOB_FILE" ]]; then
 		echo "No such file"
 		exit
 	fi
-	v_NAME="$( egrep "^\s*Name" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Name[[:blank:]]*//;s/[[:blank:]]*$//" )"
+	v_NAME="$( grep -E "^\s*Name" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Name[[:blank:]]*//;s/[[:blank:]]*$//" )"
 	if [[ -z $v_NAME ]]; then
 		echo "Cannot find name in Job file. Exiting"
 		exit
 	fi
 	v_DIR="$( echo "$f_JOB_FILE" | rev | cut -d "/" -f2- | rev )"
-	v_EXPIRE="$( egrep "^\s*Expire" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Expire[[:blank:]]*//;s/[[:blank:]]*$//" )"
+	v_EXPIRE="$( grep -E "^\s*Expire" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Expire[[:blank:]]*//;s/[[:blank:]]*$//" )"
 	### Create a directory to stand as an indicator that a job is running
 	mkdir "$v_DIR"/"$v_NAME"_run 2> /dev/null || v_EXIT=true
 	if [[ $v_EXIT == true ]]; then
 		### This won't be 100% effective, but it should prevent most instances of this running twice at the same time
 		sleep 0.$(( RANDOM % 10 ))
 		v_PID="$( cat "$v_DIR"/"$v_NAME"_run/pid 2> /dev/null )"
-		if [[ -n $v_PID && $( cat /proc/$v_PID/cmdline 2> /dev/null | egrep -c "$v_PROGRAMDIR/$v_PROGRAMNAME" ) -gt 0 ]]; then
+		if [[ -n $v_PID && $( cat /proc/$v_PID/cmdline 2> /dev/null | grep -F -c "$v_PROGRAMDIR/$v_PROGRAMNAME" ) -gt 0 ]]; then
 			v_EPOCH="$( cat "$v_DIR"/"$v_NAME"_run/epoch 2> /dev/null )"
 			### heck to see if the job has run for too long
-			v_MAX_RUN2="$( egrep "^\s*Max-run" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Max-run[[:blank:]]*//;s/[[:blank:]]*$//" )"
-			if [[ -n $v_MAX_RUN2 && $( echo "$v_MAX_RUN" | egrep -c "^[0-9]+$" ) -gt 0 ]]; then
+			v_MAX_RUN2="$( grep -E "^\s*Max-run" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Max-run[[:blank:]]*//;s/[[:blank:]]*$//" )"
+			if [[ -n $v_MAX_RUN2 && $( echo "$v_MAX_RUN" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
 				v_MAX_RUN="$v_MAX_RUN2"
 			fi
 			### Are there reasons to kill the job?
 			v_KILL=false
 			if [[ -z $v_EPOCH ]]; then
 				v_KILL=true
-			elif [[ $( echo "$v_EPOCH" | egrep -c "^[0-9]+$" ) -lt 1 ]]; then
+			elif [[ $( echo "$v_EPOCH" | grep -E -c "^[0-9]+$" ) -lt 1 ]]; then
 				v_KILL=true
 			elif [[ $(( $( date +%s ) - $v_EPOCH )) -gt $v_MAX_RUN ]]; then
 				v_KILL=true
@@ -106,7 +108,7 @@ if [[ "$1" == "--run" ]]; then
 			### If so, let's kill it
 			if [[ $v_KILL == true ]]; then
 				kill -9 $v_PID
-				if [[ -n $v_EPOCH || $( echo "$v_EPOCH" | egrep -c "^[0-9]+$" ) -gt 0 ]]; then
+				if [[ -n $v_EPOCH || $( echo "$v_EPOCH" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
 					echo "$( date +%Y-%m-%d" "%T" "%z ) - Job killed after running for $(( $( date +%s ) - $v_EPOCH )) seconds" >> "$v_DIR"/"$v_NAME".log
 				fi
 				rm -rf "$v_DIR"/"$v_NAME"_run
@@ -120,7 +122,7 @@ if [[ "$1" == "--run" ]]; then
 	fi
 	echo "$$" > "$v_DIR"/"$v_NAME"_run/pid
 	echo "$( date +%s )" > "$v_DIR"/"$v_NAME"_run/epoch
-	if [[ -n $v_EXPIRE && $( echo "$v_EXPIRE" | egrep -c "^[0-9]+$" ) -gt 0 ]]; then
+	if [[ -n $v_EXPIRE && $( echo "$v_EXPIRE" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
 	### If the job was set to expire, see if we still need to run it
 		if [[ $( date +%s ) -gt $v_EXPIRE ]]; then
 			if [[ $( date --date="now - 15 days" +%s ) -gt $v_EXPIRE ]]; then
@@ -152,10 +154,26 @@ if [[ "$1" == "--run" ]]; then
 		"$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --diff --no-check-retention -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> /dev/null
 		mv -f "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_files.txt
 		if [[ $( wc -l "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt | cut -d " " -f1 ) -lt 2 ]]; then
-			rm -f "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt
+			v_NO_CHANGE="$( grep -E -c "^\s*Email-no-changes\s*$" "$f_JOB_FILE" )"
+			if [[ $v_NO_CHANGE -gt 1 ]]; then
+				v_EMAIL="$( grep -E "^\s*Email" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Email[[:blank:]]*//;s/[[:blank:]]*$//" )"
+				if [[ -n $v_EMAIL ]]; then
+					( 
+						if [[ -f "$v_DIR"/"$v_NAME"_mesasage.txt ]]; then 
+							cat "$v_DIR"/"$v_NAME"_mesasage.txt; 
+							echo; 
+						fi
+						echo "No changes were detected."
+						echo
+						echo "This output was generated by \"$v_PROGRAMDIR/$f_PERL_SCRIPT\" and \"$v_PROGRAMDIR/$v_PROGRAMNAME\" from the job file at \"$f_JOB_FILE\'"
+					) | mail -s "Stat Watch - No changed detected on $(hostname)" $v_EMAIL
+				fi
+			else
+				rm -f "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt
+			fi
 		else
 		### If there were changes, check if we have an email address and then send a message to it
-			v_EMAIL="$( egrep "^\s*Email" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Email[[:blank:]]*//;s/[[:blank:]]*$//" )"
+			v_EMAIL="$( grep -E "^\s*Email" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Email[[:blank:]]*//;s/[[:blank:]]*$//" )"
 			if [[ -n $v_EMAIL ]]; then
 				( 
 					if [[ -f "$v_DIR"/"$v_NAME"_mesasage.txt ]]; then 
@@ -170,12 +188,12 @@ if [[ "$1" == "--run" ]]; then
 		fi
 
 		### Check to see if the user set the prune variables to soemthing different
-		v_PRUNE_MAX2="$( egrep "^\s*Prune-max" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Prune-max[[:blank:]]*//;s/[[:blank:]]*$//" )"
-		if [[ -n $v_PRUNE_MAX2 && $( echo "$v_PRUNE_MAX2" | egrep -c "^[0-9]+$" ) -gt 0 ]]; then
+		v_PRUNE_MAX2="$( grep -E "^\s*Prune-max" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Prune-max[[:blank:]]*//;s/[[:blank:]]*$//" )"
+		if [[ -n $v_PRUNE_MAX2 && $( echo "$v_PRUNE_MAX2" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
 			v_PRUNE_MAX="$v_PRUNE_MAX2"
 		fi
-		v_PRUNE_CHANCE2="$( egrep "^\s*Prune-chance" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Prune-chance[[:blank:]]*//;s/[[:blank:]]*$//" )"
-		if [[ -n $v_PRUNE_CHANCE2 && $( echo "$v_PRUNE_CHANCE2" | egrep -c "^[0-9]+$" ) -gt 0 ]]; then
+		v_PRUNE_CHANCE2="$( grep -E "^\s*Prune-chance" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Prune-chance[[:blank:]]*//;s/[[:blank:]]*$//" )"
+		if [[ -n $v_PRUNE_CHANCE2 && $( echo "$v_PRUNE_CHANCE2" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
 			v_PRUNE_CHANCE="$v_PRUNE_CHANCE2"
 		fi
 
@@ -186,19 +204,32 @@ if [[ "$1" == "--run" ]]; then
 	fi
 	rm -rf "$v_DIR"/"$v_NAME"_run
 	exit
+elif [[ "$1" == "--email-test" ]]; then
+	if [[ -z $2 ]]; then
+		echo "Please provide an email address to test sending messages to"
+		exit
+	fi
+	v_EMAIL="$2"
+	(  
+		echo "This is a test message to confirm that mesages from server $(hostname) are reaching the address \"$v_EMAIL\"."
+		echo
+		echo "If you were not expecting this message, please ignore it as it was likely sent in error."
+	) | mail -s "Stat Watch - File changes on $(hostname)" $v_EMAIL
+	echo "Test message sent to \"$v_EMAIL\""
+	exit
 fi
 
 ### Prompt for basic details about the job that we're going to create
 read -ep "What is the name of the account that you're creating a stat_watch job for? " v_ACCOUNT
-if [[ $( egrep "^""$v_ACCOUNT"":" -c /etc/passwd ) -lt 1 ]]; then
+if [[ $( grep -E "^""$v_ACCOUNT"":" -c /etc/passwd ) -lt 1 ]]; then
 	echo "Account \"$v_ACCOUNT\" Does not exist"
 	exit
 else
-	v_HOMEDIR="$( egrep "^""$v_ACCOUNT"":" /etc/passwd | cut -d ":" -f6 )"
+	v_HOMEDIR="$( grep -E "^""$v_ACCOUNT"":" /etc/passwd | cut -d ":" -f6 )"
 fi
 if [[ -d "$v_HOMEDIR""/public_html" ]]; then
 	read -ep "Monitor directory \"$v_HOMEDIR""/public_html\" (y/N)? " v_YN
-	if [[ $( echo "$v_YN" | egrep -c "^[yY]" ) -gt 0 ]]; then
+	if [[ $( echo "$v_YN" | grep -E -c "^[yY]" ) -gt 0 ]]; then
 		v_MONITOR="$v_HOMEDIR""/public_html"
 	fi
 fi
@@ -237,7 +268,7 @@ fi
 
 ### Prompt if the job should stop running after 45 days
 read -ep "Do you want this job to stop running after 45 days, and for all backed up files to be removed after 60 days (Y/n)? " v_YN
-if [[ $( echo "$v_YN" | egrep -c "^[nN]" ) -eq 0 ]]; then
+if [[ $( echo "$v_YN" | grep -E -c "^[nN]" ) -eq 0 ]]; then
 	v_EXPIRE=true
 fi
 
@@ -246,7 +277,7 @@ read -ep "What email address should reports be sent to (leave blank for none)? "
 if [[ -n $v_EMAIL ]]; then
 	echo -e "\e[91m"
 	echo "If $v_EMAIL is a customer-facing address, MAKE SURE that appropriate expectations have been set for how these emails will be followed up on."
-	echo "Here is an example of setting such expectations: " ##### I need to actually create this
+	echo "Here is an example of setting such expectations: https://raw.githubusercontent.com/sporks5000/stat_watch/master/texts/expectations.txt"
 	echo
 	echo "Note: If you create a file at \"$v_DIR/$v_NAME""_message.txt, the contents of that file will be sent at the top of each email message. It might be wise to set expectations there as well"
 	echo -e "\e[0m"
@@ -284,7 +315,7 @@ echo "$( date +%Y-%m-%d" "%T" "%z ) - Job \"$f_JOB_FILE\" created by $v_PROGRAMN
 ### Create a working directory and a file to document jobs created
 mkdir -p $v_PROGRAMDIR/."$d_WORKING"
 f_TEMP=$( mktemp )
-egrep -v "^$f_JOB_FILE - Created " "$v_PROGRAMDIR"/."$d_WORKING"/wrap_jobs_created > "$f_TEMP" 2> /dev/null
+grep -E -v "^$f_JOB_FILE - Created " "$v_PROGRAMDIR"/."$d_WORKING"/wrap_jobs_created > "$f_TEMP" 2> /dev/null
 echo "$f_JOB_FILE - Created $( date +%Y-%m-%d" "%T" "%z )" >> "$f_TEMP"
 mv -f "$f_TEMP" "$v_PROGRAMDIR"/."$d_WORKING"/wrap_jobs_created
 
