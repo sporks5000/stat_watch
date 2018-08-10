@@ -45,6 +45,7 @@ my @v_time_minus;
 my $b_diff_ctime = 1;
 my $b_ignore_on_record;
 my @v_includes;
+my $b_partial_seconds = 1;
 
 #===================#
 #== Report Output ==#
@@ -161,12 +162,18 @@ sub fn_diff {
 			chomp($_line);
 			$ref_diff->{$v_file}->{$v_first}->{'line'} = $_line;
 			my @v_line = split( m/ -- /, $_line );
-			$ref_diff->{$v_file}->{$v_first}->{'ctime'} = pop(@v_line);
-			$ref_diff->{$v_file}->{$v_first}->{'mtime'} = pop(@v_line);
+			my $v_ctime = pop(@v_line);
+			my $v_mtime = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'size'} = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'group'} = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'owner'} = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'perms'} = pop(@v_line);
+			if (! $b_partial_seconds) {
+				$v_ctime =~ s/([0-9]{2}:[0-9]{2}:[0-9]{2})\.[0-9]+/$1/;
+				$v_mtime =~ s/([0-9]{2}:[0-9]{2}:[0-9]{2})\.[0-9]+/$1/;
+			}
+			$ref_diff->{$v_file}->{$v_first}->{'ctime'} = $v_ctime;
+			$ref_diff->{$v_file}->{$v_first}->{'mtime'} = $v_mtime;
 		}
 	}
 	### Determine the changes, begin creating output
@@ -230,7 +237,7 @@ sub fn_diff {
 			my $b_owner;
 			my $b_not_stamps;
 			my $b_stamps;
-			my $v_mention;
+			my $v_mention = '';
 			my $b_list;
 			my $v_dir = substr( $ref_diff->{$v_file}->{'>'}->{'perms'}, 0, 1 );
 			if ( $ref_diff->{$v_file}->{'<'}->{'size'} ne $ref_diff->{$v_file}->{'>'}->{'size'} ) {
@@ -393,12 +400,12 @@ sub fn_diff {
 	$v_details = $v_details2 . "\nSPECIFICS FOR EACH FILE:\n\n" . $v_details;
 	$v_html_details = $v_html_details2 . "<br><h2>Specifics for each File:</h2>\n" . $v_html_details;
 	##### @v_files2 contains a list of everything new or changed in case I want to run a malware scan against them.
-	if ( $v_format eq "text" ) {
-		print $fh_output $v_details;
+	if ( $v_format eq "html" ) {
+		print $fh_output $v_html_details;
 	} elsif ( $v_format eq "diff" ) {
 		print $fh_output $v_diff_details;
 	} else {
-		print $fh_output $v_html_details;
+		print $fh_output $v_details;
 	}
 }
 
@@ -479,7 +486,7 @@ sub fn_diff_check_lines {
 #======================#
 
 sub fn_backup_initial {
-### Given a Stat Watch report, backup the files within that match the "BackupR" and "Backup+" command strings
+### Given a Stat Watch report, backup the files within that match the "BackupR" and "Backup+" control strings
 ### $_[0] is the report
 	my $v_file = $_[0];
 	my @v_lines = fn_diff_check_lines(undef, undef, 1, $v_file);
@@ -738,7 +745,7 @@ sub fn_list_file {
 #== Processing the ignore file ==#
 #================================#
 
-sub fn_get_ignore {
+sub fn_get_include {
 ### Read the ignore/include file and extract data from it
 ### $_[0] is the file in question.
 	my $f_ignore = $_[0];
@@ -785,7 +792,7 @@ sub fn_get_ignore {
 				} elsif ( $_line =~ m/^Include\s*\// ) {
 				### Process these files as additional include/ignore lists
 					$_line =~ s/^Include\s*//;
-					fn_get_ignore( $_line );
+					fn_get_include( $_line );
 				} elsif ( $_line =~ m/^BackupD\s*\// ) {
 				### Set a directory to back up to
 					$_line =~ s/^BackupD\s*//;
@@ -817,6 +824,9 @@ sub fn_get_ignore {
 		}
 		close( $fh_read );
 	}
+}
+
+sub fn_document_backup {
 	if ( $d_backup ) {
 	### If the include file listed a backup directory, add that to the list of backup directories
 		my @v_dir = split( m/\//, $v_program );
@@ -1043,7 +1053,7 @@ USAGE
 ./stat_watch.pl --record [DIRECTORY] ([DIRECTORY 2] ...)
     - Outputs stat data for all of the files under the directory specified (you probably want to use the "-o" flag or redirect output to a file)
     - The "-v" or "--verbose" flag can be used to have the directories output to STDERR
-    - The "-i" or "--ignore" or "--include" flag can be used to specify an ignore/include file
+    - The "-i" or "--include" flag can be used to specify an ignore/include file
     - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
     - This is the default functionality. Technically the "--record" flag is not necessary
     - The "--ignore-on-record" flag will result in individual files being checked against ignore rules
@@ -1052,20 +1062,30 @@ USAGE
 
 ./stat_watch.pl --diff [FILE 1] [FILE 2]
     - Compare two Stat Watch report files, weed out files that match ignore rules, output information on what has changed
-    - The "-i" or "--ignore" or "--include" flag can be used to specify an ignore/include file
+    - The "--ignore" flag can be used to specify a specific file or directory that you want to ignore
+        - This is functionally the same as the "BackupD" control string in an include/ignore file
+    - The "-i" or "--include" flag can be used to specify an ignore/include file
     - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
     - The "-f" or "--format" flag allows you to choose a number of options for how the details should be output:
         - "text" separates out what has changed and how, and outputs in plain text format
         - "html" separates out what has changed and how, and outputs in html format
         - "diff" outputs the lines that were different with "<" and ">" characters to indicate which file they came from. 
     - The "--backup" flag will result in files being backed up. "BackupD" and "BackupR" or "Backup+" lines must be set in the include file for this to be successful
-    - The "--no-check-retention" flag mean that when creating backups, existing files will not be checked for retention. This is optimal if you're regularly running this script with the "--prune" flag
+    - The "--no-check-retention" flag mean that when creating backups, existing files will not be checked for retention
+        - This is optimal if you're regularly running this script with the "--prune" flag
     - The "--no-ctime" flag tells the script to ignore differences in ctime. This is useful if you're comparing against a restored backup.
+    - The "--no-partial-seconds" limits the comparison of timestamps to full seconds
 
 ./stat_watch.pl --backup [FILE]
     - Create backups of files specified using a Stat Watch report file and the settings within an ignore/include file
     - The file must be a Stat Watch report file
-    - The "-i" or "--ignore" or "--include" flag must be used to specify an ignore/include file and that file must have "BackupD" and "BackupR" or "Backup+" command strings present
+    - The "-i" or "--include" flag can be used to specify an ignore/include file and that file must have "BackupD" and "BackupR" or "Backup+" control strings present
+    - The "--backupd" flag can be used, followed by the directory that you want to back up to
+        - This is functionally the same as the "BackupD" control string in an include/ignore file
+    - The "--backup+" flag can be used, followed by the full path of a file that you wish to back up. This flag can be used more than once.
+        - This is functionally the same as the "Backup+" control string in an include/ignore file
+    - The "--backupr" flag can be used, followed by perl regular expression to match in order to decide what files to backup. This flag can be used more than once.
+        - This is functionally the same as the "BackupR" control string in an include/ignore file
     - If you modify the "BackupR" or "Backup+" settings and re-run "--backup", it will compare stats of existing backups and only save files that are different / not present
         - However, files that are no longer matched will not be removed
 
@@ -1076,8 +1096,8 @@ USAGE
 ./stat_watch.pl --prune [FILE]
     - Go through the backup directory and remove files older files
     - The file must be a Stat Watch report file
-    - The "-i" or "--ignore" or "--include" flag must be used to specify an ignore/include file and that file must have "BackupD" string present
-    - Any files outside of the range specified by the "BackupMD" and "BackupMC" command strings will be removed
+    - The "-i" or "--include" flag must be used to specify an ignore/include file and that file must have "BackupD" string present
+    - Any files outside of the range specified by the "BackupMD" and "BackupMC" control strings will be removed
 
 ./stat_watch.pl --help
 ./stat_watch.pl -h
@@ -1163,9 +1183,19 @@ while ( defined $ARGV[0] ) {
 	} elsif ( $v_arg eq "--help" || $v_arg eq "-h" ) {
 		fn_help();
 		exit 0;
-	} elsif ( $v_arg eq "-i" || $v_arg eq "--ignore" || $v_arg eq "--include" ) {
+	} elsif ( $v_arg eq "--ignore" ) {
 		if ( defined $ARGV[0] ) {
-			fn_get_ignore( shift( @ARGV ) );
+			my $v_file = shift( @ARGV );
+			if ( substr($v_file, 0, 1) ne "/" ) {
+				$v_file = abs_path($v_file);
+			}
+			push( @v_ignore, $v_file );
+		} else {
+			print STDERR 'Argument "' . $v_arg . '" must be followed by a file name' . "\n";
+		}
+	} elsif ( $v_arg eq "-i" || $v_arg eq "--include" ) {
+		if ( defined $ARGV[0] ) {
+			fn_get_include( shift( @ARGV ) );
 		} else {
 			print STDERR 'Argument "' . $v_arg . '" must be followed by a file name' . "\n";
 		}
@@ -1206,6 +1236,8 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			}
 		} elsif ( $v_arg eq "--no-check-retention" ) {
 			$b_retention = 0;
+		} elsif ( $v_arg eq "--no-partial-seconds" ) {
+			$b_partial_seconds = 0;
 		} elsif ( $v_arg eq "--no-ctime" ) {
 			$b_diff_ctime = 0;
 		} elsif ( $v_arg eq "--backup" ) {
@@ -1230,10 +1262,11 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	if ( ! $d_backup || ! -d $d_backup || ! -w $d_backup || (! @v_backupr && ! @v_backup_plus) ) {
 		$b_backup = 0;
 	}
-	if ( $v_format ne "text" && $v_format ne "html" ) {
+	if ( ! $v_format || ($v_format ne "text" && $v_format ne "html" && $v_format ne "diff") ) {
 		$v_format = "text";
 	}
 	my $b_close = fn_sort_prep();
+	fn_document_backup();
 	fn_log("Processing diff of files '" . $v_file1 . "' and '" . $v_file2 . "'\n");
 	fn_diff( $v_file1, $v_file2 );
 	fn_log("Finished processing diff\n");
@@ -1241,6 +1274,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		close $fh_output;
 	}
 } elsif ( defined $args[0] && $args[0] eq "--list" ) {
+	shift( @args );
 	my $v_file;
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
@@ -1261,10 +1295,37 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	fn_list_file($v_file);
 } elsif ( defined $args[0] && $args[0] eq "--backup" ) {
 ### Backup files from "--report" output.
+	shift( @args );
 	my $v_file;
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
-		if ( -e $v_arg ) {
+		if ( $v_arg eq "--backupd" ) {
+			if ( defined $args[0] ) {
+				my $v_file = shift( @args );
+				if ( substr($v_file, 0, 1) ne "/" ) {
+					$v_file = abs_path($v_file);
+				}
+				$d_backup = $v_file;
+			} else {
+				print STDERR 'Argument "' . $v_arg . '" must be followed by a file name' . "\n";
+			}
+		} elsif ( $v_arg eq "--backup+" ) {
+			if ( defined $args[0] ) {
+				my $v_file = shift( @args );
+				if ( substr($v_file, 0, 1) ne "/" ) {
+					$v_file = abs_path($v_file);
+				}
+				push( @v_backup_plus, $v_file );
+			} else {
+				print STDERR 'Argument "' . $v_arg . '" must be followed by a file name' . "\n";
+			}
+		} elsif ( $v_arg eq "--backupr" ) {
+			if ( defined $args[0] ) {
+				push( @v_backupr, shift( @args ) );
+			} else {
+				print STDERR 'Argument "' . $v_arg . '" must be followed by a file name' . "\n";
+			}
+		} elsif ( -e $v_arg ) {
 			$v_file = $v_arg;
 		} else {
 			push ( @v_unknown, $v_arg );
@@ -1275,7 +1336,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	}
 	$b_retention = 0;
 	if ( ! $d_backup || (! @v_backupr && ! @v_backup_plus) ) {
-		print STDERR "The include file must have \"BackupD\" and \"BackupR\" or \"Backup+\" command strings present\n";
+		print STDERR "The include file must have \"BackupD\" and \"BackupR\" or \"Backup+\" control strings present\n";
 		exit 1;
 	} elsif ( ! -d $d_backup || ! -w $d_backup ) {
 		print STDERR "The backup directory does not exist or is not writable\n";
@@ -1286,8 +1347,10 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		close $fh_output;
 	}
 	fn_log("Checking to see if there are files that need to be backed up '" . $d_backup . "'\n");
+	fn_document_backup();
 	fn_backup_initial($v_file);
 } elsif ( defined $args[0] && $args[0] eq "--prune" ) {
+	shift( @args );
 	while ( defined $args[0] ) {
 		push ( @v_unknown, shift( @args ) );
 	}
