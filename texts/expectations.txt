@@ -8,7 +8,7 @@ It is also the recommendation of the author of this project that any backups tak
 
 **Examples of customer communication setting expectations for how emails from Stat Watch should be handled**
 
-
+Please note that while there might be instances where these examples could be used as-is, you should always review the contents to verify that they match what you intend to communicate to the customer. Feel free to use portions of them or use them in whole as matches your needs.
 
 **Example email offering to put the script in place:**
 

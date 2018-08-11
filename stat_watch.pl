@@ -6,10 +6,9 @@
 use strict;
 use warnings;
 
-my $v_VERSION = "1.0.0";
+my $v_VERSION = "1.0.1";
 
 use Cwd 'abs_path';
-use File::Temp 'tempfile';
 use POSIX 'strftime';
 
 my $v_program = __FILE__;
@@ -55,10 +54,14 @@ sub fn_check_file {
 ### Check a file to see if it matches any of the ignore lists
 ### $_[0] is the full path to the file
 	my $v_file = $_[0];
+	my $v_file_escape = $v_file;
+	if ($b_verbose) {
+		$v_file_escape =~ s/'/'\\''/g;
+	}
 	for my $_string (@v_temp_ignore){
 		if ( $v_file eq $_string ) {
 			if ($b_verbose) {
-				print STDERR "IGNORED: " . $v_file . "\n";
+				print STDERR "IGNORED: '" . $v_file_escape. "'\n";
 			}
 			return 0;
 		}
@@ -66,7 +69,7 @@ sub fn_check_file {
 	for my $_string (@v_temp_rignore) {
 		if ( ($v_file . "/" ) =~ m/$_string/ ) {
 			if ($b_verbose) {
-				print STDERR "IGNORED: " . $v_file . "\n";
+				print STDERR "IGNORED: '" . $v_file_escape . "'\n";
 			}
 			return 0;
 		}
@@ -74,7 +77,7 @@ sub fn_check_file {
 	for my $_string (@v_temp_star_ignore){
 		if ( $v_file =~ m/$_string/ ) {
 			if ($b_verbose) {
-				print STDERR "IGNORED: " . $v_file . "\n";
+				print STDERR "IGNORED: '" . $v_file_escape . "'\n";
 			}
 			return 0;
 		}
@@ -86,15 +89,18 @@ sub fn_stat_watch {
 ### Stat every file in the directory, then dive into directories
 ### $_[0] is the directory in question
 	my $v_dir = $_[0];
+	my $v_timestamp = $_[1];
 	if ($b_verbose) {
-		print STDERR "Directory: " . $v_dir . "\n";
+		my $v_dir_escape = $v_dir;
+		$v_dir_escape =~ s/'/'\\''/g;
+		print STDERR "Directory: '" . $v_dir_escape . "'\n";
 	}
 	if ( -e $v_dir && ! -d $v_dir ) {
 	### If we were given a file instead of a directory
 		if ( fn_check_file($v_dir) ) {
-			my $v_dir_temp = $v_dir;
-			$v_dir_temp =~ s/'/'\\''/;
-			my $v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z '$v_dir_temp' 2> /dev/null`;
+			my $v_dir_escape = $v_dir;
+			$v_dir_escape =~ s/'/'\\''/g;
+			my $v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z '$v_dir_escape' 2> /dev/null`;
 			chomp( $v_line );
 			print $fh_output "'" . $v_dir . "' -- " . $v_line . "\n";
 		}
@@ -105,9 +111,7 @@ sub fn_stat_watch {
 			closedir $fh_dir;
 			my @dirs;
 			for my $_file (@files) {
-				if ( $_file =~ /\n/ ) {
-					print STDERR "The following file contains a newline character and as such is not in the scope of this script:\n\n" . $v_dir . "/" . $_file . "\n";
-				} elsif ( $_file ne "." && $_file ne ".." ) {
+				if ( $_file ne "." && $_file ne ".." ) {
 					$_file = $v_dir . "/" . $_file;
 					### Make sure that the file doesn't match any of the ignore lists
 					if ( $b_ignore_on_record && ! fn_check_file($_file) ) {
@@ -118,11 +122,15 @@ sub fn_stat_watch {
 						push( @dirs, $_file );
 					}
 					### Stat the file and output the results to the report
-					my $v_file_temp = $_file;
-					$v_file_temp =~ s/'/'\\''/;
-					my $v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z '$v_file_temp' 2> /dev/null`;
+					my $v_file_escape = $_file;
+					$v_file_escape =~ s/'/'\\''/g;
+					my $v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z '$v_file_escape' 2> /dev/null`;
 					chomp( $v_line );
-					print $fh_output "'" . $_file . "' -- " . $v_line . "\n";
+					my $v_file_name = $_file;
+					if ( $_file =~ m/\n/ ) {
+						$v_file_name =~ s/\n/_mlfn_$v_timestamp/g;
+					}
+					print $fh_output "'" . $v_file_name . "' -- " . $v_line . "\n";
 				}
 			}
 			for my $_dir (@dirs) {
@@ -131,7 +139,7 @@ sub fn_stat_watch {
 				if ( ! fn_check_file($_dir) ) {
 					next;
 				}
-				fn_stat_watch($_dir);
+				fn_stat_watch( $_dir, $v_timestamp);
 			}
 		}
 	}
@@ -147,19 +155,24 @@ sub fn_diff {
 	my $f_diff1 = $_[0];
 	my $f_diff2 = $_[1];
 	### Make the file names quote safe
-	my $diff1_temp = $f_diff1;
-	$diff1_temp =~ s/'/'\\''/;
-	my $diff2_temp = $f_diff2;
-	$diff2_temp =~ s/'/'\\''/;
-	my @v_diff = `diff '$diff1_temp' '$diff2_temp' 2> /dev/null`;
+	my $diff1_escape = $f_diff1;
+	$diff1_escape =~ s/'/'\\''/g;
+	my $diff2_escape = $f_diff2;
+	$diff2_escape =~ s/'/'\\''/g;
+	my @v_diff = `diff '$diff1_escape' '$diff2_escape' 2> /dev/null`;
 	@v_diff = fn_diff_check_lines( undef, 2, undef, @v_diff );
 	### Separate out just the file names from the diff
 	my $ref_diff;
 	for my $_line (@v_diff) {
 		my $v_first = substr( $_line, 0, 1 );
 		if ( $v_first eq ">" || $v_first eq "<" ) {
-			my $v_file = substr((split(/'([^']+)$/, $_line))[0], 3);
 			chomp($_line);
+			my $v_file = substr((split( m/'([^']+)$/, $_line ))[0], 3);
+			if ( ! exists $ref_diff->{$v_file} ) {
+				my $v_file_escape = $v_file;
+				$v_file_escape =~ s/'/'\\''/g;
+				$ref_diff->{$v_file}->{'escape'} = "'" . $v_file_escape . "'";
+			}
 			$ref_diff->{$v_file}->{$v_first}->{'line'} = $_line;
 			my @v_line = split( m/ -- /, $_line );
 			my $v_ctime = pop(@v_line);
@@ -198,12 +211,12 @@ sub fn_diff {
 	my @v_files = sort {$a cmp $b} keys(%{ $ref_diff });
 	my @v_files2;
 	DIFF_FILE: for my $v_file (@v_files) {
-		my $details = "'" . $v_file . "'" . "\n";
-		my $html_details = "<b>'" . $v_file . "'</b>\n<br><table><tbody>";
+		my $details = $ref_diff->{$v_file}->{'escape'} . "\n";
+		my $html_details = "<b>" . $ref_diff->{$v_file}->{'escape'} . "</b>\n<br><table><tbody>";
 		if ( ! exists $ref_diff->{$v_file}->{'<'} ) {
 			### This file is new
 			my $v_dir = substr( $ref_diff->{$v_file}->{'>'}->{'perms'}, 0, 1 );
-			push( @v_new, "'" . $v_file . "'" );
+			push( @v_new, $ref_diff->{$v_file}->{'escape'} );
 			$v_diff_details .= $ref_diff->{$v_file}->{'>'}->{'line'} . "\n";
 			$details .= "     Status:       New\n     M-time:       " . $ref_diff->{$v_file}->{'>'}->{'mtime'} . "\n     C-time:       " . $ref_diff->{$v_file}->{'>'}->{'ctime'} . "\n     File Size:    " . $ref_diff->{$v_file}->{'>'}->{'size'} . " bytes\n     Permissions:  " . $ref_diff->{$v_file}->{'>'}->{'perms'} . "\n     Owner:        " . $ref_diff->{$v_file}->{'>'}->{'owner'} . "\n     Group:        " . $ref_diff->{$v_file}->{'>'}->{'group'} . "\n";
 			my $html_details1 = '<tr><th>Status</th><th>M-time</th><th>C-time</th><th>File Size</th><th>Permissions</th><th>Owner</th><th>Group</th></tr>' . "\n";
@@ -222,7 +235,7 @@ sub fn_diff {
 			$html_details .= $html_details1 . "</tr>\n" . $html_details2 . "</tr>\n";
 		} elsif ( ! exists $ref_diff->{$v_file}->{'>'} ) {
 			### This file was removed
-			push( @v_removed, "'" . $v_file . "'" );
+			push( @v_removed, $ref_diff->{$v_file}->{'escape'} );
 			$v_diff_details .= $ref_diff->{$v_file}->{'<'}->{'line'} . "\n";
 			$details .= "     Status:       Removed\n";
 			$html_details .= '<tr><th>Status</th></tr>' . "\n";
@@ -241,7 +254,7 @@ sub fn_diff {
 			my $b_list;
 			my $v_dir = substr( $ref_diff->{$v_file}->{'>'}->{'perms'}, 0, 1 );
 			if ( $ref_diff->{$v_file}->{'<'}->{'size'} ne $ref_diff->{$v_file}->{'>'}->{'size'} ) {
-				push( @v_size, "'" . $v_file . "'" . $v_mention );
+				push( @v_size, $ref_diff->{$v_file}->{'escape'} . $v_mention );
 				$v_mention = " (Also listed above)";
 				$details2 .= "     File Size:    " . $ref_diff->{$v_file}->{'<'}->{'size'} . " bytes -> " . $ref_diff->{$v_file}->{'>'}->{'size'} . " bytes\n";
 				$html_details1 .= '<th>File Size</th>';
@@ -254,7 +267,7 @@ sub fn_diff {
 			}
 			if ( $ref_diff->{$v_file}->{'<'}->{'perms'} ne $ref_diff->{$v_file}->{'>'}->{'perms'} ) {
 				$b_owner = 1;
-				push( @v_perms, "'" . $v_file . "'" . $v_mention );
+				push( @v_perms, $ref_diff->{$v_file}->{'escape'} . $v_mention );
 				$v_mention = " (Also listed above)";
 				$details2 .= "     Permissions:  " . $ref_diff->{$v_file}->{'<'}->{'perms'} . " -> " . $ref_diff->{$v_file}->{'>'}->{'perms'} . "\n";
 				$html_details1 .= '<th>Permissions</th>';
@@ -263,7 +276,7 @@ sub fn_diff {
 			if ( $ref_diff->{$v_file}->{'<'}->{'owner'} ne $ref_diff->{$v_file}->{'>'}->{'owner'} ) {
 				if (! $b_owner) {
 					$b_owner = 1;
-					push( @v_perms, "'" . $v_file . "'" . $v_mention );
+					push( @v_perms, $ref_diff->{$v_file}->{'escape'} . $v_mention );
 					$v_mention = " (Also listed above)";
 				}
 				$details2 .= "     Owner:        " . $ref_diff->{$v_file}->{'<'}->{'owner'} . " -> " . $ref_diff->{$v_file}->{'>'}->{'owner'} . "\n";
@@ -272,7 +285,7 @@ sub fn_diff {
 			}
 			if ( $ref_diff->{$v_file}->{'<'}->{'group'} ne $ref_diff->{$v_file}->{'>'}->{'group'} ) {
 				if (! $b_owner) {
-					push( @v_perms, "'" . $v_file . "'" . $v_mention );
+					push( @v_perms, $ref_diff->{$v_file}->{'escape'} . $v_mention );
 					$v_mention = " (Also listed above)";
 				}
 				$details2 .= "     Group:        " . $ref_diff->{$v_file}->{'<'}->{'group'} . " -> " . $ref_diff->{$v_file}->{'>'}->{'group'} . "\n";
@@ -294,7 +307,7 @@ sub fn_diff {
 			}
 			if ( $ref_diff->{$v_file}->{'<'}->{'mtime'} ne $ref_diff->{$v_file}->{'>'}->{'mtime'} ) {
 				$b_stamps = 1;
-				push( @v_stamps, "'" . $v_file . "'" . $v_mention );
+				push( @v_stamps, $ref_diff->{$v_file}->{'escape'} . $v_mention );
 				$v_mention = " (Also listed above)";
 				$details .= "     M-time:       " . $ref_diff->{$v_file}->{'<'}->{'mtime'} . " -> " . $ref_diff->{$v_file}->{'>'}->{'mtime'} . "\n";
 				$html_details3 .= '<th>M-time</th>';
@@ -306,7 +319,7 @@ sub fn_diff {
 			}
 			if ( $b_diff_ctime && $ref_diff->{$v_file}->{'<'}->{'ctime'} ne $ref_diff->{$v_file}->{'>'}->{'ctime'} ) {
 				if (! $b_stamps) {
-					push( @v_stamps, "'" . $v_file . "'" . $v_mention );
+					push( @v_stamps, $ref_diff->{$v_file}->{'escape'} . $v_mention );
 					$v_mention = " (Also listed above)";
 				}
 				$details .= "     C-time:       " . $ref_diff->{$v_file}->{'<'}->{'ctime'} . " -> " . $ref_diff->{$v_file}->{'>'}->{'ctime'} . "\n";
@@ -320,6 +333,7 @@ sub fn_diff {
 			if ( ! $v_mention ) {
 				next DIFF_FILE;
 			}
+			### Attempt to back up the file
 			if ( $v_dir ne "d" && $b_backup ) {
 				my $b_backup_success = fn_backup_file($v_file, $d_backup);
 				if ($b_backup_success) {
@@ -424,25 +438,43 @@ sub fn_diff_check_lines {
 		my $f_read = shift(@_);
 		if ( open( my $fh_read, "<", $f_read ) ) {
 			my $v_processing;
+			my $v_timestamp1 = '';
+			my $v_timestamp2 = '';
+			my $re_multiline;
 			while (<$fh_read>) {
 				my $v_line = substr($_, $v_prune);
 				my $v_start = substr($_, 0, $v_prune);
 				if ( $v_line =~ m/^Processing:/ ) {
 					### Each time we see a processing line, we have to re-do the ignore strings to make sure that we're not ignoring something we shouldn't
-					$v_processing = substr( (split( m/'/, $v_line, 2 ))[1], 0, -2 );
+					$v_processing = substr( (split( m/'/, $v_line, 2 ))[1], 0, -1 );
+					$v_timestamp2 = $v_timestamp1;
+					$v_timestamp1 = $v_processing;
+					$v_timestamp1 =~ s/^.*\s([0-9]+)$/$1/;
+					$re_multiline = qr/_mlfn_(\Q$v_timestamp1\E|\Q$v_timestamp2\E)/;
+					if ( $v_timestamp2 eq '' ) {
+						$re_multiline = qr/_mlfn_\Q$v_timestamp1\E/;
+					}
 					$v_processing =~ s/' - [0-9]+$//;
 					fn_check_strings( $v_processing );
 				} elsif ( substr( $v_line, 0, 2 ) eq "'/" ) {
 					if ( ! $v_processing ) {
-						print STDERR "File \"$f_read\" does not appear to be a Stat Watch file\n";
+						my $f_read_escape = $f_read;
+						$f_read_escape =~ s/'/'\\''/g;
+						print STDERR "File '" . $f_read_escape . "' does not appear to be a Stat Watch file\n";
 						exit 1;
 					}
-					my $v_file = substr( (split(/'([^']+)$/, $v_line))[0], 1 );
+					my @v_line = split( m/'/, $v_line );
+					$v_line = pop(@v_line);
+					my $v_file = join( "'", @v_line );
+					$v_file = substr( $v_file, 1 );
+					if ( $v_file =~ m/$re_multiline/ ) {
+						$v_file =~ s/$re_multiline/\n/g;
+					}
 					if ( fn_check_file($v_file) ) {
 						if ($fh_write) {
-							print $fh_write $v_start . $v_line;
+							print $fh_write $v_start . "'" . $v_file . "'" . $v_line;
 						} else {
-							push( @v_lines_out, $v_start . $v_line ) ;
+							push( @v_lines_out, $v_start . "'" . $v_file . "'" . $v_line ) ;
 						}
 					}
 				}
@@ -451,12 +483,22 @@ sub fn_diff_check_lines {
 	} else {
 		my @v_lines_in = @_;
 		my $v_processing;
+		my $v_timestamp1 = '';
+		my $v_timestamp2 = '';
+		my $re_multiline;
 		for my $_line (@v_lines_in) {
 			my $v_line = substr($_line, $v_prune);
 			my $v_start = substr($_line, 0, $v_prune);
 			if ( $v_line =~ m/^Processing:/ ) {
 				### Each time we see a processing line, we have to re-do the ignore strings to make sure that we're not ignoring something we shouldn't
-				$v_processing = substr( (split( m/'/, $v_line, 2 ))[1], 0, -2 );
+				$v_processing = substr( (split( m/'/, $v_line, 2 ))[1], 0, -1 );
+				$v_timestamp2 = $v_timestamp1;
+				$v_timestamp1 = $v_processing;
+				$v_timestamp1 =~ s/^.*\s([0-9]+)$/$1/;
+				$re_multiline = qr/_mlfn_(\Q$v_timestamp1\E|\Q$v_timestamp2\E)/;
+				if ( $v_timestamp2 eq '' ) {
+					$re_multiline = qr/_mlfn_\Q$v_timestamp1\E/;
+				}
 				$v_processing =~ s/' - [0-9]+$//;
 				fn_check_strings( $v_processing );
 			} elsif ( substr( $v_line, 0, 2 ) eq "'/" ) {
@@ -464,12 +506,18 @@ sub fn_diff_check_lines {
 					print STDERR "Input does not appear to be from a Stat Watch file\n";
 					exit 1;
 				}
-				my $v_file = substr( (split(/'([^']+)$/, $v_line))[0], 1 );
+				my @v_line = split( m/'/, $v_line );
+				$v_line = pop(@v_line);
+				my $v_file = join( "'", @v_line );
+				$v_file = substr( $v_file, 1 );
+				if ( $v_file =~ m/$re_multiline/ ) {
+					$v_file =~ s/$re_multiline/\n/g;
+				}
 				if ( fn_check_file($v_file) ) {
 					if ($fh_write) {
-						print $fh_write $v_start . $v_line;
+						print $fh_write $v_start . "'" . $v_file . "'" . $v_line;
 					} else {
-						push( @v_lines_out, $v_start . $v_line ) ;
+						push( @v_lines_out, $v_start . "'" . $v_file . "'" . $v_line ) ;
 					}
 				}
 			}
@@ -491,8 +539,8 @@ sub fn_backup_initial {
 	my $v_file = $_[0];
 	my @v_lines = fn_diff_check_lines(undef, undef, 1, $v_file);
 	for my $_line (@v_lines) {
-		my $v_file = substr( (split(/'([^']+)$/, $_line))[0], 1 );
-		chomp($v_file);
+		chomp($_line);
+		my $v_file = substr( (split( m/'([^']+)$/, $_line ))[0], 1 );
 		fn_backup_file($v_file, $d_backup, 1);
 	}
 }
@@ -512,7 +560,9 @@ sub fn_check_retention {
 		my $v_file = $v_dir . "/" . $v_files[$v_count];
 		my $v_stamp = (split( m/_/, $v_files[$v_count] ))[-1];
 		if ( (time() - $v_stamp) > (86400 * $v_retention_min_days) ) {
-			fn_log("Removing backed-up file '" . $v_file . "'\n");
+			my $v_file_escape = $v_file;
+			$v_file_escape =~ s/'/'\\''/g;
+			fn_log("Removing backed-up file '" . $v_file_escape . "'\n");
 			unlink( $v_file );
 		}
 		$v_count++;
@@ -524,7 +574,9 @@ sub fn_prune_backups {
 ### $_[0] is the backup directory
 	my $v_dir = $_[0];
 	if ($b_verbose) {
-		print STDERR "Directory: " . $v_dir . "\n";
+		my $v_dir_escape = $v_dir;
+		$v_dir_escape =~ s/'/'\\''/g;
+		print STDERR "Directory: " . $v_dir_escape . "\n";
 	}
 	if ( -e $v_dir && -d $v_dir ) {
 		### Open the directory and get a file list
@@ -547,7 +599,7 @@ sub fn_prune_backups {
 			}
 			for my $_dir (@dirs) {
 			### For each of the directories we found, go through RECURSIVELY!
-				fn_stat_watch($_dir);
+				fn_prune_backups($_dir);
 			}
 		}
 	}
@@ -594,6 +646,8 @@ sub fn_backup_file {
 				chmod( 0700, $d_backup );
 			}
 		}
+		my $v_file_escape = $v_file;
+		$v_file_escape =~ s/'/'\\''/g;
 		if ( -d $d_backup ) {
 			if ( $b_check ) {
 				$b_continue = fn_compare_backup($v_file, $d_backup);
@@ -608,18 +662,20 @@ sub fn_backup_file {
 			### Test if the files was successfully copied
 			if ( -f $d_backup || -l $d_backup ) {
 				if ($b_verbose) {
-					print STDERR "'" . $v_file . "' -> '" . $d_backup . "'\n";
+					my $d_backup_escape = $d_backup;
+					$d_backup_escape =~ s/'/'\\''/g;
+					print STDERR "'" . $v_file_escape . "' -> '" . $d_backup_escape . "'\n";
 				}
-				fn_log("Backed up file \"" . $v_file . "\"\n");
+				fn_log("Backed up file '" . $v_file_escape . "'\n");
 				if ($b_retention) {
 					fn_check_retention( $d_backup .= "/" . $v_name );
 				}
 				return 1;
 			}
 		}
-		fn_log("Failed to backup file \"" . $v_file . "\"\n");
+		fn_log("Failed to backup file '" . $v_file_escape . "'\n");
 		if ($b_verbose) {
-			print STDERR "Failed to backup file \"" . $v_file . "\"\n";
+			print STDERR "Failed to backup file '" . $v_file_escape . "'\n";
 		}
 	}
 	return 0;
@@ -728,13 +784,17 @@ sub fn_list_file {
 		push( @v_files, @v_files2 );
 	}
 	### Output the details
-	print "\nAvailable Backups for '" . $v_file . "':\n";
+	my $v_file_escape = $v_file;
+	$v_file_escape =~ s/'/'\\''/g;
+	print "\nAvailable Backups for '" . $v_file_escape . "':\n";
 	if (@v_files) {
 		@v_files = sort {$a cmp $b} @v_files;
 		for my $_file (@v_files) {
 			my $v_stamp = (split( m/_/, $_file ))[-1];
 			$v_stamp = strftime( '%Y-%m-%d %T %z', localtime($v_stamp) );
-			print "  '" . $_file . "' -- Timestamp: " . $v_stamp . "\n";
+			my $_file_escape = $_file;
+			$_file_escape =~ s/'/'\\''/g;
+			print "  '" . $_file_escape . "' -- Timestamp: " . $v_stamp . "\n";
 		}
 	} else {
 		print "There are no backups of this file in the directory specified\n"
@@ -750,7 +810,9 @@ sub fn_get_include {
 ### $_[0] is the file in question.
 	my $f_ignore = $_[0];
 	if ( ! -r $f_ignore ) {
-		print STDERR "Cannot read file \"" . $f_ignore . "\"\n";
+		my $f_ignore_escape = $f_ignore;
+		$f_ignore_escape =~ s/'/'\\''/g;
+		print STDERR "Cannot read file '" . $f_ignore_escape . "'\n";
 	}
 	### Make sure we don't read a file twice
 	for my $_include (@v_includes) {
@@ -780,27 +842,27 @@ sub fn_get_include {
 				$_line =~ s/\/$//;
 				if ( substr( $_line,0,1 ) eq "/" ) {
 				### Ignore files with this exact name
-					push( @v_ignore, $_line );
+					push( @v_ignore, abs_path($_line) );
 				} elsif ( $_line =~ m/^\*\s*\// ) {
 				### Ignore all files whose full path starts with this string
 					$_line =~ s/^\*\s*//;
-					push( @v_star_ignore, $_line );
+					push( @v_star_ignore, abs_path($_line) );
 				} elsif ( $_line =~ m/^I\s*\// ) {
 				### Also report on these files / directories
 					$_line =~ s/^I\s*//;
-					push( @v_dirs, $_line );
+					push( @v_dirs, abs_path($_line) );
 				} elsif ( $_line =~ m/^Include\s*\// ) {
 				### Process these files as additional include/ignore lists
 					$_line =~ s/^Include\s*//;
-					fn_get_include( $_line );
+					fn_get_include( abs_path($_line) );
 				} elsif ( $_line =~ m/^BackupD\s*\// ) {
 				### Set a directory to back up to
 					$_line =~ s/^BackupD\s*//;
-					$d_backup = $_line;
+					$d_backup = abs_path($_line);
 				} elsif ( $_line =~ m/^Backup\+\s*\// ) {
 				### Specify a file that should be backed up if there are changes
 					$_line =~ s/^Backup\+\s*//;
-					push(@v_backup_plus, $_line);
+					push(@v_backup_plus, abs_path($_line));
 				} elsif ( $_line =~ m/^BackupMD\s*[0-9]/ ) {
 				### The minimum number of days a backup is kept
 					$_line =~ s/^BackupMD\s*//;
@@ -814,11 +876,11 @@ sub fn_get_include {
 				} elsif ( $_line =~ m/^Log\s*\// ) {
 				### Where to log actions
 					$_line =~ s/^Log\s*//;
-					$f_log = $_line;
+					$f_log = abs_path($_line);
 				} elsif ( $_line =~ m/^Time-\s*\// ) {
 				### Specify a file that we should be unconcerned about changes to the timestamps
 					$_line =~ s/^Time-\s*//;
-					push(@v_time_minus, $_line);
+					push(@v_time_minus, abs_path($_line));
 				}
 			}
 		}
@@ -899,7 +961,9 @@ sub fn_sort_prep {
 	if ( defined $f_output && open( $fh_output, ">", $f_output ) ) {
 		return 1;
 	} elsif ( defined $f_output ) {
-		print STDERR "Cannot open file \"" . $f_output . "\" for writing\n";
+		my $f_output_escape = $f_output;
+		$f_output_escape =~ s/'/'\\''/g;
+		print STDERR "Cannot open file '" . $f_output_escape . "' for writing\n";
 		exit 1;
 	} else {
 		$fh_output = \*STDOUT;
@@ -934,6 +998,30 @@ sub fn_log {
 #========================#
 #== Helper Subroutines ==#
 #========================#
+
+sub fn_test_file {
+	my $v_file = $_[0];
+	my $b_exist = ( $_[1] || 0 );
+	my $v_type = ( $_[2] || 0 );
+	$v_file = abs_path( $v_file );
+	if ( $b_exist ) {
+		if ( ! -e $v_file ) {
+			return 0;
+		}
+	}
+	if ( $v_type ) {
+		if ( $v_type eq "f" ) {
+			if ( ! -f $v_file && -e $v_file ) {
+				return 0;
+			}
+		} elsif ( $v_type eq "d" ) {
+			if ( ! -d $v_file && -e $v_file ) {
+				return 0;
+			}
+		}
+	}
+	return $v_file;
+}
 
 sub fn_uniq {
 ### Given an array, reduce the array to unique elements
@@ -1033,6 +1121,10 @@ sub fold_print {
 sub fn_version {
 print "Current Version: $v_VERSION\n";
 my $v_message = <<'EOF';
+
+Version 1.0.1 (2018-08-10) -
+    - Added the ability to capture data on files with names that include a newline character
+    - Liberal use of abs_path in hopes of ensuring that files are always referenced in the same manner
 
 Version 1.0.0 (2018-08-04) -
     - Original Version
@@ -1168,12 +1260,17 @@ exit 0;
 my @args;
 while ( defined $ARGV[0] ) {
 	my $v_arg = shift( @ARGV );
+	my $v_file;
 	if ( $v_arg =~ m/^-[a-zA-Z0-9][a-zA-Z0-9]+$/ ) {
 	### If there's a string of single character arguments, break them up and process them separately
 		my @v_args = split( m//, substr($v_arg,1) );
 		for my $a (@v_args) {
 			unshift( @ARGV, "-" . $a );
 		}
+	} elsif ( $v_arg =~ m/^-[a-zA-Z0-9][a-zA-Z0-9]+=.*$/ ) {
+		my @v_args = split( m/=/, $v_arg, 2 );
+		unshift( @ARGV, pop(@v_args) );
+		unshift( @ARGV, pop(@v_args) );
 	} elsif ( $v_arg =~ m/^--.*=/ ) {
 	### If it's a full-style argument with an euals sign, split at the equals sign and make it two arguments
 		my @v_args = split( m/=/, $v_arg, 2 );
@@ -1185,25 +1282,30 @@ while ( defined $ARGV[0] ) {
 		exit 0;
 	} elsif ( $v_arg eq "--ignore" ) {
 		if ( defined $ARGV[0] ) {
-			my $v_file = shift( @ARGV );
-			if ( substr($v_file, 0, 1) ne "/" ) {
-				$v_file = abs_path($v_file);
-			}
+			$v_file = fn_test_file(shift( @ARGV ), 1);
+		}
+		if ( $v_file ) {
 			push( @v_ignore, $v_file );
 		} else {
-			print STDERR 'Argument "' . $v_arg . '" must be followed by a file name' . "\n";
+			print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
 		}
 	} elsif ( $v_arg eq "-i" || $v_arg eq "--include" ) {
 		if ( defined $ARGV[0] ) {
-			fn_get_include( shift( @ARGV ) );
+			$v_file = fn_test_file(shift( @ARGV ), 1);
+		}
+		if ( $v_file ) {
+			fn_get_include( $v_file );
 		} else {
-			print STDERR 'Argument "' . $v_arg . '" must be followed by a file name' . "\n";
+			print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
 		}
 	} elsif ( $v_arg eq "--output" || $v_arg eq "-o" ) {
 		if ( defined $ARGV[0] ) {
-			$f_output = shift( @ARGV );
+			$v_file = fn_test_file(shift( @ARGV ));
+		}
+		if ( $v_file ) {
+			$f_output = $v_file;
 		} else {
-			print STDERR 'Argument "' . $v_arg . '" must be followed by a file name' . "\n";
+			print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
 		}
 	} elsif ( $v_arg eq "--version" ) {
 		fn_version();
@@ -1232,7 +1334,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			if ( defined $args[0] ) {
 				$v_format = shift( @args );
 			} else {
-				print STDERR 'Argument "' . $v_arg . '" must be followed by "text" or "html"' . "\n";
+				print STDERR "Argument '" . $v_arg . "' must be followed by 'text' or 'html'\n";
 			}
 		} elsif ( $v_arg eq "--no-check-retention" ) {
 			$b_retention = 0;
@@ -1267,7 +1369,11 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	}
 	my $b_close = fn_sort_prep();
 	fn_document_backup();
-	fn_log("Processing diff of files '" . $v_file1 . "' and '" . $v_file2 . "'\n");
+	my $v_file1_escape = $v_file1;
+	$v_file1_escape =~ s/'/'\\''/g;
+	my $v_file2_escape = $v_file2;
+	$v_file2_escape =~ s/'/'\\''/g;
+	fn_log("Processing diff of files '" . $v_file1_escape . "' and '" . $v_file2_escape . "'\n");
 	fn_diff( $v_file1, $v_file2 );
 	fn_log("Finished processing diff\n");
 	if ($b_close) {
@@ -1278,8 +1384,9 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	my $v_file;
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
-		if ( substr( $v_arg, 0, 1 ) eq "/" ) {
-			$v_file = $v_arg;
+		my $v_file2 = fn_test_file($v_arg, 0, 'f');
+		if ( $v_file2 ) {
+			$v_file = $v_file2;
 		} else {
 			push ( @v_unknown, $v_arg );
 		}
@@ -1291,7 +1398,6 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		print STDERR "A file must be given to look for\n";
 		exit 1;
 	}
-	$v_file = abs_path($v_file);
 	fn_list_file($v_file);
 } elsif ( defined $args[0] && $args[0] eq "--backup" ) {
 ### Backup files from "--report" output.
@@ -1301,29 +1407,27 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		my $v_arg = shift( @args );
 		if ( $v_arg eq "--backupd" ) {
 			if ( defined $args[0] ) {
-				my $v_file = shift( @args );
-				if ( substr($v_file, 0, 1) ne "/" ) {
-					$v_file = abs_path($v_file);
+				my $v_file = fn_test_file( shift( @args ), 1, 'd' );
+				if ( $v_file ) {
+					$d_backup = $v_file;
 				}
-				$d_backup = $v_file;
 			} else {
-				print STDERR 'Argument "' . $v_arg . '" must be followed by a file name' . "\n";
+				print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
 			}
 		} elsif ( $v_arg eq "--backup+" ) {
 			if ( defined $args[0] ) {
-				my $v_file = shift( @args );
-				if ( substr($v_file, 0, 1) ne "/" ) {
-					$v_file = abs_path($v_file);
+				my $v_file = fn_test_file( shift( @args ), 0, 'f' );
+				if ( $v_file ) {
+					push( @v_backup_plus, $v_file );
 				}
-				push( @v_backup_plus, $v_file );
 			} else {
-				print STDERR 'Argument "' . $v_arg . '" must be followed by a file name' . "\n";
+				print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
 			}
 		} elsif ( $v_arg eq "--backupr" ) {
 			if ( defined $args[0] ) {
 				push( @v_backupr, shift( @args ) );
 			} else {
-				print STDERR 'Argument "' . $v_arg . '" must be followed by a file name' . "\n";
+				print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
 			}
 		} elsif ( -e $v_arg ) {
 			$v_file = $v_arg;
@@ -1346,7 +1450,9 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	if ($b_close) {
 		close $fh_output;
 	}
-	fn_log("Checking to see if there are files that need to be backed up '" . $d_backup . "'\n");
+	my $d_backup_escape = $d_backup;
+	$d_backup_escape =~ s/'/'\\''/g;
+	fn_log("Checking to see if there are files that need to be backed up '" . $d_backup_escape . "'\n");
 	fn_document_backup();
 	fn_backup_initial($v_file);
 } elsif ( defined $args[0] && $args[0] eq "--prune" ) {
@@ -1358,7 +1464,9 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		fn_report_unknown(@v_unknown);
 	}
 	if ($d_backup) {
-		fn_log("Pruning old backups from directory '" . $d_backup . "'\n");
+		my $d_backup_escape = $d_backup;
+		$d_backup_escape =~ s/'/'\\''/g;
+		fn_log("Pruning old backups from directory '" . $d_backup_escape . "'\n");
 		fn_prune_backups($d_backup);
 	}
 } elsif ( defined $args[0] && ($args[0] eq "--record" || substr($args[0],0,2) ne "--") ) {
@@ -1368,7 +1476,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		if ( $v_arg eq "--ignore-on-record" ) {
 			$b_ignore_on_record = 1;
 		} elsif ( -e $v_arg ) {
-			push( @v_dirs, $v_arg );
+			push( @v_dirs, abs_path($v_arg) );
 		} elsif ( $v_arg eq "--record" ) {
 		} else {
 			push ( @v_unknown, $v_arg );
@@ -1385,20 +1493,20 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	for my $_dir (@v_dirs) {
 		$_dir =~ s/\/\/+/\//g;
 		$_dir =~ s/\/$//;
-		if ( substr($_dir,0,1) ne "/" ) {
-			$_dir = abs_path($_dir);
-		}
 	}
 	my $b_close = fn_sort_prep();
 	### Process those directories
 	for my $_dir ( @v_dirs ) {
-		print $fh_output "Processing: '" . $_dir . "' - " . time() . "\n";
+		my $v_timestamp = time();
+		print $fh_output "Processing: '" . $_dir . "' - " . $v_timestamp . "\n";
 		fn_check_strings( $_dir );
 		if ( -d $_dir ) {
 			### Individual files can be listed as well, but there's no need to log the fact we're looking at those. Just directories will suffice
-			fn_log("Running a report for directory '" . $_dir . "'\n");
+			my $_dir_escape = $_dir;
+			$_dir_escape =~ s/'/'\\''/g;
+			fn_log("Running a report for directory '" . $_dir_escape . "'\n");
 		}
-		fn_stat_watch( $_dir );
+		fn_stat_watch( $_dir, $v_timestamp );
 	}
 	fn_log("Finished all reports\n");
 	### Close the output file
