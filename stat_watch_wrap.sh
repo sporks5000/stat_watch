@@ -39,10 +39,10 @@ if [[ ! -f "$v_PROGRAMDIR"/."$d_WORKING"/md5.pm ]]; then
 	sleep 2
 else
 	v_MODULES=''
-	if [[ $( "$v_PERL" -e "use Digest::MD5;" | head -n1 | egrep -c "^Can't locate" ) -gt 0 ]]; then
+	if [[ $( "$v_PERL" -e "use Digest::MD5;" | head -n1 | grep -E -c "^Can't locate" ) -gt 0 ]]; then
 		v_MODULES="$v_MODULES Digest::MD5"
 	fi
-	if [[ $( "$v_PERL" -e "use Digest::MD5::File;" | head -n1 | egrep -c "^Can't locate" ) -gt 0 ]]; then
+	if [[ $( "$v_PERL" -e "use Digest::MD5::File;" | head -n1 | grep -E -c "^Can't locate" ) -gt 0 ]]; then
 		v_MODULES="$v_MODULES Digest::MD5::File"
 	fi
 	if [[ -n $v_MODULES ]]; then
@@ -63,7 +63,7 @@ function fn_get_script {
 ### Given an identifier from the job file, rind the script and all command line arguments that follow
 	local a_SCRIPT=()
 	local v_SCRIPT_IDENT="$1"
-	v_SCRIPT="$( grep -E "^\s*$v_SCRIPT_IDENT" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*$v_SCRIPT_IDENT[[:blank:]]*//;s/[[:blank:]]*$//" )"
+	v_SCRIPT="$( grep -E "^\s*$v_SCRIPT_IDENT" "$f_JOB" | tail -n1 | sed "s/^[[:blank:]]*$v_SCRIPT_IDENT[[:blank:]]*//;s/[[:blank:]]*$//" )"
 	if [[ -n $v_SCRIPT ]]; then
 		local word
 		for word in $( echo $v_SCRIPT ); do
@@ -79,7 +79,7 @@ function fn_get_script {
 
 function fn_get_direc {
 	local v_DIREC_IDENT="$1"
-	v_DIREC="$( grep -E "^\s*$v_DIREC_IDENT" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*$v_DIREC_IDENT[[:blank:]]*//;s/[[:blank:]]*$//" )"
+	v_DIREC="$( grep -E "^\s*$v_DIREC_IDENT" "$f_JOB" | tail -n1 | sed "s/^[[:blank:]]*$v_DIREC_IDENT[[:blank:]]*//;s/[[:blank:]]*$//" )"
 }
 
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then
@@ -205,8 +205,8 @@ EOF
 exit 0
 elif [[ "$1" == "--run" ]]; then
 ### Here's the part for if we're running a job
-	f_JOB_FILE="$2"
-	if [[ ! -f "$f_JOB_FILE" ]]; then
+	f_JOB="$2"
+	if [[ ! -f "$f_JOB" ]]; then
 		echo "No such file"
 		exit
 	fi
@@ -219,7 +219,7 @@ elif [[ "$1" == "--run" ]]; then
 		echo "Cannot find name in Job file. Exiting"
 		exit
 	fi
-	v_DIR="$( echo "$f_JOB_FILE" | rev | cut -d "/" -f2- | rev )"
+	v_DIR="$( echo "$f_JOB" | rev | cut -d "/" -f2- | rev )"
 	fn_get_direc "Expire"; v_EXPIRE="$v_DIREC"
 	### Create a directory to stand as an indicator that a job is running
 	mkdir "$v_DIR"/"$v_NAME"_run 2> "$v_ERROR_OUT" || v_EXIT=true
@@ -265,10 +265,10 @@ elif [[ "$1" == "--run" ]]; then
 		if [[ $( date +%s ) -gt $v_EXPIRE ]]; then
 			if [[ $( date --date="now - 15 days" +%s ) -gt $v_EXPIRE ]]; then
 			### If we're 15 days past expiration, delete everything
-				echo "$( date +%Y-%m-%d" "%T" "%z ) - Removing job \"$f_JOB_FILE\"" >> "$v_DIR"/"$v_NAME".log
+				echo "$( date +%Y-%m-%d" "%T" "%z ) - Removing job \"$f_JOB\"" >> "$v_DIR"/"$v_NAME".log
 				rm -f "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_changes_*.txt "$v_DIR"/"$v_NAME"_message_head.txt "$v_DIR"/"$v_NAME"_message_foot.txt "$v_DIR"/"$v_NAME"_stamp
 				rm -rf "$v_DIR"/backup_"$v_NAME"
-				rm -f "$f_JOB_FILE"
+				rm -f "$f_JOB"
 			fi
 			rm -rf "$v_DIR"/"$v_NAME"_run
 			exit
@@ -282,22 +282,22 @@ elif [[ "$1" == "--run" ]]; then
 	if [[ ! -f "$v_DIR"/"$v_NAME"_files.txt ]]; then
 	### If this is the first run, do an initial backup of files
 		eval "$v_RUN_START"
-		stat -c '%Y' "$f_JOB_FILE" > "$v_DIR"/"$v_NAME"_stamp
-		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --record -i "$f_JOB_FILE" -o "$v_DIR"/"$v_NAME"_files.txt -v 2> "$v_ERROR_OUT"
-		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --backup -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files.txt 2> "$v_ERROR_OUT"
+		stat -c '%Y' "$f_JOB" > "$v_DIR"/"$v_NAME"_stamp
+		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --record -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files.txt -v 2> "$v_ERROR_OUT"
+		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --backup -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt 2> "$v_ERROR_OUT"
 		eval "$v_RUN_POST"
 	else
 	### If this is a later run, diff the reports, and if there were changes, email them out
 		eval "$v_RUN_START"
-		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --record -i "$f_JOB_FILE" -o "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
-		if [[ $( stat -c '%Y' "$f_JOB_FILE" ) -gt $( cat "$v_DIR"/"$v_NAME"_stamp 2> "$v_ERROR_OUT" ) ]]; then
+		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --record -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
+		if [[ $( stat -c '%Y' "$f_JOB" ) -gt $( cat "$v_DIR"/"$v_NAME"_stamp 2> "$v_ERROR_OUT" ) ]]; then
 			### If the job file has been updated, there's a chance that we need to back up additional files
-			nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --backup -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
+			nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --backup -i "$f_JOB" "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
 			### ypdate the stat file so that we know not to do that next time
-			stat -c '%Y' "$f_JOB_FILE" > "$v_DIR"/"$v_NAME"_stamp
+			stat -c '%Y' "$f_JOB" > "$v_DIR"/"$v_NAME"_stamp
 		fi
 		v_STAMP="$( date +%s )"
-		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --diff --no-check-retention -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> "$v_ERROR_OUT"
+		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --diff --no-check-retention -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> "$v_ERROR_OUT"
 		eval "$v_RUN_POST"
 		### this file should contain at least two lines
 		if [[ $( wc -l "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -gt 1 ]]; then
@@ -305,7 +305,7 @@ elif [[ "$1" == "--run" ]]; then
 			fn_get_direc "Email"; v_EMAIL="$v_DIREC"
 			if [[ $( wc -l "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -lt 2 ]]; then
 				### This is the one instances where we're getting a directive from the job file without fn_get_direc
-				v_NO_CHANGE="$( grep -E -c "^\s*Email-no-changes\s*$" "$f_JOB_FILE" )"
+				v_NO_CHANGE="$( grep -E -c "^\s*Email-no-changes\s*$" "$f_JOB" )"
 				if [[ $v_NO_CHANGE -gt 1 ]]; then
 					if [[ -n $v_EMAIL ]]; then
 						eval "$v_RUN_PRE_E"
@@ -320,7 +320,7 @@ elif [[ "$1" == "--run" ]]; then
 								cat "$v_DIR"/"$v_NAME"_message_foot.txt; 
 								echo; 
 							fi
-							echo "This output was generated by \"$v_PROGRAMDIR/$f_PERL_SCRIPT\" and \"$v_PROGRAMDIR/$v_PROGRAMNAME\" from the job file at \"$f_JOB_FILE\'"
+							echo "This output was generated by \"$v_PROGRAMDIR/$f_PERL_SCRIPT\" and \"$v_PROGRAMDIR/$v_PROGRAMNAME\" from the job file at \"$f_JOB\'"
 						) | mail -s "Stat Watch - No changed detected on $(hostname)" $v_EMAIL
 						eval "$v_RUN_POST_E"
 					fi
@@ -342,7 +342,7 @@ elif [[ "$1" == "--run" ]]; then
 							cat "$v_DIR"/"$v_NAME"_message_foot.txt; 
 							echo; 
 						fi
-						echo "This output was generated by \"$v_PROGRAMDIR/$f_PERL_SCRIPT\" and \"$v_PROGRAMDIR/$v_PROGRAMNAME\" from the job file at \"$f_JOB_FILE\""
+						echo "This output was generated by \"$v_PROGRAMDIR/$f_PERL_SCRIPT\" and \"$v_PROGRAMDIR/$v_PROGRAMNAME\" from the job file at \"$f_JOB\""
 					) | mail -s "Stat Watch - File changes on $(hostname)" $v_EMAIL
 					eval "$v_RUN_POST_E"
 				fi
@@ -363,7 +363,7 @@ elif [[ "$1" == "--run" ]]; then
 
 		### Determine whether or not we're purning old backups
 		if [[ $(( $v_PRUNE_CHANCE + RANDOM % $v_PRUNE_MAX )) -le $v_PRUNE_CHANCE ]]; then
-			nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --prune -i "$f_JOB_FILE" 2> "$v_ERROR_OUT"
+			nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --prune -i "$f_JOB" 2> "$v_ERROR_OUT"
 		fi
 	fi
 
@@ -466,8 +466,8 @@ fi
 ### Create the relevant files
 mkdir -p "$v_DIR"/backup_"$v_NAME"
 touch $v_DIR/$v_NAME.log
-f_JOB_FILE="$v_DIR/$v_NAME".job
-cat << EOF > "$f_JOB_FILE"
+f_JOB="$v_DIR/$v_NAME".job
+cat << EOF > "$f_JOB"
 ### This file created by $v_PROGRAMNAME
 I $v_MONITOR
 BackupD $v_DIR/backup_$v_NAME
@@ -481,32 +481,32 @@ Log $v_DIR/$v_NAME.log
 Name $v_NAME
 EOF
 if [[ -n $v_EMAIL ]]; then
-	echo "Email $v_EMAIL" >> "$f_JOB_FILE"
+	echo "Email $v_EMAIL" >> "$f_JOB"
 fi
 if [[ $v_EXPIRE == true ]]; then
-	echo "Expire $( date --date="now + 45 days" +%s )" >> "$f_JOB_FILE"
+	echo "Expire $( date --date="now + 45 days" +%s )" >> "$f_JOB"
 fi
 
 ### Log that the job was created by this script
-echo "$( date +%Y-%m-%d" "%T" "%z ) - Job \"$f_JOB_FILE\" created by $v_PROGRAMNAME" >> "$v_DIR"/"$v_NAME".log
+echo "$( date +%Y-%m-%d" "%T" "%z ) - Job \"$f_JOB\" created by $v_PROGRAMNAME" >> "$v_DIR"/"$v_NAME".log
 
 ### Create a working directory and a file to document jobs created
 mkdir -p $v_PROGRAMDIR/."$d_WORKING"
 f_TEMP=$( mktemp )
-grep -E -v "^$f_JOB_FILE - Created " "$v_PROGRAMDIR"/."$d_WORKING"/wrap_jobs_created > "$f_TEMP" 2> /dev/null
-echo "$f_JOB_FILE - Created $( date +%Y-%m-%d" "%T" "%z )" >> "$f_TEMP"
+grep -E -v "^$f_JOB - Created " "$v_PROGRAMDIR"/."$d_WORKING"/wrap_jobs_created > "$f_TEMP" 2> /dev/null
+echo "$f_JOB - Created $( date +%Y-%m-%d" "%T" "%z )" >> "$f_TEMP"
 mv -f "$f_TEMP" "$v_PROGRAMDIR"/."$d_WORKING"/wrap_jobs_created
 
 ### Output text telling the user what next steps they need to take
 echo
-echo -e "A job file has been created at \"\e[92m$f_JOB_FILE\e[0m\""
+echo -e "A job file has been created at \"\e[92m$f_JOB\e[0m\""
 echo "Run \"$v_PROGRAMDIR/$f_PERL_SCRIPT --help\" for further information on how it can be edited to suit your needs"
 echo "Once you have that file organized as you need it, run the following command:"
 echo
-echo "$v_PROGRAMDIR/$v_PROGRAMNAME --run \"$f_JOB_FILE\""
+echo "$v_PROGRAMDIR/$v_PROGRAMNAME --run \"$f_JOB\""
 echo
 echo "Then add the following line to root's crontab (adjusting times if necessary):"
 echo
 ### set a random minute from 1 to 59 for the cron job to run
-echo "$(( 1 + RANDOM % 58 )) */2 * * * $v_PROGRAMDIR/$v_PROGRAMNAME --run "$f_JOB_FILE" > /dev/null 2>&1"
+echo "$(( 1 + RANDOM % 58 )) */2 * * * $v_PROGRAMDIR/$v_PROGRAMNAME --run "$f_JOB" > /dev/null 2>&1"
 echo
