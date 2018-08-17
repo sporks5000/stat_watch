@@ -77,6 +77,11 @@ function fn_get_script {
 	fi
 }
 
+function fn_get_direc {
+	local v_DIREC_IDENT="$1"
+	v_DIREC="$( grep -E "^\s*$v_DIREC_IDENT" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*$v_DIREC_IDENT[[:blank:]]*//;s/[[:blank:]]*$//" )"
+}
+
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then
 cat << EOF | fold -s -w $(( $(tput cols) - 1 )) > /dev/stdout
 
@@ -114,10 +119,14 @@ The help output for "$v_PROGRAMDIR/$f_PERL_SCRIPT" explains a number of control 
     - "Prune-chance" - Pruning old backups will occur X out of every Y runs. "Prune-chance" designates the "X". Without this set, the default is 1.
     - "Email-no-changes" - If this control string is present, send emails even if there are no changes.
     - "Log-max" - A number following this control string will designate the maximum size (in bytes) of the log before it's trimmed. Without this set, the default is 10485760.
-    - "Run-start" - At the start of the Stat Watch job, before any uses of $f_PERL_SCRIPT, attempt to run the script (with any given flags and arguments) that follows this control string
-        - The full path to the script must be used
-    - "Run-end" - At the end of the Stat Watch job, after all "--record" "--backup" or "--diff" uses of $f_PERL_SCRIPT, attempt to run the script (with any given flags and arguments) that follows this control string
-        - The full path to the script must be used
+    - There are four control strings that allow the user to run a custom script at various points during the process of a typical Stat Watch job run: "Run-start", "Run-post", "Run-end", "Run-pre-e", and "Run-post-e":
+        - For any of these, the full path to the script must be used.
+        - Anything following the control string (and any whitespace after it) will be interpreted by the "eval" command
+        - "Run-start" - The script specified here will run immediately previous to the first $f_PERL_SCRIPT "--record" "--backup" or "--diff" command
+        - "Run-post" - The script specified here will run immediately after all of the $f_PERL_SCRIPT "--record" "--backup" or "--diff" commands
+        - "Run-pre-e" - The script here will run immediately previous to sending an email message (Only if there's reason to send one)
+        - "Run-post-e" - The script here will run immediately after sending an email message (Only if there's reason to send one)
+        - "Run-end" - The script specified here will run immediately before $v_PROGRAMNAME exits
 
 
 JOB FILES
@@ -142,7 +151,10 @@ There are a number of files assiciated with each Stat Watch job. Here is an expl
 ./[JOB NAME].log
     - This file contains logs for everything that has occurred as part of the job. If the job expires and is removed as a result of the "Expire" control string, this is the only file that will be left afterward.
 
-./[JOB NAME]_mesasage.txt
+./[JOB NAME]_message_foot.txt
+    - If this file exists, its contents will be added to the end of each email message sent.
+
+./[JOB NAME]_message_head.txt
     - If this file exists, its contents will be added to the beginning of each email message sent.
 
 ./[JOB NAME]_run
@@ -180,7 +192,7 @@ Version Notes:
 
 1.1.0 (2018-08-17) -
     - Added the ability to turn off error supression
-    - Added the ability to un helper-scripts before and after the main portions fo the Stat Watch job
+    - Added the ability to run helper-scripts during various phases of the Stat Watch job
 
 1.0.1 (2018-08-10) -
     - Added log trimming to prevent the log from going out of control (like Dave Coulier)
@@ -202,13 +214,13 @@ elif [[ "$1" == "--run" ]]; then
 	if [[ -n $3 && "$3" == "--errors" ]]; then
 		v_ERROR_OUT="/dev/stderr"
 	fi
-	v_NAME="$( grep -E "^\s*Name" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Name[[:blank:]]*//;s/[[:blank:]]*$//" )"
+	fn_get_direc "Name"; v_NAME="$v_DIREC"
 	if [[ -z $v_NAME ]]; then
 		echo "Cannot find name in Job file. Exiting"
 		exit
 	fi
 	v_DIR="$( echo "$f_JOB_FILE" | rev | cut -d "/" -f2- | rev )"
-	v_EXPIRE="$( grep -E "^\s*Expire" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Expire[[:blank:]]*//;s/[[:blank:]]*$//" )"
+	fn_get_direc "Expire"; v_EXPIRE="$v_DIREC"
 	### Create a directory to stand as an indicator that a job is running
 	mkdir "$v_DIR"/"$v_NAME"_run 2> "$v_ERROR_OUT" || v_EXIT=true
 	if [[ $v_EXIT == true ]]; then
@@ -218,7 +230,7 @@ elif [[ "$1" == "--run" ]]; then
 		if [[ -n $v_PID && $( cat /proc/$v_PID/cmdline 2> "$v_ERROR_OUT" | grep -F -c "$v_PROGRAMDIR/$v_PROGRAMNAME" ) -gt 0 ]]; then
 			v_EPOCH="$( cat "$v_DIR"/"$v_NAME"_run/epoch 2> "$v_ERROR_OUT" )"
 			### check to see if the job has run for too long
-			v_MAX_RUN2="$( grep -E "^\s*Max-run" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Max-run[[:blank:]]*//;s/[[:blank:]]*$//" )"
+			fn_get_direc "Max-run"; v_MAX_RUN2="$v_DIREC"
 			if [[ -n $v_MAX_RUN2 && $( echo "$v_MAX_RUN" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
 				v_MAX_RUN="$v_MAX_RUN2"
 			fi
@@ -254,7 +266,7 @@ elif [[ "$1" == "--run" ]]; then
 			if [[ $( date --date="now - 15 days" +%s ) -gt $v_EXPIRE ]]; then
 			### If we're 15 days past expiration, delete everything
 				echo "$( date +%Y-%m-%d" "%T" "%z ) - Removing job \"$f_JOB_FILE\"" >> "$v_DIR"/"$v_NAME".log
-				rm -f "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_changes_*.txt "$v_DIR"/"$v_NAME"_mesasage.txt "$v_DIR"/"$v_NAME"_stamp
+				rm -f "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_changes_*.txt "$v_DIR"/"$v_NAME"_message_head.txt "$v_DIR"/"$v_NAME"_message_foot.txt "$v_DIR"/"$v_NAME"_stamp
 				rm -rf "$v_DIR"/backup_"$v_NAME"
 				rm -f "$f_JOB_FILE"
 			fi
@@ -263,6 +275,9 @@ elif [[ "$1" == "--run" ]]; then
 		fi
 	fi
 	fn_get_script "Run-start"; v_RUN_START="$v_SCRIPT"
+	fn_get_script "Run-post"; v_RUN_POST="$v_SCRIPT"
+	fn_get_script "Run-pre-e"; v_RUN_PRE_E="$v_SCRIPT"
+	fn_get_script "Run-post-e"; v_RUN_POST_E="$v_SCRIPT"
 	fn_get_script "Run-end"; v_RUN_END="$v_SCRIPT"
 	if [[ ! -f "$v_DIR"/"$v_NAME"_files.txt ]]; then
 	### If this is the first run, do an initial backup of files
@@ -270,7 +285,7 @@ elif [[ "$1" == "--run" ]]; then
 		stat -c '%Y' "$f_JOB_FILE" > "$v_DIR"/"$v_NAME"_stamp
 		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --record -i "$f_JOB_FILE" -o "$v_DIR"/"$v_NAME"_files.txt -v 2> "$v_ERROR_OUT"
 		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --backup -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files.txt 2> "$v_ERROR_OUT"
-		eval "$v_RUN_END"
+		eval "$v_RUN_POST"
 	else
 	### If this is a later run, diff the reports, and if there were changes, email them out
 		eval "$v_RUN_START"
@@ -283,41 +298,53 @@ elif [[ "$1" == "--run" ]]; then
 		fi
 		v_STAMP="$( date +%s )"
 		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --diff --no-check-retention -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> "$v_ERROR_OUT"
-		eval "$v_RUN_END"
+		eval "$v_RUN_POST"
 		### this file should contain at least two lines
 		if [[ $( wc -l "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -gt 1 ]]; then
 			mv -f "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_files.txt
+			fn_get_direc "Email"; v_EMAIL="$v_DIREC"
 			if [[ $( wc -l "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -lt 2 ]]; then
+				### This is the one instances where we're getting a directive from the job file without fn_get_direc
 				v_NO_CHANGE="$( grep -E -c "^\s*Email-no-changes\s*$" "$f_JOB_FILE" )"
 				if [[ $v_NO_CHANGE -gt 1 ]]; then
-					v_EMAIL="$( grep -E "^\s*Email" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Email[[:blank:]]*//;s/[[:blank:]]*$//" )"
 					if [[ -n $v_EMAIL ]]; then
+						eval "$v_RUN_PRE_E"
 						( 
-							if [[ -f "$v_DIR"/"$v_NAME"_mesasage.txt ]]; then 
-								cat "$v_DIR"/"$v_NAME"_mesasage.txt; 
+							if [[ -f "$v_DIR"/"$v_NAME"_message_head.txt ]]; then 
+								cat "$v_DIR"/"$v_NAME"_message_head.txt; 
 								echo; 
 							fi
 							echo "No changes were detected."
 							echo
+							if [[ -f "$v_DIR"/"$v_NAME"_message_foot.txt ]]; then 
+								cat "$v_DIR"/"$v_NAME"_message_foot.txt; 
+								echo; 
+							fi
 							echo "This output was generated by \"$v_PROGRAMDIR/$f_PERL_SCRIPT\" and \"$v_PROGRAMDIR/$v_PROGRAMNAME\" from the job file at \"$f_JOB_FILE\'"
 						) | mail -s "Stat Watch - No changed detected on $(hostname)" $v_EMAIL
+						eval "$v_RUN_POST_E"
 					fi
 				else
 					rm -f "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt
 				fi
 			else
 			### If there were changes, check if we have an email address and then send a message to it
-				v_EMAIL="$( grep -E "^\s*Email" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Email[[:blank:]]*//;s/[[:blank:]]*$//" )"
 				if [[ -n $v_EMAIL ]]; then
+					eval "$v_RUN_PRE_E"
 					( 
-						if [[ -f "$v_DIR"/"$v_NAME"_mesasage.txt ]]; then 
-							cat "$v_DIR"/"$v_NAME"_mesasage.txt; 
+						if [[ -f "$v_DIR"/"$v_NAME"_message_head.txt ]]; then 
+							cat "$v_DIR"/"$v_NAME"_message_head.txt; 
 							echo; 
 						fi
 						cat "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt 
 						echo
+						if [[ -f "$v_DIR"/"$v_NAME"_message_foot.txt ]]; then 
+							cat "$v_DIR"/"$v_NAME"_message_foot.txt; 
+							echo; 
+						fi
 						echo "This output was generated by \"$v_PROGRAMDIR/$f_PERL_SCRIPT\" and \"$v_PROGRAMDIR/$v_PROGRAMNAME\" from the job file at \"$f_JOB_FILE\""
 					) | mail -s "Stat Watch - File changes on $(hostname)" $v_EMAIL
+					eval "$v_RUN_POST_E"
 				fi
 			fi
 		else
@@ -325,11 +352,11 @@ elif [[ "$1" == "--run" ]]; then
 		fi
 
 		### Check to see if the user set the prune variables to soemthing different
-		v_PRUNE_MAX2="$( grep -E "^\s*Prune-max" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Prune-max[[:blank:]]*//;s/[[:blank:]]*$//" )"
+		fn_get_direc "Prune-max"; v_PRUNE_MAX2="$v_DIREC"
 		if [[ -n $v_PRUNE_MAX2 && $( echo "$v_PRUNE_MAX2" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
 			v_PRUNE_MAX="$v_PRUNE_MAX2"
 		fi
-		v_PRUNE_CHANCE2="$( grep -E "^\s*Prune-chance" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Prune-chance[[:blank:]]*//;s/[[:blank:]]*$//" )"
+		fn_get_direc "Prune-chance"; v_PRUNE_CHANCE2="$v_DIREC"
 		if [[ -n $v_PRUNE_CHANCE2 && $( echo "$v_PRUNE_CHANCE2" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
 			v_PRUNE_CHANCE="$v_PRUNE_CHANCE2"
 		fi
@@ -341,7 +368,7 @@ elif [[ "$1" == "--run" ]]; then
 	fi
 
 	### Trim lines from the beginning of the log if necessary
-	v_LOG_MAX2="$( grep -E "^\s*Log-max" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Log-max[[:blank:]]*//;s/[[:blank:]]*$//" )"
+	fn_get_direc "Log-max"; v_LOG_MAX2="$v_DIREC"
 	if [[ -n $v_LOG_MAX2 && $( echo "$v_LOG_MAX2" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
 		v_LOG_MAX="$v_LOG_MAX2"
 	fi
@@ -349,6 +376,7 @@ elif [[ "$1" == "--run" ]]; then
 		printf "%s\n" "1,1000d" w | ed -s "$v_DIR"/"$v_NAME".log 2> "$v_ERROR_OUT"
 	fi
 
+	eval "$v_RUN_POST"
 	rm -rf "$v_DIR"/"$v_NAME"_run
 	exit
 elif [[ "$1" == "--email-test" ]]; then
@@ -429,7 +457,7 @@ if [[ -n $v_EMAIL ]]; then
 	echo "If $v_EMAIL is a customer-facing address, MAKE SURE that appropriate expectations have been set for how these emails will be followed up on."
 	echo "Here is an example of setting such expectations: https://raw.githubusercontent.com/sporks5000/stat_watch/master/texts/expectations.txt"
 	echo
-	echo "Note: If you create a file at \"$v_DIR/$v_NAME""_message.txt, the contents of that file will be sent at the top of each email message. It might be wise to set expectations there as well"
+	echo "Note: If you create a file at \"$v_DIR/$v_NAME""_message_head.txt\" or \"$v_DIR/$v_NAME""_message_foot.txt\", the contents of that file will be sent at the top or bottom, respectively, of each email message. It might be wise to set expectations there as well"
 	echo -e "\e[0m"
 	### Pause here, because I SUPER want people to read this
 	sleep 10

@@ -246,9 +246,9 @@ sub fn_diff {
 	my @v_new;
 	my @v_perms;
 	my @v_size;
-	my @v_md5;
 	my @v_stamps;
 	my @v_removed;
+	my $b_md5_change;
 	my $v_details = '';
 	my $v_html_details = '';
 	my $v_diff_details = '';
@@ -311,7 +311,8 @@ sub fn_diff {
 			if ( exists $ref_diff->{$v_file}->{'<'}->{'md5'} && exists $ref_diff->{$v_file}->{'>'}->{'md5'} ) {
 				### Only compare md5sums if they exist for both
 				if ( $ref_diff->{$v_file}->{'<'}->{'md5'} ne $ref_diff->{$v_file}->{'>'}->{'md5'} ) {
-					push( @v_md5, $ref_diff->{$v_file}->{'escape'} . $v_mention );
+					push( @v_size, $ref_diff->{$v_file}->{'escape'} . $v_mention );
+					$b_md5_change = 1;
 					$v_mention = " (Also listed above)";
 					$details2 .= "     MD5 Sum:      " . $ref_diff->{$v_file}->{'<'}->{'md5'} . " -> " . $ref_diff->{$v_file}->{'>'}->{'md5'} . "\n";
 					$html_details1 .= '<th>MD5 Sum</th>';
@@ -449,19 +450,14 @@ sub fn_diff {
 		$v_details2 .= "\n";
 		$v_html_details2 .= "<br>\n";
 	}
-	if (@v_md5) {
-		$v_details2 .= "FILES WITH CHANGED MD5 SUMS:\n";
-		$v_html_details2 .= '<h2>Files with Changed MD5 Sums:</h2>' . "\n";
-		for my $_file (@v_md5) {
-			$v_details2 .= "   " . $_file . "\n";
-			$v_html_details2 .= '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' . $_file . "<br>\n";
-		}
-		$v_details2 .= "\n";
-		$v_html_details2 .= "<br>\n";
-	}
 	if (@v_size) {
-		$v_details2 .= "FILES THAT CHANGED IN SIZE:\n";
-		$v_html_details2 .= '<h2>Files that Changed in Size:</h2>' . "\n";
+		if ($b_md5_change) {
+			$v_details2 .= "FILES WITH A DIFFERENT SIZE OR MD5 SUM:\n";
+			$v_html_details2 .= '<h2>Files with a Different Size or MD5 Sum:</h2>' . "\n";
+		} else {
+			$v_details2 .= "FILES THAT CHANGED IN SIZE:\n";
+			$v_html_details2 .= '<h2>Files that Changed in Size:</h2>' . "\n";
+		}
 		for my $_file (@v_size) {
 			$v_details2 .= "   " . $_file . "\n";
 			$v_html_details2 .= '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' . $_file . "<br>\n";

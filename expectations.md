@@ -1,16 +1,16 @@
-**Regarding Setting Appropriate Expectations**
+# Regarding Setting Appropriate Expectations
 
-A tool like Stat Watch can be a nightmare for a an organization if appropriate expectations are not set with customers on how it should be used. It is the recommendation of the author of this project that when configuring Stat Watch to send customer facing emails, they are coupled with the expectation that the customer is the one responsible for determining whether or not a change to a file is a problem .Otherwise, it's likely that the customer will react to each email they receive by forwarding it on and expecting that someone else will make those assessments - and that's really not reasonable.
+A tool like Stat Watch can be a nightmare for an organization if appropriate expectations are not set with customers on how it should be used. It is the recommendation of the author of this project that when configuring Stat Watch to send customer facing emails, they are coupled with the expectation that the customer is the one responsible for determining whether or not a change to a file is a problem .Otherwise, it's likely that the customer will react to each email they receive by forwarding it on and expecting that someone else will make those assessments - and that's really not reasonable.
 
 It is also the recommendation of the author of this project that any backups taken by Stat Watch not be mentioned to the customer. The backups taken by Stat Watch were intended to be a resource for the technician assisting the customer, and not one for the customer themselves.
 
 
 
-**Examples of customer communication setting expectations for how emails from Stat Watch should be handled**
+## Examples of customer communication setting expectations for how emails from Stat Watch should be handled
 
 Please note that while there might be instances where these examples could be used as-is, you should always review the contents to verify that they match what you intend to communicate to the customer. Feel free to use portions of them or use them in whole as matches your needs.
 
-**Example email offering to put the script in place:**
+### Example email offering to put the script in place:
 
 ```
 Dear Customer,
@@ -30,7 +30,7 @@ I look forward to hearing back from you regarding this.
 
 
 
-**Example follow-up email indicating that the script is in place:**
+### Example follow-up email indicating that the script is in place:
 
 ```
 Dear Customer,
@@ -46,9 +46,9 @@ If you have any questions or concerns that I can address, please don't hesitate 
 
 
 
-**Example message for the top of each email message:**
+### Example message for the top of each email message:
 
-By modifying the file ./[JOB NAME]_mesasage.txt, you can add a message to the beginning of each email Stat Watch sends. It's recommended that you add a message here as well to remind the customer of these expectations.
+By modifying the files ./[JOB NAME]_message_head.txt and ./[JOB NAME]_message_foot.txt, you can add a message to the beginning or end (respectively) of each email Stat Watch sends. It's recommended that you add a message here as well to remind the customer of these expectations.
 
 ```
 Hello,
