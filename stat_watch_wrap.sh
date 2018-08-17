@@ -2,7 +2,7 @@
 ### A wrapper script for stat_watch.pl
 ### Created by ACWilliams
 
-v_VERSION="1.0.0";
+v_VERSION="1.1.0";
 
 f_PERL_SCRIPT="stat_watch.pl"
 d_WORKING="stat_watch"
@@ -19,9 +19,35 @@ if [[ ! -f "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" ]]; then
 	echo "Cannot find \"$f_PERL_SCRIPT\". It should be located in the same directory as this file"
 	exit
 elif [[ -f /usr/local/cpanel/3rdparty/bin/perl && $( head -n1 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" | cut -d " " -f2 ) == "/usr/bin/perl" ]]; then
-	### If cPanels perl is present, change stat_watch.pl to use that
+	### If cPanel's perl is present, change stat_watch.pl to use that
 	sed -i '1 s@^.*$@#! /usr/local/cpanel/3rdparty/bin/perl@' "$v_PROGRAMDIR"/"$f_PERL_SCRIPT"
 fi
+
+if [[ ! -f "$v_PROGRAMDIR"/."$d_WORKING"/md5.pm ]]; then
+	echo
+	echo "\"$v_PROGRAMDIR/$f_PERL_SCRIPT\" might not function as expected without the file \"$v_PROGRAMDIR/.$d_WORKING/md5.pm\":"
+	echo "https://raw.githubusercontent.com/sporks5000/stat_watch/master/.stat_watch/md5.pm";
+	echo
+	sleep 2
+fi
+
+function fn_get_script {
+### Given an identifier from the job file, rind the script and all command line arguments that follow
+	local a_SCRIPT=()
+	local v_SCRIPT_IDENT="$1"
+	v_SCRIPT="$( grep -E "^\s*$v_SCRIPT_IDENT" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*$v_SCRIPT_IDENT[[:blank:]]*//;s/[[:blank:]]*$//" )"
+	if [[ -n $v_SCRIPT ]]; then
+		local word
+		for word in $( echo $v_SCRIPT ); do
+			a_SCRIPT[${#a_SCRIPT[@]}]="$word"
+		done
+		if [[ ${a_SCRIPT[0]:0:1} != "/" ]]; then
+			unset v_SCRIPT
+		elif [[ ! -n "${a_SCRIPT[0]}" || ! -f "${a_SCRIPT[0]}" || ! -x "${a_SCRIPT[0]}" ]]; then
+			unset v_SCRIPT
+		fi
+	fi
+}
 
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then
 cat << EOF | fold -s -w $(( $(tput cols) - 1 )) > /dev/stdout
@@ -33,12 +59,13 @@ USAGE
 
 ./$v_PROGRAMNAME
     - Asks the user key questions in order to create a Stat Watch job to watch and backup key user files
-    - By default, this will enable backup for files that end with the following: .php, .php4, .php5, .php7, .pl, .pm, .py, .js, .css, .cgi, .htm, .html, .htaccess, .htpasswd, .sh, .rb
+    - By default, this will enable backup for files that end with the following: .php, .php4, .php5, .php7, .pl, .pm, .py, .js, .json, .css, .cgi .htm, .html, .htaccess, .htpasswd, .sh, .rb
     - What files are being checked and what files are being backed up can be modified by editing the .job file that this script creates
 
 ./$v_PROGRAMNAME --run [FILE]
     - Runs the necessary commands to complete a Stat Watch job, including checking the stats of files, determining th edifferences, and backing up files when necessary
     - FILE is the .job file created by $v_PROGRAMNAME
+    - Adding the "--errors" flag after the file will prevent errors from $v_PROGRAMDIR/$f_PERL_SCRIPT from being routed to /dev/null
 
 ./$v_PROGRAMNAME --email-test [EMAIL ADDRESS]
     - Sends a test message to the email address specified so that the end recipient can see an example
@@ -59,6 +86,10 @@ The help output for "$v_PROGRAMDIR/$f_PERL_SCRIPT" explains a number of control 
     - "Prune-chance" - Pruning old backups will occur X out of every Y runs. "Prune-chance" designates the "X". Without this set, the default is 1.
     - "Email-no-changes" - If this control string is present, send emails even if there are no changes.
     - "Log-max" - A number following this control string will designate the maximum size (in bytes) of the log before it's trimmed. Without this set, the default is 10485760.
+    - "Run-start" - At the start of the Stat Watch job, before any uses of $f_PERL_SCRIPT, attempt to run the script (with any given flags and arguments) that follows this control string
+        - The full path to the script must be used
+    - "Run-end" - At the end of the Stat Watch job, after all "--record" "--backup" or "--diff" uses of $f_PERL_SCRIPT, attempt to run the script (with any given flags and arguments) that follows this control string
+        - The full path to the script must be used
 
 
 JOB FILES
@@ -119,6 +150,10 @@ Current Version: $v_VERSION
 
 Version Notes:
 
+1.1.0 (2018-08-17) -
+    - Added the ability to turn off error supression
+    - Added the ability to un helper-scripts before and after the main portions fo the Stat Watch job
+
 1.0.1 (2018-08-10) -
     - Added log trimming to prevent the log from going out of control (like Dave Coulier)
 
@@ -135,6 +170,10 @@ elif [[ "$1" == "--run" ]]; then
 		echo "No such file"
 		exit
 	fi
+	v_ERROR_OUT="/dev/null"
+	if [[ -n $3 && "$3" == "--errors" ]]; then
+		v_ERROR_OUT="/dev/stderr"
+	fi
 	v_NAME="$( grep -E "^\s*Name" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Name[[:blank:]]*//;s/[[:blank:]]*$//" )"
 	if [[ -z $v_NAME ]]; then
 		echo "Cannot find name in Job file. Exiting"
@@ -143,14 +182,14 @@ elif [[ "$1" == "--run" ]]; then
 	v_DIR="$( echo "$f_JOB_FILE" | rev | cut -d "/" -f2- | rev )"
 	v_EXPIRE="$( grep -E "^\s*Expire" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Expire[[:blank:]]*//;s/[[:blank:]]*$//" )"
 	### Create a directory to stand as an indicator that a job is running
-	mkdir "$v_DIR"/"$v_NAME"_run 2> /dev/null || v_EXIT=true
+	mkdir "$v_DIR"/"$v_NAME"_run 2> "$v_ERROR_OUT" || v_EXIT=true
 	if [[ $v_EXIT == true ]]; then
 		### This won't be 100% effective, but it should prevent most instances of this running twice at the same time
 		sleep 0.$(( RANDOM % 10 ))
-		v_PID="$( cat "$v_DIR"/"$v_NAME"_run/pid 2> /dev/null )"
-		if [[ -n $v_PID && $( cat /proc/$v_PID/cmdline 2> /dev/null | grep -F -c "$v_PROGRAMDIR/$v_PROGRAMNAME" ) -gt 0 ]]; then
-			v_EPOCH="$( cat "$v_DIR"/"$v_NAME"_run/epoch 2> /dev/null )"
-			### heck to see if the job has run for too long
+		v_PID="$( cat "$v_DIR"/"$v_NAME"_run/pid 2> "$v_ERROR_OUT" )"
+		if [[ -n $v_PID && $( cat /proc/$v_PID/cmdline 2> "$v_ERROR_OUT" | grep -F -c "$v_PROGRAMDIR/$v_PROGRAMNAME" ) -gt 0 ]]; then
+			v_EPOCH="$( cat "$v_DIR"/"$v_NAME"_run/epoch 2> "$v_ERROR_OUT" )"
+			### check to see if the job has run for too long
 			v_MAX_RUN2="$( grep -E "^\s*Max-run" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Max-run[[:blank:]]*//;s/[[:blank:]]*$//" )"
 			if [[ -n $v_MAX_RUN2 && $( echo "$v_MAX_RUN" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
 				v_MAX_RUN="$v_MAX_RUN2"
@@ -195,26 +234,51 @@ elif [[ "$1" == "--run" ]]; then
 			exit
 		fi
 	fi
+	fn_get_script "Run-start"; v_RUN_START="$v_SCRIPT"
+	fn_get_script "Run-end"; v_RUN_END="$v_SCRIPT"
 	if [[ ! -f "$v_DIR"/"$v_NAME"_files.txt ]]; then
 	### If this is the first run, do an initial backup of files
+		eval "$v_RUN_START"
 		stat -c '%Y' "$f_JOB_FILE" > "$v_DIR"/"$v_NAME"_stamp
-		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --record -i "$f_JOB_FILE" -o "$v_DIR"/"$v_NAME"_files.txt -v 2> /dev/null
-		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --backup -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files.txt 2> /dev/null
+		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --record -i "$f_JOB_FILE" -o "$v_DIR"/"$v_NAME"_files.txt -v 2> "$v_ERROR_OUT"
+		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --backup -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files.txt 2> "$v_ERROR_OUT"
+		eval "$v_RUN_END"
 	else
 	### If this is a later run, diff the reports, and if there were changes, email them out
-		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --record -i "$f_JOB_FILE" -o "$v_DIR"/"$v_NAME"_files2.txt 2> /dev/null
-		if [[ $( stat -c '%Y' "$f_JOB_FILE" ) -gt $( cat "$v_DIR"/"$v_NAME"_stamp 2> /dev/null ) ]]; then
+		eval "$v_RUN_START"
+		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --record -i "$f_JOB_FILE" -o "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
+		if [[ $( stat -c '%Y' "$f_JOB_FILE" ) -gt $( cat "$v_DIR"/"$v_NAME"_stamp 2> "$v_ERROR_OUT" ) ]]; then
 			### If the job file has been updated, there's a chance that we need to back up additional files
-			nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --backup -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files2.txt 2> /dev/null
+			nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --backup -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
 			### ypdate the stat file so that we know not to do that next time
 			stat -c '%Y' "$f_JOB_FILE" > "$v_DIR"/"$v_NAME"_stamp
 		fi
 		v_STAMP="$( date +%s )"
-		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --diff --no-check-retention -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> /dev/null
-		mv -f "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_files.txt
-		if [[ $( wc -l "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt | cut -d " " -f1 ) -lt 2 ]]; then
-			v_NO_CHANGE="$( grep -E -c "^\s*Email-no-changes\s*$" "$f_JOB_FILE" )"
-			if [[ $v_NO_CHANGE -gt 1 ]]; then
+		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --diff --no-check-retention -i "$f_JOB_FILE" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> "$v_ERROR_OUT"
+		eval "$v_RUN_END"
+		### this file should contain at least two lines
+		if [[ $( wc -l "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -gt 1 ]]; then
+			mv -f "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_files.txt
+			if [[ $( wc -l "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -lt 2 ]]; then
+				v_NO_CHANGE="$( grep -E -c "^\s*Email-no-changes\s*$" "$f_JOB_FILE" )"
+				if [[ $v_NO_CHANGE -gt 1 ]]; then
+					v_EMAIL="$( grep -E "^\s*Email" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Email[[:blank:]]*//;s/[[:blank:]]*$//" )"
+					if [[ -n $v_EMAIL ]]; then
+						( 
+							if [[ -f "$v_DIR"/"$v_NAME"_mesasage.txt ]]; then 
+								cat "$v_DIR"/"$v_NAME"_mesasage.txt; 
+								echo; 
+							fi
+							echo "No changes were detected."
+							echo
+							echo "This output was generated by \"$v_PROGRAMDIR/$f_PERL_SCRIPT\" and \"$v_PROGRAMDIR/$v_PROGRAMNAME\" from the job file at \"$f_JOB_FILE\'"
+						) | mail -s "Stat Watch - No changed detected on $(hostname)" $v_EMAIL
+					fi
+				else
+					rm -f "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt
+				fi
+			else
+			### If there were changes, check if we have an email address and then send a message to it
 				v_EMAIL="$( grep -E "^\s*Email" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Email[[:blank:]]*//;s/[[:blank:]]*$//" )"
 				if [[ -n $v_EMAIL ]]; then
 					( 
@@ -222,28 +286,14 @@ elif [[ "$1" == "--run" ]]; then
 							cat "$v_DIR"/"$v_NAME"_mesasage.txt; 
 							echo; 
 						fi
-						echo "No changes were detected."
+						cat "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt 
 						echo
-						echo "This output was generated by \"$v_PROGRAMDIR/$f_PERL_SCRIPT\" and \"$v_PROGRAMDIR/$v_PROGRAMNAME\" from the job file at \"$f_JOB_FILE\'"
-					) | mail -s "Stat Watch - No changed detected on $(hostname)" $v_EMAIL
+						echo "This output was generated by \"$v_PROGRAMDIR/$f_PERL_SCRIPT\" and \"$v_PROGRAMDIR/$v_PROGRAMNAME\" from the job file at \"$f_JOB_FILE\""
+					) | mail -s "Stat Watch - File changes on $(hostname)" $v_EMAIL
 				fi
-			else
-				rm -f "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt
 			fi
 		else
-		### If there were changes, check if we have an email address and then send a message to it
-			v_EMAIL="$( grep -E "^\s*Email" "$f_JOB_FILE" | tail -n1 | sed "s/^[[:blank:]]*Email[[:blank:]]*//;s/[[:blank:]]*$//" )"
-			if [[ -n $v_EMAIL ]]; then
-				( 
-					if [[ -f "$v_DIR"/"$v_NAME"_mesasage.txt ]]; then 
-						cat "$v_DIR"/"$v_NAME"_mesasage.txt; 
-						echo; 
-					fi
-					cat "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt 
-					echo
-					echo "This output was generated by \"$v_PROGRAMDIR/$f_PERL_SCRIPT\" and \"$v_PROGRAMDIR/$v_PROGRAMNAME\" from the job file at \"$f_JOB_FILE\""
-				) | mail -s "Stat Watch - File changes on $(hostname)" $v_EMAIL
-			fi
+			rm -f "$v_DIR"/"$v_NAME"_files2.txt
 		fi
 
 		### Check to see if the user set the prune variables to soemthing different
@@ -258,7 +308,7 @@ elif [[ "$1" == "--run" ]]; then
 
 		### Determine whether or not we're purning old backups
 		if [[ $(( $v_PRUNE_CHANCE + RANDOM % $v_PRUNE_MAX )) -le $v_PRUNE_CHANCE ]]; then
-			nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --prune -i "$f_JOB_FILE"
+			nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --prune -i "$f_JOB_FILE" 2> "$v_ERROR_OUT"
 		fi
 	fi
 
@@ -268,7 +318,7 @@ elif [[ "$1" == "--run" ]]; then
 		v_LOG_MAX="$v_LOG_MAX2"
 	fi
 	if [[ $( stat -c %s "$v_DIR"/"$v_NAME".log ) -gt $v_LOG_MAX ]]; then
-		printf "%s\n" "1,1000d" w | ed -s "$v_DIR"/"$v_NAME".log 2> /dev/null
+		printf "%s\n" "1,1000d" w | ed -s "$v_DIR"/"$v_NAME".log 2> "$v_ERROR_OUT"
 	fi
 
 	rm -rf "$v_DIR"/"$v_NAME"_run
@@ -365,8 +415,8 @@ cat << EOF > "$f_JOB_FILE"
 ### This file created by $v_PROGRAMNAME
 I $v_MONITOR
 BackupD $v_DIR/backup_$v_NAME
-### back up the following extensions: .php, .php4, .php5, .php7, .pl, .pm, .py, .js, .css, .cgi .htm, .html, .htaccess, .htpasswd, .sh, .rb
-BackupR \.(p(hp(4|5|7)?|[lym])|js|c(ss|gi)|ht(ml?|access|passwd)|sh|rb)$
+### back up the following extensions: .php, .php4, .php5, .php7, .pl, .pm, .py, .js, .json, .css, .cgi .htm, .html, .htaccess, .htpasswd, .sh, .rb
+BackupR \.(p(hp(4|5|7)?|[lym])|js(on)?|c(ss|gi)|ht(ml?|access|passwd)|sh|rb)$
 BackupMD 7
 BackupMC 4
 Log $v_DIR/$v_NAME.log

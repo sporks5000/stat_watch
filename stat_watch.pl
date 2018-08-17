@@ -6,14 +6,15 @@
 use strict;
 use warnings;
 
-my $v_VERSION = "1.0.1";
+my $v_VERSION = "1.1.0";
 
 use Cwd 'abs_path';
 use POSIX 'strftime';
 
 my $v_program = __FILE__;
+my $d_working;
 
-### Arrays to hold directories to check against and ignore strings
+### Arrays to hold files and directories to check against and ignore strings
 my @v_dirs;
 my @v_ignore;
 my @v_rignore;
@@ -45,6 +46,10 @@ my $b_diff_ctime = 1;
 my $b_ignore_on_record;
 my @v_includes;
 my $b_partial_seconds = 1;
+my @v_md5;
+my @v_md5r;
+my $b_use_md5;
+my $b_md5_all;
 
 #===================#
 #== Report Output ==#
@@ -67,7 +72,7 @@ sub fn_check_file {
 		}
 	}
 	for my $_string (@v_temp_rignore) {
-		if ( ($v_file . "/" ) =~ m/$_string/ ) {
+		if ( $v_file =~ m/$_string/ ) {
 			if ($b_verbose) {
 				print STDERR "IGNORED: '" . $v_file_escape . "'\n";
 			}
@@ -85,9 +90,30 @@ sub fn_check_file {
 	return 1;
 }
 
+sub fn_check_md5 {
+### Given a file name, if we're supposed to get md5's return the md5. Otherwise, return an empty string
+	my $v_file = $_[0];
+	if ( $b_use_md5 && (-l $v_file || ! -d $v_file) ) {
+		if ($b_md5_all) {
+			return( ' -- ' . &sw_md5::get_md5($v_file) );
+		}
+		for my $_string (@v_md5) {
+			if ( $v_file eq $_string ) {
+				return( ' -- ' . &sw_md5::get_md5($v_file) );
+			}
+		}
+		for my $_string (@v_md5r) {
+			if ( $v_file =~ m/$_string/ ) {
+				return( ' -- ' . &sw_md5::get_md5($v_file) );
+			}
+		}
+	}
+	return '';
+}
+
 sub fn_stat_watch {
 ### Stat every file in the directory, then dive into directories
-### $_[0] is the directory in question
+### $_[0] is the directory in question; $_[1] is the timestamp associated with this process
 	my $v_dir = $_[0];
 	my $v_timestamp = $_[1];
 	if ($b_verbose) {
@@ -102,6 +128,7 @@ sub fn_stat_watch {
 			$v_dir_escape =~ s/'/'\\''/g;
 			my $v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z '$v_dir_escape' 2> /dev/null`;
 			chomp( $v_line );
+			$v_line .= fn_check_md5($v_dir);
 			print $fh_output "'" . $v_dir . "' -- " . $v_line . "\n";
 		}
 	} elsif ( -e $v_dir ) {
@@ -112,22 +139,23 @@ sub fn_stat_watch {
 			my @dirs;
 			for my $_file (@files) {
 				if ( $_file ne "." && $_file ne ".." ) {
-					$_file = $v_dir . "/" . $_file;
+					my $v_file = $v_dir . "/" . $_file;
 					### Make sure that the file doesn't match any of the ignore lists
-					if ( $b_ignore_on_record && ! fn_check_file($_file) ) {
+					if ( $b_ignore_on_record && ! fn_check_file($v_file) ) {
 						next;
 					}
 					### Capture it if it's a directory
-					if ( -d $_file && ! -l $_file ) {
-						push( @dirs, $_file );
+					if ( -d $v_file && ! -l $v_file ) {
+						push( @dirs, $v_file );
 					}
 					### Stat the file and output the results to the report
-					my $v_file_escape = $_file;
+					my $v_file_escape = $v_file;
 					$v_file_escape =~ s/'/'\\''/g;
 					my $v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z '$v_file_escape' 2> /dev/null`;
 					chomp( $v_line );
-					my $v_file_name = $_file;
-					if ( $_file =~ m/\n/ ) {
+					$v_line .= fn_check_md5($v_file);
+					my $v_file_name = $v_file;
+					if ( $v_file =~ m/\n/ ) {
 						$v_file_name =~ s/\n/_mlfn_$v_timestamp/g;
 					}
 					print $fh_output "'" . $v_file_name . "' -- " . $v_line . "\n";
@@ -162,19 +190,34 @@ sub fn_diff {
 	my @v_diff = `diff '$diff1_escape' '$diff2_escape' 2> /dev/null`;
 	@v_diff = fn_diff_check_lines( undef, 2, undef, @v_diff );
 	### Separate out just the file names from the diff
+	my $b_checked_md5;
 	my $ref_diff;
 	for my $_line (@v_diff) {
 		my $v_first = substr( $_line, 0, 1 );
 		if ( $v_first eq ">" || $v_first eq "<" ) {
 			chomp($_line);
-			my $v_file = substr((split( m/'([^']+)$/, $_line ))[0], 3);
+			my @v_line = split( m/'/, $_line );
+			my $v_line = pop(@v_line);
+			### Remove up to the first single quote
+			shift(@v_line);
+			### Most files won't have single quotes in them, but just in case...
+			my $v_file = join( "'", @v_line );
 			if ( ! exists $ref_diff->{$v_file} ) {
 				my $v_file_escape = $v_file;
 				$v_file_escape =~ s/'/'\\''/g;
 				$ref_diff->{$v_file}->{'escape'} = "'" . $v_file_escape . "'";
 			}
 			$ref_diff->{$v_file}->{$v_first}->{'line'} = $_line;
-			my @v_line = split( m/ -- /, $_line );
+			@v_line = split( m/ -- /, $v_line );
+			if ( scalar(@v_line) == 8 ) {
+				if ( length($v_line[7]) == 32 ) {
+					### If there's an md5sum, capture it
+					$ref_diff->{$v_file}->{$v_first}->{'md5'} = pop(@v_line);
+				} else {
+					### I don't know what this is, so get rid of it
+					pop(@v_line);
+				}
+			}
 			my $v_ctime = pop(@v_line);
 			my $v_mtime = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'size'} = pop(@v_line);
@@ -203,6 +246,7 @@ sub fn_diff {
 	my @v_new;
 	my @v_perms;
 	my @v_size;
+	my @v_md5;
 	my @v_stamps;
 	my @v_removed;
 	my $v_details = '';
@@ -217,10 +261,22 @@ sub fn_diff {
 			### This file is new
 			my $v_dir = substr( $ref_diff->{$v_file}->{'>'}->{'perms'}, 0, 1 );
 			push( @v_new, $ref_diff->{$v_file}->{'escape'} );
+
+			### Details Strings
 			$v_diff_details .= $ref_diff->{$v_file}->{'>'}->{'line'} . "\n";
-			$details .= "     Status:       New\n     M-time:       " . $ref_diff->{$v_file}->{'>'}->{'mtime'} . "\n     C-time:       " . $ref_diff->{$v_file}->{'>'}->{'ctime'} . "\n     File Size:    " . $ref_diff->{$v_file}->{'>'}->{'size'} . " bytes\n     Permissions:  " . $ref_diff->{$v_file}->{'>'}->{'perms'} . "\n     Owner:        " . $ref_diff->{$v_file}->{'>'}->{'owner'} . "\n     Group:        " . $ref_diff->{$v_file}->{'>'}->{'group'} . "\n";
-			my $html_details1 = '<tr><th>Status</th><th>M-time</th><th>C-time</th><th>File Size</th><th>Permissions</th><th>Owner</th><th>Group</th></tr>' . "\n";
-			my $html_details2 = '<tr><td>New</td><td>' . $ref_diff->{$v_file}->{'>'}->{'mtime'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'ctime'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'size'}. ' bytes</td><td>' . $ref_diff->{$v_file}->{'>'}->{'perms'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'owner'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'group'} . '</td></tr>' . "\n";
+			$details .= "     Status:       New\n     M-time:       " . $ref_diff->{$v_file}->{'>'}->{'mtime'} . "\n     C-time:       " . $ref_diff->{$v_file}->{'>'}->{'ctime'} . "\n     File Size:    " . $ref_diff->{$v_file}->{'>'}->{'size'} . " bytes\n";
+			my $html_details1 = '<tr><th>Status</th><th>M-time</th><th>C-time</th><th>File Size</th>';
+			my $html_details2 = '<tr><td>New</td><td>' . $ref_diff->{$v_file}->{'>'}->{'mtime'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'ctime'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'size'}. ' bytes</td>';
+			if ( exists $ref_diff->{$v_file}->{'>'}->{'md5'} ) {
+				$details .= "     MD5 Sum:      " . $ref_diff->{$v_file}->{'>'}->{'md5'} . "\n";
+				$html_details1 .= '<th>MD5 Sum</th>';
+				$html_details2 .= '<td>' . $ref_diff->{$v_file}->{'>'}->{'md5'} . '</td>';
+			}
+			$details .= "     Permissions:  " . $ref_diff->{$v_file}->{'>'}->{'perms'} . "\n     Owner:        " . $ref_diff->{$v_file}->{'>'}->{'owner'} . "\n     Group:        " . $ref_diff->{$v_file}->{'>'}->{'group'} . "\n";
+			$html_details1 .= '<th>Permissions</th><th>Owner</th><th>Group</th></tr>' . "\n";
+			$html_details2 .= '<td>' . $ref_diff->{$v_file}->{'>'}->{'perms'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'owner'} . '</td><td>' . $ref_diff->{$v_file}->{'>'}->{'group'} . '</td></tr>' . "\n";
+
+			### Check if there's anything else we need to do
 			if ( $v_dir ne "d" ) {
 				push( @v_files2, $v_file );
 			}
@@ -248,11 +304,24 @@ sub fn_diff {
 			my $html_details3 = '';
 			my $html_details4 = '';
 			my $b_owner;
-			my $b_not_stamps;
 			my $b_stamps;
 			my $v_mention = '';
 			my $b_list;
 			my $v_dir = substr( $ref_diff->{$v_file}->{'>'}->{'perms'}, 0, 1 );
+			if ( exists $ref_diff->{$v_file}->{'<'}->{'md5'} && exists $ref_diff->{$v_file}->{'>'}->{'md5'} ) {
+				### Only compare md5sums if they exist for both
+				if ( $ref_diff->{$v_file}->{'<'}->{'md5'} ne $ref_diff->{$v_file}->{'>'}->{'md5'} ) {
+					push( @v_md5, $ref_diff->{$v_file}->{'escape'} . $v_mention );
+					$v_mention = " (Also listed above)";
+					$details2 .= "     MD5 Sum:      " . $ref_diff->{$v_file}->{'<'}->{'md5'} . " -> " . $ref_diff->{$v_file}->{'>'}->{'md5'} . "\n";
+					$html_details1 .= '<th>MD5 Sum</th>';
+					$html_details2 .= '<td>' . $ref_diff->{$v_file}->{'>'}->{'md5'} . '</td>';
+					if ( $v_dir ne "d" && ! $b_list ) {
+						push( @v_files2, $v_file );
+						$b_list = 1;
+					}
+				}
+			}
 			if ( $ref_diff->{$v_file}->{'<'}->{'size'} ne $ref_diff->{$v_file}->{'>'}->{'size'} ) {
 				push( @v_size, $ref_diff->{$v_file}->{'escape'} . $v_mention );
 				$v_mention = " (Also listed above)";
@@ -263,7 +332,6 @@ sub fn_diff {
 					push( @v_files2, $v_file );
 					$b_list = 1;
 				}
-				$b_not_stamps = 1;
 			}
 			if ( $ref_diff->{$v_file}->{'<'}->{'perms'} ne $ref_diff->{$v_file}->{'>'}->{'perms'} ) {
 				$b_owner = 1;
@@ -375,6 +443,16 @@ sub fn_diff {
 		$v_details2 .= "FILES THAT WERE REMOVED:\n";
 		$v_html_details2 .= '<h2>Files that were Removed:</h2>' . "\n";
 		for my $_file (@v_removed) {
+			$v_details2 .= "   " . $_file . "\n";
+			$v_html_details2 .= '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' . $_file . "<br>\n";
+		}
+		$v_details2 .= "\n";
+		$v_html_details2 .= "<br>\n";
+	}
+	if (@v_md5) {
+		$v_details2 .= "FILES WITH CHANGED MD5 SUMS:\n";
+		$v_html_details2 .= '<h2>Files with Changed MD5 Sums:</h2>' . "\n";
+		for my $_file (@v_md5) {
 			$v_details2 .= "   " . $_file . "\n";
 			$v_html_details2 .= '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' . $_file . "<br>\n";
 		}
@@ -826,6 +904,7 @@ sub fn_get_include {
 		while (<$fh_read>) {
 			my $_line = $_;
 			chomp($_line);
+			### Remove any space at the start or end of the line
 			$_line =~ s/(^\s*|\s*$)//g;
 			if ( $_line =~ m/^R\s*[^\s]/ ) {
 			### Regex for files to ignore
@@ -835,6 +914,10 @@ sub fn_get_include {
 			### Regex for files to back up
 				$_line =~ s/^BackupR\s*//;
 				push( @v_backupr, qr/$_line/ );
+			} elsif ( $_line =~ m/^MD5R\s*[^\s]/ ) {
+			### Regex for files to check md5sums in addition to stats
+				$_line =~ s/^MD5R\s*//;
+				push( @v_md5r, qr/$_line/ );
 			} else {
 				### There are no instances where double slashes will be necessary in file names. Get rid of them.
 				$_line =~ s/\/\/+/\//g;
@@ -847,14 +930,14 @@ sub fn_get_include {
 				### Ignore all files whose full path starts with this string
 					$_line =~ s/^\*\s*//;
 					push( @v_star_ignore, abs_path($_line) );
-				} elsif ( $_line =~ m/^I\s*\// ) {
-				### Also report on these files / directories
-					$_line =~ s/^I\s*//;
-					push( @v_dirs, abs_path($_line) );
 				} elsif ( $_line =~ m/^Include\s*\// ) {
 				### Process these files as additional include/ignore lists
 					$_line =~ s/^Include\s*//;
 					fn_get_include( abs_path($_line) );
+				} elsif ( $_line =~ m/^I\s*\// ) {
+				### Also report on these files / directories
+					$_line =~ s/^I\s*//;
+					push( @v_dirs, abs_path($_line) );
 				} elsif ( $_line =~ m/^BackupD\s*\// ) {
 				### Set a directory to back up to
 					$_line =~ s/^BackupD\s*//;
@@ -863,6 +946,13 @@ sub fn_get_include {
 				### Specify a file that should be backed up if there are changes
 					$_line =~ s/^Backup\+\s*//;
 					push(@v_backup_plus, abs_path($_line));
+				} elsif ( $_line =~ m/^MD5\s*\// ) {
+				### Specify a file that we want to capture the md5 sum of
+					$_line =~ s/^MD5\s*//;
+					push(@v_md5, abs_path($_line));
+				} elsif ( $_line eq "MD5" ) {
+				### If we just want to md5sum everything...
+					$b_md5_all = 1;
 				} elsif ( $_line =~ m/^BackupMD\s*[0-9]/ ) {
 				### The minimum number of days a backup is kept
 					$_line =~ s/^BackupMD\s*//;
@@ -891,17 +981,10 @@ sub fn_get_include {
 sub fn_document_backup {
 	if ( $d_backup ) {
 	### If the include file listed a backup directory, add that to the list of backup directories
-		my @v_dir = split( m/\//, $v_program );
-		pop( @v_dir );
-		my $v_dir = join( '/', @v_dir );
-		$v_dir = $v_dir . "/.stat_watch";
-		if ( ! -d $v_dir ) {
-			mkdir( $v_dir, 0755 );
-		}
 		my @v_backup_dirs;
 		### Open the list and read from it
-		if ( -f $v_dir . "/backup_locations" ) {
-			if ( open( my $fh_read, "<", $v_dir . "/backup_locations" ) ) {
+		if ( -f $d_working . "/backup_locations" ) {
+			if ( open( my $fh_read, "<", $d_working . "/backup_locations" ) ) {
 				while (<$fh_read>) {
 					my $_line = $_;
 					chomp($_line);
@@ -916,7 +999,7 @@ sub fn_document_backup {
 		}
 		### If we've gotten this far, it wasn't in the list. Add it
 		push( @v_backup_dirs, $d_backup );
-		if ( open( my $fh_write, ">", $v_dir . "/backup_locations" ) ) {
+		if ( open( my $fh_write, ">", $d_working . "/backup_locations" ) ) {
 			for my $_line (@v_backup_dirs) {
 				print $fh_write $_line . "\n";
 			}
@@ -1048,6 +1131,49 @@ sub fn_report_unknown {
 	sleep( 2 );
 }
 
+sub fn_get_working {
+### Given the name of the program, return the name of an appropriate working directory
+	my $v_program = $_[0];
+	my @v_working = split( m/\//, $v_program );
+	my $v_name = pop( @v_working );
+	$v_name =~ s/\.pl$//;
+	my $d_working = join( '/', @v_working );
+	$d_working .= "/." . $v_name;
+	if ( ! -d $d_working ) {
+		mkdir( $d_working, 0755 );
+	}
+	return $d_working;
+}
+
+sub fn_mod_check {
+	my @module_list = @_;
+
+	### Check for the modules. Compile a list of any that are not present.
+	my @missing_modules;
+	MODULES: for my $module ( @module_list ) {
+		my $module2 = $module;
+		$module2 =~ s/::/\//g;
+		for my $dir ( @INC ) {
+			if ( -f $dir . "/" . $module2 . ".pm" ) {
+				next MODULES;
+			}
+		}
+		push( @missing_modules, $module );
+	}
+
+	### If any of the modules are missing, let the user know and exit
+	if ( @missing_modules ) {
+		print "You will need to install the following Perl modules:\n\n";
+		for ( @missing_modules ) {
+			print $_, "\n";
+		}
+		print "\n";
+		print "In order to do so, run the following command:\n\n";
+		print "cpan -i @missing_modules\n\n";
+		exit;
+	}
+}
+
 sub fold_print {
 ### Given a message to print to the terminal, line-break that message at word breaks
 ### $_[0] is the message; $_[1] is the number of columns to use if columns can't be determined.
@@ -1121,6 +1247,10 @@ sub fold_print {
 sub fn_version {
 print "Current Version: $v_VERSION\n";
 my $v_message = <<'EOF';
+
+Version 1.1.0 (2018-08-17) -
+    - Added the ability to compare md5sums of files as well
+    - Fixed a bug where files might be being matched against incorrectly due to an added slash
 
 Version 1.0.1 (2018-08-10) -
     - Added the ability to capture data on files with names that include a newline character
@@ -1214,6 +1344,10 @@ Control Strings:
         - "BackupR" - If a file matches the regular expression that follows, and the appropriate flags are set, they will be backed up
         - "Backup+" - In any instance where there are changes to the following file, it will be backed up
         - "Time-" - Stat changes to this file will not be reported if the only change is to mtime or ctime
+        - "MD5R" - If a file matches the regular expression that follows, also capture the file's MD5 sum for comparison
+        - "MD5" -
+            - If a file's name and full path matches the exact string that follows, also capture the file's MD5 sum for comparison
+            - If this is alone on a line, then capture MD5 sums for everything
     - Lines beginning with the following control strings have special meanings, but only the last declaration will be interpreted:
         - "BackupD" - This specifies the directory to backup files to. The directory must already exist and be writable, or Stat Watch will error out
         - "BackupMD" - A number specified here will set the minumum number of days a backed up file should be kept
@@ -1256,6 +1390,9 @@ exit 0;
 #== Parse command line arguments ==#
 #==================================#
 
+### Find the working directory, in case it's needed
+$d_working = fn_get_working($v_program);
+
 ### Process all of the universal arguments first
 my @args;
 while ( defined $ARGV[0] ) {
@@ -1268,6 +1405,8 @@ while ( defined $ARGV[0] ) {
 			unshift( @ARGV, "-" . $a );
 		}
 	} elsif ( $v_arg =~ m/^-[a-zA-Z0-9][a-zA-Z0-9]+=.*$/ ) {
+	### If it's single character arguments, and then there's an equals sign followed by more data
+	### ...this isn't posix compliant, but let's split it up anyway
 		my @v_args = split( m/=/, $v_arg, 2 );
 		unshift( @ARGV, pop(@v_args) );
 		unshift( @ARGV, pop(@v_args) );
@@ -1495,6 +1634,18 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		$_dir =~ s/\/$//;
 	}
 	my $b_close = fn_sort_prep();
+	### If we're supposed to be getting md5sums, check to ensure that that's possible
+	if ( @v_md5r || $b_md5_all || @v_md5 ) {
+		if ( -f $d_working . '/md5.pm' ) {
+			fn_mod_check( 'Digest::MD5', 'Digest::MD5::File' );
+			require( $d_working . '/md5.pm' );
+			$b_use_md5 = 1;
+		} else {
+			print STDERR "\nCannot check md5sums without module '" . $d_working . "/md5.pm':\n";
+			print STDERR "https://raw.githubusercontent.com/sporks5000/stat_watch/master/.stat_watch/md5.pm\n\n";
+			sleep 2;
+		}
+	}
 	### Process those directories
 	for my $_dir ( @v_dirs ) {
 		my $v_timestamp = time();
