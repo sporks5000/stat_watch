@@ -15,20 +15,48 @@ v_LOG_MAX=10485760
 ### Find out where we are and make sure that stat_watch.pl is here too
 v_PROGRAMDIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 v_PROGRAMNAME="$( basename "${BASH_SOURCE[0]}" )"
+v_PERL="/usr/bin/perl"
+v_CPAN="/usr/bin/cpan"
 if [[ ! -f "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" ]]; then
 	echo "Cannot find \"$f_PERL_SCRIPT\". It should be located in the same directory as this file"
 	exit
-elif [[ -f /usr/local/cpanel/3rdparty/bin/perl && $( head -n1 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" | cut -d " " -f2 ) == "/usr/bin/perl" ]]; then
-	### If cPanel's perl is present, change stat_watch.pl to use that
-	sed -i '1 s@^.*$@#! /usr/local/cpanel/3rdparty/bin/perl@' "$v_PROGRAMDIR"/"$f_PERL_SCRIPT"
+elif [[ -f /usr/local/cpanel/3rdparty/bin/perl ]]; then
+	if  [[ $( head -n1 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" | cut -d " " -f2 ) == "/usr/bin/perl" ]]; then
+		### If cPanel's perl is present, change stat_watch.pl to use that
+		sed -i '1 s@^.*$@#! /usr/local/cpanel/3rdparty/bin/perl@' "$v_PROGRAMDIR"/"$f_PERL_SCRIPT"
+	fi
+	### If we're making this change, we need to modify what versions of perl and cpan we're referencing
+	v_PERL="/usr/local/cpanel/3rdparty/bin/perl"
+	v_CPAN="$( \ls -1 /usr/local/cpanel/3rdparty/perl/*/bin/cpan | tail -n1 )"
 fi
 
+### Check if the md5 module is present
 if [[ ! -f "$v_PROGRAMDIR"/."$d_WORKING"/md5.pm ]]; then
 	echo
 	echo "\"$v_PROGRAMDIR/$f_PERL_SCRIPT\" might not function as expected without the file \"$v_PROGRAMDIR/.$d_WORKING/md5.pm\":"
-	echo "https://raw.githubusercontent.com/sporks5000/stat_watch/master/.stat_watch/md5.pm";
+	echo "https://raw.githubusercontent.com/sporks5000/stat_watch/master/.stat_watch/md5.pm"
 	echo
 	sleep 2
+else
+	v_MODULES=''
+	if [[ $( "$v_PERL" -e "use Digest::MD5;" | head -n1 | egrep -c "^Can't locate" ) -gt 0 ]]; then
+		v_MODULES="$v_MODULES Digest::MD5"
+	fi
+	if [[ $( "$v_PERL" -e "use Digest::MD5::File;" | head -n1 | egrep -c "^Can't locate" ) -gt 0 ]]; then
+		v_MODULES="$v_MODULES Digest::MD5::File"
+	fi
+	if [[ -n $v_MODULES ]]; then
+		echo
+		echo "Attempting to install the necessary perl modules"
+		echo
+		sleep 2
+		"$v_CPAN" -i $v_MODULES
+		if [[ $? -ne 0 ]]; then
+			echo "Failed to install perl modules" > /dev/stderr
+			exit
+		fi
+		echo
+	fi
 fi
 
 function fn_get_script {
