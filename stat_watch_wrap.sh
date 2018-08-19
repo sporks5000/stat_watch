@@ -39,10 +39,10 @@ if [[ ! -f "$v_PROGRAMDIR"/."$d_WORKING"/md5.pm ]]; then
 	sleep 2
 else
 	v_MODULES=''
-	if [[ $( "$v_PERL" -e "use Digest::MD5;" | head -n1 | grep -E -c "^Can't locate" ) -gt 0 ]]; then
+	if [[ $( "$v_PERL" -e "use Digest::MD5;" 2>&1 | head -n1 | grep -E -c "^Can't locate" ) -gt 0 ]]; then
 		v_MODULES="$v_MODULES Digest::MD5"
 	fi
-	if [[ $( "$v_PERL" -e "use Digest::MD5::File;" | head -n1 | grep -E -c "^Can't locate" ) -gt 0 ]]; then
+	if [[ $( "$v_PERL" -e "use Digest::MD5::File;" 2>&1 | head -n1 | grep -E -c "^Can't locate" ) -gt 0 ]]; then
 		v_MODULES="$v_MODULES Digest::MD5::File"
 	fi
 	if [[ -n $v_MODULES ]]; then

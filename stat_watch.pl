@@ -6,7 +6,7 @@
 use strict;
 use warnings;
 
-my $v_VERSION = "1.1.0";
+my $v_VERSION = "1.2.0";
 
 use Cwd 'abs_path';
 use POSIX 'strftime';
@@ -50,6 +50,10 @@ my @v_md5;
 my @v_md5r;
 my $b_use_md5;
 my $b_md5_all;
+my $v_max_depth = 20;
+my $v_cur_depth = 0;
+my $v_as_dir;
+my $v_current_dir;
 
 #===================#
 #== Report Output ==#
@@ -111,6 +115,32 @@ sub fn_check_md5 {
 	return '';
 }
 
+sub fn_get_file_name {
+### Given the name of a file, appropriately replace new line characters and modify as necessary for a "--record" style report
+	my $v_file = $_[0];
+	my $v_timestamp = $_[1];
+	if ($v_as_dir) {
+		$v_file = $v_as_dir . substr( $v_file, length($v_current_dir) );
+	}
+	if ( $v_file =~ m/\n/ ) {
+		$v_file =~ s/\n/_mlfn_$v_timestamp/g;
+	}
+	return $v_file;
+}
+
+sub fn_report_line {
+### Given a file name, output the necessary data for a "--record" style report
+	my $v_file = $_[0];
+	my $v_timestamp = $_[1];
+	my $v_file_escape = $v_file;
+	$v_file_escape =~ s/'/'\\''/g;
+	my $v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z '$v_file_escape' 2> /dev/null`;
+	chomp( $v_line );
+	$v_line .= fn_check_md5($v_file);
+	$v_file = fn_get_file_name($v_file, $v_timestamp);
+	print $fh_output "'" . $v_file . "' -- " . $v_line . "\n";
+}
+
 sub fn_stat_watch {
 ### Stat every file in the directory, then dive into directories
 ### $_[0] is the directory in question; $_[1] is the timestamp associated with this process
@@ -123,15 +153,14 @@ sub fn_stat_watch {
 	}
 	if ( -e $v_dir && ! -d $v_dir ) {
 	### If we were given a file instead of a directory
-		if ( fn_check_file($v_dir) ) {
-			my $v_dir_escape = $v_dir;
-			$v_dir_escape =~ s/'/'\\''/g;
-			my $v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z '$v_dir_escape' 2> /dev/null`;
-			chomp( $v_line );
-			$v_line .= fn_check_md5($v_dir);
-			print $fh_output "'" . $v_dir . "' -- " . $v_line . "\n";
+		my $v_file = $v_dir;
+		if ( fn_check_file($v_file) ) {
+			fn_report_line($v_file, $v_timestamp);
 		}
 	} elsif ( -e $v_dir ) {
+		if ( $v_dir eq $v_current_dir ) {
+			fn_report_line($v_dir, $v_timestamp);
+		}
 		### Open the directory and get a file list
 		if ( opendir my $fh_dir, $v_dir ) {
 			my @files = readdir $fh_dir;
@@ -148,17 +177,7 @@ sub fn_stat_watch {
 					if ( -d $v_file && ! -l $v_file ) {
 						push( @dirs, $v_file );
 					}
-					### Stat the file and output the results to the report
-					my $v_file_escape = $v_file;
-					$v_file_escape =~ s/'/'\\''/g;
-					my $v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z '$v_file_escape' 2> /dev/null`;
-					chomp( $v_line );
-					$v_line .= fn_check_md5($v_file);
-					my $v_file_name = $v_file;
-					if ( $v_file =~ m/\n/ ) {
-						$v_file_name =~ s/\n/_mlfn_$v_timestamp/g;
-					}
-					print $fh_output "'" . $v_file_name . "' -- " . $v_line . "\n";
+					fn_report_line($v_file, $v_timestamp);
 				}
 			}
 			for my $_dir (@dirs) {
@@ -167,7 +186,16 @@ sub fn_stat_watch {
 				if ( ! fn_check_file($_dir) ) {
 					next;
 				}
-				fn_stat_watch( $_dir, $v_timestamp);
+				$v_cur_depth++;
+				if ( $v_cur_depth <= $v_max_depth ) {
+					fn_stat_watch( $_dir, $v_timestamp);
+				} else {
+					fn_log("Maximum depth reached at '" . $_dir . "'\n");
+					### If it contains a newline character, then it needs to be processed specially
+					my $v_dir_name = fn_get_file_name($_dir, $v_timestamp);
+					print $fh_output "Maximum depth reached at '" . $v_dir_name . "' - " . $v_timestamp . "\n";
+				}
+				$v_cur_depth--;
 			}
 		}
 	}
@@ -187,16 +215,26 @@ sub fn_diff {
 	$diff1_escape =~ s/'/'\\''/g;
 	my $diff2_escape = $f_diff2;
 	$diff2_escape =~ s/'/'\\''/g;
+	### With the file sizes we're looking at, most of the time the diff binary will be quicker than any tool Perl itself can provide
 	my @v_diff = `diff '$diff1_escape' '$diff2_escape' 2> /dev/null`;
-	@v_diff = fn_diff_check_lines( undef, 2, undef, @v_diff );
+	@v_diff = fn_diff_check_lines( 2, undef, @v_diff );
 	### Separate out just the file names from the diff
-	my $b_checked_md5;
+	my @v_deep_dirs;
 	my $ref_diff;
 	for my $_line (@v_diff) {
 		my $v_first = substr( $_line, 0, 1 );
 		if ( $v_first eq ">" || $v_first eq "<" ) {
 			chomp($_line);
 			my @v_line = split( m/'/, $_line );
+			if ( $_line =~ m/^. Maximum depth reached at / ) {
+				if ( $v_first eq ">" ) {
+					pop(@v_line);
+					shift(@v_line);
+					my $v_file = join( "'", @v_line );
+					push( @v_deep_dirs, $v_file );
+				}
+				next;
+			}
 			my $v_line = pop(@v_line);
 			### Remove up to the first single quote
 			shift(@v_line);
@@ -249,6 +287,7 @@ sub fn_diff {
 	my @v_stamps;
 	my @v_removed;
 	my $b_md5_change;
+	$b_md5_all = 0;
 	my $v_details = '';
 	my $v_html_details = '';
 	my $v_diff_details = '';
@@ -281,7 +320,11 @@ sub fn_diff {
 				push( @v_files2, $v_file );
 			}
 			if ( $v_dir ne "d" && $b_backup ) {
+				if ( exists $ref_diff->{$v_file}->{'>'}->{'md5'} ) {
+					$b_md5_all = 1;
+				}
 				my $b_backup_success = fn_backup_file($v_file, $d_backup);
+				$b_md5_all = 0;
 				if ($b_backup_success) {
 					$details .= "     Backed-up:    True\n";
 					$html_details1 .= '<th>Backed-up</th>';
@@ -402,9 +445,13 @@ sub fn_diff {
 			if ( ! $v_mention ) {
 				next DIFF_FILE;
 			}
-			### Attempt to back up the file
+			### Attempt to backup the file
 			if ( $v_dir ne "d" && $b_backup ) {
+				if ( exists $ref_diff->{$v_file}->{'>'}->{'md5'} ) {
+					$b_md5_all = 1;
+				}
 				my $b_backup_success = fn_backup_file($v_file, $d_backup);
+				$b_md5_all = 0;
 				if ($b_backup_success) {
 					$details2 .= "     Backed-up:    True\n";
 					$html_details1 .= '<th>Backed-up</th>';
@@ -485,6 +532,16 @@ sub fn_diff {
 		$v_details2 .= "\n";
 		$v_html_details2 .= "<br>\n";
 	}
+	if (@v_deep_dirs) {
+		$v_details2 .= "DIRECTORIES TOO DEEP TO PROCESS:\n";
+		$v_html_details2 .= '<h2>Directories too Deep to Process:</h2>' . "\n";
+		for my $_file (@v_deep_dirs) {
+			$v_details2 .= "   " . $_file . "\n";
+			$v_html_details2 .= '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' . $_file . "<br>\n";
+		}
+		$v_details2 .= "\n";
+		$v_html_details2 .= "<br>\n";
+	}
 	$v_details = $v_details2 . "\nSPECIFICS FOR EACH FILE:\n\n" . $v_details;
 	$v_html_details = $v_html_details2 . "<br><h2>Specifics for each File:</h2>\n" . $v_html_details;
 	##### @v_files2 contains a list of everything new or changed in case I want to run a malware scan against them.
@@ -497,110 +554,99 @@ sub fn_diff {
 	}
 }
 
+sub fn_diff_lines {
+### Given a line from a Stat Watch report, process it.
+### $_[0] is the line; $_[1] is the regular expression indicating multi-line file names; $_[2] and $_[3] are the first and second timestamps
+### $_[4] is the directory that we're currently processing; $_[5] is the error message to give if things are wrong
+	my ($v_line, $re_multiline, $v_timestamp1, $v_timestamp2, $v_processing, $v_prune, $v_error) = @_;
+	chomp($v_line);
+	my $v_start = substr($v_line, 0, $v_prune);
+	$v_line = substr($v_line, $v_prune);
+	if ( $v_line =~ m/^Processing:/ ) {
+		### Each time we see a processing line, we have to re-do the ignore strings to make sure that we're not ignoring something we shouldn't
+		$v_processing = (split( m/'/, $v_line, 2 ))[1];
+		### Trade timestamps
+		$v_timestamp2 = $v_timestamp1;
+		$v_timestamp1 = $v_processing;
+		$v_timestamp1 =~ s/^.*\s([0-9]+)$/$1/;
+		### create the regex for the multi-line
+		$re_multiline = qr/_mlfn_(\Q$v_timestamp1\E|\Q$v_timestamp2\E)/;
+		if ( $v_timestamp2 eq '' ) {
+			$re_multiline = qr/_mlfn_\Q$v_timestamp1\E/;
+		}
+		$v_processing =~ s/' - [0-9]+$//;
+		### Check to see if anything needs to be ignored
+		fn_check_strings( $v_processing );
+		$v_line = 0;
+	} elsif ( substr( $v_line, 0, 2 ) eq "'/" || $v_line =~ m/^Maximum depth reached at '/ ) {
+		### If we've reached a normal line before we reached a processing line, there's a problem
+		if ( ! $v_processing ) {
+			print STDERR $v_error;
+			exit 1;
+		}
+		my @v_line = split( m/'/, $v_line );
+		$v_line = pop(@v_line);
+		### Special capturing steps if it's a max depth line
+		if ( $v_line[0] eq 'Maximum depth reached at ' ) {
+			$v_start .= shift(@v_line);
+		} else {
+			### regular lines would have begun with a single quote, so the split means that there's an empty string at the beginning of the array. Get rid of it.
+			shift(@v_line);
+		}
+		my $v_file = join( "'", @v_line );
+		if ( $v_file =~ m/$re_multiline/ ) {
+			$v_file =~ s/$re_multiline/\n/g;
+		}
+		### Check to see if there's any reason for the file to be excluded. If not, output it
+		if ( fn_check_file($v_file) ) {
+			$v_line = $v_start . "'" . $v_file . "'" . $v_line;
+		} else {
+			$v_line = 0;
+		}
+	}
+	return( $v_line, $re_multiline, $v_timestamp1, $v_timestamp2, $v_processing );
+}
+
 sub fn_diff_check_lines {
 ### Check lines in a Stat Watch report to see if the file described matches the ignore lists. If not, output them to a file
 ### Prune timestamps from directories so they don't cause false positives
-### $_[0] is the file handle (already open) that we're printing to; if $_[0] is undef, an array of results will be returned instead
-### $_[1] is the number of characters to ignore from the beginning of each line
-### $_[2] is 1 if we're reading from a file, and 0 if we're reading from an array
-### $_[3] is the filename or the array
-	my $fh_write = shift(@_);
+### $_[0] is the number of characters to ignore from the beginning of each line
+### $_[1] is 1 if we're reading from a file, and 0 if we're reading from an array
+### $_[2] is the filename or the array
 	my $v_prune = ( shift(@_) || 0 );
 	my $b_file = ( shift(@_) || 0 );
 	my @v_lines_out;
+	my $v_processing;
+	my $v_timestamp1 = '';
+	my $v_timestamp2 = '';
+	my $re_multiline;
+	my $v_error = "Input does not appear to be from a Stat Watch file\n";
 	if ($b_file) {
+	### If we're reading from a file
 		my $f_read = shift(@_);
+		my $f_read_escape = $f_read;
+		$f_read_escape =~ s/'/'\\''/g;
+		$v_error = "File '" . $f_read_escape . "' does not appear to be a Stat Watch file\n";
 		if ( open( my $fh_read, "<", $f_read ) ) {
-			my $v_processing;
-			my $v_timestamp1 = '';
-			my $v_timestamp2 = '';
-			my $re_multiline;
 			while (<$fh_read>) {
-				my $v_line = substr($_, $v_prune);
-				my $v_start = substr($_, 0, $v_prune);
-				if ( $v_line =~ m/^Processing:/ ) {
-					### Each time we see a processing line, we have to re-do the ignore strings to make sure that we're not ignoring something we shouldn't
-					$v_processing = substr( (split( m/'/, $v_line, 2 ))[1], 0, -1 );
-					$v_timestamp2 = $v_timestamp1;
-					$v_timestamp1 = $v_processing;
-					$v_timestamp1 =~ s/^.*\s([0-9]+)$/$1/;
-					$re_multiline = qr/_mlfn_(\Q$v_timestamp1\E|\Q$v_timestamp2\E)/;
-					if ( $v_timestamp2 eq '' ) {
-						$re_multiline = qr/_mlfn_\Q$v_timestamp1\E/;
-					}
-					$v_processing =~ s/' - [0-9]+$//;
-					fn_check_strings( $v_processing );
-				} elsif ( substr( $v_line, 0, 2 ) eq "'/" ) {
-					if ( ! $v_processing ) {
-						my $f_read_escape = $f_read;
-						$f_read_escape =~ s/'/'\\''/g;
-						print STDERR "File '" . $f_read_escape . "' does not appear to be a Stat Watch file\n";
-						exit 1;
-					}
-					my @v_line = split( m/'/, $v_line );
-					$v_line = pop(@v_line);
-					my $v_file = join( "'", @v_line );
-					$v_file = substr( $v_file, 1 );
-					if ( $v_file =~ m/$re_multiline/ ) {
-						$v_file =~ s/$re_multiline/\n/g;
-					}
-					if ( fn_check_file($v_file) ) {
-						if ($fh_write) {
-							print $fh_write $v_start . "'" . $v_file . "'" . $v_line;
-						} else {
-							push( @v_lines_out, $v_start . "'" . $v_file . "'" . $v_line ) ;
-						}
-					}
+				my $v_line = $_;
+				($v_line, $re_multiline, $v_timestamp1, $v_timestamp2, $v_processing) = fn_diff_lines($v_line, $re_multiline, $v_timestamp1, $v_timestamp2, $v_processing, $v_prune, $v_error);
+				if ($v_line) {
+					push( @v_lines_out, $v_line ) ;
 				}
 			}
 		}
 	} else {
+	### Otherwise we've been given an array
 		my @v_lines_in = @_;
-		my $v_processing;
-		my $v_timestamp1 = '';
-		my $v_timestamp2 = '';
-		my $re_multiline;
-		for my $_line (@v_lines_in) {
-			my $v_line = substr($_line, $v_prune);
-			my $v_start = substr($_line, 0, $v_prune);
-			if ( $v_line =~ m/^Processing:/ ) {
-				### Each time we see a processing line, we have to re-do the ignore strings to make sure that we're not ignoring something we shouldn't
-				$v_processing = substr( (split( m/'/, $v_line, 2 ))[1], 0, -1 );
-				$v_timestamp2 = $v_timestamp1;
-				$v_timestamp1 = $v_processing;
-				$v_timestamp1 =~ s/^.*\s([0-9]+)$/$1/;
-				$re_multiline = qr/_mlfn_(\Q$v_timestamp1\E|\Q$v_timestamp2\E)/;
-				if ( $v_timestamp2 eq '' ) {
-					$re_multiline = qr/_mlfn_\Q$v_timestamp1\E/;
-				}
-				$v_processing =~ s/' - [0-9]+$//;
-				fn_check_strings( $v_processing );
-			} elsif ( substr( $v_line, 0, 2 ) eq "'/" ) {
-				if ( ! $v_processing ) {
-					print STDERR "Input does not appear to be from a Stat Watch file\n";
-					exit 1;
-				}
-				my @v_line = split( m/'/, $v_line );
-				$v_line = pop(@v_line);
-				my $v_file = join( "'", @v_line );
-				$v_file = substr( $v_file, 1 );
-				if ( $v_file =~ m/$re_multiline/ ) {
-					$v_file =~ s/$re_multiline/\n/g;
-				}
-				if ( fn_check_file($v_file) ) {
-					if ($fh_write) {
-						print $fh_write $v_start . "'" . $v_file . "'" . $v_line;
-					} else {
-						push( @v_lines_out, $v_start . "'" . $v_file . "'" . $v_line ) ;
-					}
-				}
+		for my $v_line (@v_lines_in) {
+			($v_line, $re_multiline, $v_timestamp1, $v_timestamp2, $v_processing) = fn_diff_lines($v_line, $re_multiline, $v_timestamp1, $v_timestamp2, $v_processing, $v_prune, $v_error);
+			if ($v_line) {
+				push( @v_lines_out, $v_line ) ;
 			}
 		}
-
 	}
-	if ( ! $fh_write ) {
-		return @v_lines_out;
-	}
+	return @v_lines_out;
 }
 
 #======================#
@@ -611,11 +657,26 @@ sub fn_backup_initial {
 ### Given a Stat Watch report, backup the files within that match the "BackupR" and "Backup+" control strings
 ### $_[0] is the report
 	my $v_file = $_[0];
-	my @v_lines = fn_diff_check_lines(undef, undef, 1, $v_file);
+	$b_md5_all = 0;
+	my @v_lines = fn_diff_check_lines(undef, 1, $v_file);
 	for my $_line (@v_lines) {
 		chomp($_line);
-		my $v_file = substr( (split( m/'([^']+)$/, $_line ))[0], 1 );
+		if ( $_line =~ m/^(Maximum depth reached at |Processing: )'/ ) {
+			next;
+		}
+		my @v_file = split( m/'/, $_line );
+		$_line = pop(@v_file);
+		shift(@v_file);
+		my $v_file = join( "'", @v_file );
+		my @v_line = split( m/ -- /, $_line );
+		if ( scalar(@v_line) == 8 ) {
+			if ( length($v_line[7]) == 32 ) {
+				### If there's an md5sum, turn on md5sum use
+				$b_md5_all = 1;
+			}
+		}
 		fn_backup_file($v_file, $d_backup, 1);
+		$b_md5_all = 0;
 	}
 }
 
@@ -775,6 +836,22 @@ sub fn_list_backups {
 	return @v_files;
 }
 
+sub fn_stat_line {
+### Given the name of a file, get stats for that file
+	my $v_file = $_[0];
+	my $v_line;
+	if ( -l $v_file ) {
+		$v_line = join( ' -- ', (lstat($v_file))[2,4,5,7,9] );
+	} else {
+		$v_line = join( ' -- ', (stat($v_file))[2,4,5,7,9] );
+	}
+	if ($b_md5_all) {
+	### This should only be the case if the file was listed with an md5sum
+		$v_line .= fn_check_md5($v_file);
+	}
+	return $v_line;
+}
+
 sub fn_compare_backup {
 ### Compare an existing backup to the files it was taken from
 ### This will compare user, group, permissions, size, and mtime of the two files
@@ -788,19 +865,9 @@ sub fn_compare_backup {
 	if (@v_files) {
 		@v_files = sort {$b cmp $a} @v_files;
 		### Since I don't anticipate this needing to be human readable, there's no reason to use the stat binary
-		my $v_line1;
-		my $v_line2;
 		my $v_file2 = $v_dir . "/" . $v_files[0];
-		if ( -l $v_file ) {
-			$v_line1 = join( ' -- ', (lstat($v_file))[2,4,5,7,9] );
-		} else {
-			$v_line1 = join( ' -- ', (stat($v_file))[2,4,5,7,9] );
-		}
-		if ( -l $v_file2 ) {
-			$v_line2 = join( ' -- ', (lstat($v_file2))[2,4,5,7,9] );
-		} else {
-			$v_line2 = join( ' -- ', (stat($v_file2))[2,4,5,7,9] );
-		}
+		my $v_line1 = fn_stat_line($v_file);
+		my $v_line2 = fn_stat_line($v_file2);
 		if ( $v_line1 eq $v_line2 ) {
 			return 1;
 		}
@@ -871,7 +938,7 @@ sub fn_list_file {
 			print "  '" . $_file_escape . "' -- Timestamp: " . $v_stamp . "\n";
 		}
 	} else {
-		print "There are no backups of this file in the directory specified\n"
+		print "There are no backups of this file\n"
 	}
 	print "\n";
 }
@@ -959,6 +1026,11 @@ sub fn_get_include {
 					$_line =~ s/^BackupMC\s*//;
 					$_line =~ s/[^0-9].*$//;
 					$v_retention_max_copies = $_line;
+				} elsif ( $_line =~ m/^Max-depth\s*[0-9]/ ) {
+				### The maximum depth of directories that we will recurse into
+					$_line =~ s/^Max-depth\s*//;
+					$_line =~ s/[^0-9].*$//;
+					$v_max_depth = $_line;
 				} elsif ( $_line =~ m/^Log\s*\// ) {
 				### Where to log actions
 					$_line =~ s/^Log\s*//;
@@ -975,6 +1047,7 @@ sub fn_get_include {
 }
 
 sub fn_document_backup {
+### Document the backup locations we've seen so that we can check all of them when necessary
 	if ( $d_backup ) {
 	### If the include file listed a backup directory, add that to the list of backup directories
 		my @v_backup_dirs;
@@ -1078,11 +1151,31 @@ sub fn_log {
 #== Helper Subroutines ==#
 #========================#
 
+sub fn_date_files {
+### Given two file names, return those file names in order of mtime, oldest to newest
+	my $v_file1 = $_[0];
+	my $v_file2 = $_[1];
+	my $mtime1 = (stat($v_file1))[9];
+	my $mtime2 = (stat($v_file2))[9];
+	if ( $mtime1 < $mtime2 ) {
+		return( $v_file1, $v_file2 );
+	} elsif ( $mtime1 > $mtime2 ) {
+		return( $v_file2, $v_file1 );
+	}
+	### If the mtimes are equal, return in the order given
+	return( $v_file1, $v_file2 );
+}
+
+
 sub fn_test_file {
+### Given a file name, test against it. Does it exist? What's it's file type?
+### $_[0] is the path to the file; $_[1] is whether or not it needs to exist; $_[2] is whether it needs to test as a certain type.
 	my $v_file = $_[0];
 	my $b_exist = ( $_[1] || 0 );
 	my $v_type = ( $_[2] || 0 );
-	$v_file = abs_path( $v_file );
+	if ( ! -p $v_file ) {
+		$v_file = ( abs_path( $v_file ) || $v_file );
+	}
 	if ( $b_exist ) {
 		if ( ! -e $v_file ) {
 			return 0;
@@ -1090,7 +1183,10 @@ sub fn_test_file {
 	}
 	if ( $v_type ) {
 		if ( $v_type eq "f" ) {
-			if ( ! -f $v_file && -e $v_file ) {
+			if ( -p $v_file ) {
+			### Sometimes files are pipes.
+				return $v_file;
+			} elsif ( ! -f $v_file && -e $v_file ) {
 				return 0;
 			}
 		} elsif ( $v_type eq "d" ) {
@@ -1112,7 +1208,7 @@ sub fn_uniq {
 	}
 	my @v_array2;
 	for my $v_item (keys(%v_hash)) {
-		push( @v_array2,$v_item );
+		push( @v_array2, $v_item );
 	}
 	return @v_array2;
 }
@@ -1128,7 +1224,7 @@ sub fn_report_unknown {
 }
 
 sub fn_get_working {
-### Given the name of the program, return the name of an appropriate working directory
+### Given the full path to the program, return the name of an appropriate working directory
 	my $v_program = $_[0];
 	my @v_working = split( m/\//, $v_program );
 	my $v_name = pop( @v_working );
@@ -1142,7 +1238,13 @@ sub fn_get_working {
 }
 
 sub fn_mod_check {
+### Given a list of perl modules, check if they're located somewhere within @INC
 	my @module_list = @_;
+	my $b_exit = 1;
+
+	if ( $module_list[-1] eq "0" ) {
+		$b_exit = pop(@module_list);
+	}
 
 	### Check for the modules. Compile a list of any that are not present.
 	my @missing_modules;
@@ -1158,7 +1260,7 @@ sub fn_mod_check {
 	}
 
 	### If any of the modules are missing, let the user know and exit
-	if ( @missing_modules ) {
+	if ( @missing_modules && $b_exit ) {
 		print "You will need to install the following Perl modules:\n\n";
 		for ( @missing_modules ) {
 			print $_, "\n";
@@ -1167,7 +1269,10 @@ sub fn_mod_check {
 		print "In order to do so, run the following command:\n\n";
 		print "cpan -i @missing_modules\n\n";
 		exit;
+	} elsif ( @missing_modules ) {
+		return 0;
 	}
+	return 1;
 }
 
 sub fold_print {
@@ -1244,6 +1349,15 @@ sub fn_version {
 print "Current Version: $v_VERSION\n";
 my $v_message = <<'EOF';
 
+Version 1.2.0 (2018-08-19) -
+    - Added the "--md5" flag, as well as a few control strings
+    - Added a maximum depth for the script to recurse to
+        - The "--record" and "--diff" outputs now include instances where such directories are present
+    - Split out help text so that you can reference individual bits of it
+    - In "--diff" mode, check mtimes of the two reports we're comparing. Always make the newest file on the right for diff purposes
+        - Added the "--before" and "--after" flags for "--diff" mode to override this behavior
+    - When checking whether a file needs to be backed up, if the md5sum was captured initially, check against the md5sum of the backup as well.
+
 Version 1.1.0 (2018-08-17) -
     - Added the ability to compare md5sums of files as well
     - Fixed a bug where files might be being matched against incorrectly due to an added slash
@@ -1261,10 +1375,12 @@ exit 0;
 }
 
 sub fn_help {
-my $v_message =  <<'EOF';
+my $v_header = <<'EOF';
 
 stat_watch.pl - a script for finding and reporting changes in files and directories
 
+EOF
+my $v_usage = <<'EOF';
 
 USAGE
 
@@ -1274,9 +1390,15 @@ USAGE
     - The "-i" or "--include" flag can be used to specify an ignore/include file
     - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
     - This is the default functionality. Technically the "--record" flag is not necessary
+    - The "--md5" flag will result in the MD5 sums of all files being captured in addition to their stats
+        - This will require that the .stat_watch/md5.pm file be present, as well as the perl modules 'Digest::MD5' and 'Digest::MD5::File'
+        - This will cause the process to take longer and generally isn't necessary - the combination of mtime, ctime, and file size is usually enough to detect if a change has occurred
     - The "--ignore-on-record" flag will result in individual files being checked against ignore rules
         - Otherwise only directories are checked against this rules, and weeding out things to be ignored only occurrs during "--diff"
         - Use of this flag results in larger file sizes for Stat Watch reports, but generally reduces processing time overall
+    - The "--as-dir" flag can be followed by a string of text that will be used to replace the directory name when recording the full file path
+        - For example, running "./stat_watch.pl --record /home/account --as-dir "/home/different/path" will result in the file "/home/account/file.txt" to be listed as "/home/different/path/file.txt"
+        - This is useful for situations where you want to capture information for backed-up files and compare them to files in place.
 
 ./stat_watch.pl --diff [FILE 1] [FILE 2]
     - Compare two Stat Watch report files, weed out files that match ignore rules, output information on what has changed
@@ -1293,6 +1415,8 @@ USAGE
         - This is optimal if you're regularly running this script with the "--prune" flag
     - The "--no-ctime" flag tells the script to ignore differences in ctime. This is useful if you're comparing against a restored backup.
     - The "--no-partial-seconds" limits the comparison of timestamps to full seconds
+    - The "--before" and "--after" flags can be used to specify which is the earlier Stat Watch report file and which is the later
+        - Without these flags, the mtimes of the files are used to determine which is which
 
 ./stat_watch.pl --backup [FILE]
     - Create backups of files specified using a Stat Watch report file and the settings within an ignore/include file
@@ -1319,8 +1443,15 @@ USAGE
 
 ./stat_watch.pl --help
 ./stat_watch.pl -h
-    - Outputs this information
+    - Outputs full help information
 
+./stat-watch.pl --help-usage
+./stat-watch.pl --help-includes
+./stat-watch.pl --help-backups
+    - Outputs information regarding the specific aspect of Stat Watch requested
+
+EOF
+my $v_include = <<'EOF';
 
 REGARDING THE IGNORE/INCLUDE FILE
 
@@ -1340,15 +1471,19 @@ Control Strings:
         - "BackupR" - If a file matches the regular expression that follows, and the appropriate flags are set, they will be backed up
         - "Backup+" - In any instance where there are changes to the following file, it will be backed up
         - "Time-" - Stat changes to this file will not be reported if the only change is to mtime or ctime
+            - Useful if a file is regularly getting touched by a process, but still want to track changes to it otherwise
         - "MD5R" - If a file matches the regular expression that follows, also capture the file's MD5 sum for comparison
         - "MD5" -
             - If a file's name and full path matches the exact string that follows, also capture the file's MD5 sum for comparison
-            - If this is alone on a line, then capture MD5 sums for everything
+            - If this is alone on a line, then capture MD5 sums for everything (as if the "--md5" flag was used)
+            - This will require that the .stat_watch/md5.pm file be present, as well as the perl modules 'Digest::MD5' and 'Digest::MD5::File'
     - Lines beginning with the following control strings have special meanings, but only the last declaration will be interpreted:
         - "BackupD" - This specifies the directory to backup files to. The directory must already exist and be writable, or Stat Watch will error out
         - "BackupMD" - A number specified here will set the minumum number of days a backed up file should be kept
         - "BackupMC" - A number here will set the maximum number of copies of a file that should be backed up (after the minumum retention has been met)
         - "Log" - Placing a full path to a file after this will tell Stat Watch where to log
+        - "Max-depth" - A number here will set the maximum depth of directories that the script can recurse into (default 20)
+            - Any directories deeper than this will be logged on each run, assuming that the "Log" control string is used
     - Control strings can have any amount of whitespace before or after them on the line. It will not be interpreted.
     - When a file is included via "Include", the entirety of that file will be interpreted before the going on to interpret the next line
     - For "*" or "R", any line matching a directory will result in that directory and all files and subdirectories it contains being passed over
@@ -1358,6 +1493,8 @@ Other Rules:
     - Lines cannot begin with more than one control string
     - If a directory is included with "I" or given at the command line that would otherwise be ignored due to entries in the file, those entries will be ignored while it is being checked
 
+EOF
+my $v_backup =  <<'EOF';
 
 REGARDING BACKUPS
 
@@ -1370,15 +1507,34 @@ When do backups occur?
 When are backups pruned?
     - Every time a file is backed up, the directory is checked afterward for other backups of the same file
     - Of those other backups, the newest X are ignored, where X is the number set by the "BackupMC" control string
-    - Any of the remaining backups that are older then X days are removed, where X is the number set by the BackupMD control string
+    - Any of the remaining backups that are older then Y days are removed, where Y is the number set by the BackupMD control string
+    - Because old backups will not typically be removed unles a new backup of the file is made, there is also the option to run stat_watch.pl with the "--prune" flag
 
+Automating backups
+    - The Stat Watch project includes a script named stat_watch_wrap.sh. This is the most straight-forward way to set up reoccurring Stat Watch checks including backups and email notifications.
+
+EOF
+my $v_feedback = <<'EOF';
 
 FEEDBACK
+
+The Stat Watch project is available at the following git repositories (one of which is public facing):
+    - https://github.com/sporks5000/stat_watch
+    - https://git.liquidweb.com/acwilliams/stat_watch
 
 Report any errors, unexpected behaviors, comments, or feedback to acwilliams@liquidweb.com
 
 EOF
-print fold_print($v_message);
+
+if ( ! $_[0] ) {
+	print fold_print($v_header . $v_usage . $v_include . $v_backup . $v_feedback);
+} elsif ( $_[0] eq "usage" ) {
+	print fold_print($v_header . $v_usage . $v_feedback);
+} elsif ( $_[0] eq "includes" ) {
+	print fold_print($v_header . $v_include . $v_feedback);
+} elsif ( $_[0] eq "backups" ) {
+	print fold_print($v_header . $v_backup . $v_feedback);
+}
 exit 0;
 }
 
@@ -1414,6 +1570,15 @@ while ( defined $ARGV[0] ) {
 		}
 	} elsif ( $v_arg eq "--help" || $v_arg eq "-h" ) {
 		fn_help();
+		exit 0;
+	} elsif ( $v_arg eq "--help-usage" ) {
+		fn_help('usage');
+		exit 0;
+	} elsif ( $v_arg eq "--help-includes" ) {
+		fn_help('includes');
+		exit 0;
+	} elsif ( $v_arg eq "--help-backups" ) {
+		fn_help('backups');
 		exit 0;
 	} elsif ( $v_arg eq "--ignore" ) {
 		if ( defined $ARGV[0] ) {
@@ -1463,6 +1628,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	shift( @args );
 	my $v_file1;
 	my $v_file2;
+	my $b_no_sort;
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
 		if ( $v_arg eq "--format" || $v_arg eq "-f" ) {
@@ -1479,6 +1645,15 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			$b_diff_ctime = 0;
 		} elsif ( $v_arg eq "--backup" ) {
 			$b_backup = 1;
+		} elsif ( $v_arg eq "--before" && defined $args[0] ) {
+			if ($v_file1) {
+				$v_file2 = $v_file1;
+			}
+			$v_file1 = shift( @args );
+			$b_no_sort = 1;
+		} elsif ( $v_arg eq "--after" && defined $args[0] ) {
+			$v_file2 = shift( @args );
+			$b_no_sort = 1;
 		} elsif ( -e $v_arg ) {
 			if (! $v_file1) {
 				$v_file1 = $v_arg;
@@ -1495,6 +1670,8 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	if ( ! defined $v_file1 || ! defined $v_file2 || ! -r $v_file1 || ! -r $v_file2 ) {
 		print STDERR "With \"--diff\", must specify two files\n";
 		exit 1;
+	} elsif ( ! $b_no_sort ) {
+		( $v_file1, $v_file2 ) = fn_date_files( $v_file1, $v_file2 );
 	}
 	if ( ! $d_backup || ! -d $d_backup || ! -w $d_backup || (! @v_backupr && ! @v_backup_plus) ) {
 		$b_backup = 0;
@@ -1502,6 +1679,14 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	if ( ! $v_format || ($v_format ne "text" && $v_format ne "html" && $v_format ne "diff") ) {
 		$v_format = "text";
 	}
+	### Check if the ability to use md5sums is present
+	$b_use_md5 = fn_mod_check( 'Digest::MD5', 'Digest::MD5::File', 0 );
+	if ( $b_use_md5 && ! -f $d_working . '/md5.pm' ) {
+		$b_use_md5 = 0;
+	} elsif ( $b_use_md5 ) {
+		require( $d_working . '/md5.pm' );
+	}
+	### Sort the relevant arrays
 	my $b_close = fn_sort_prep();
 	fn_document_backup();
 	my $v_file1_escape = $v_file1;
@@ -1585,6 +1770,14 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	if ($b_close) {
 		close $fh_output;
 	}
+	### Check if the ability to use md5sums is present
+	$b_use_md5 = fn_mod_check( 'Digest::MD5', 'Digest::MD5::File', 0 );
+	if ( $b_use_md5 && ! -f $d_working . '/md5.pm' ) {
+		$b_use_md5 = 0;
+	} elsif ( $b_use_md5 ) {
+		require( $d_working . '/md5.pm' );
+	}
+	### Output to the log and begin the job
 	my $d_backup_escape = $d_backup;
 	$d_backup_escape =~ s/'/'\\''/g;
 	fn_log("Checking to see if there are files that need to be backed up '" . $d_backup_escape . "'\n");
@@ -1610,6 +1803,10 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		my $v_arg = shift( @args );
 		if ( $v_arg eq "--ignore-on-record" ) {
 			$b_ignore_on_record = 1;
+		} elsif ( $v_arg eq "--md5" ) {
+			$b_md5_all = 1;
+		} elsif ( $v_arg eq "--as-dir" && defined $args[0] ) {
+			$v_as_dir = shift( @args );
 		} elsif ( -e $v_arg ) {
 			push( @v_dirs, abs_path($v_arg) );
 		} elsif ( $v_arg eq "--record" ) {
@@ -1644,8 +1841,10 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	}
 	### Process those directories
 	for my $_dir ( @v_dirs ) {
+		$v_current_dir = $_dir;
 		my $v_timestamp = time();
-		print $fh_output "Processing: '" . $_dir . "' - " . $v_timestamp . "\n";
+		my $v_output_dir = fn_get_file_name($_dir);
+		print $fh_output "Processing: '" . $v_output_dir . "' - " . $v_timestamp . "\n";
 		fn_check_strings( $_dir );
 		if ( -d $_dir ) {
 			### Individual files can be listed as well, but there's no need to log the fact we're looking at those. Just directories will suffice

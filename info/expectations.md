@@ -20,9 +20,9 @@ Please note that while there might be instances where these examples could be us
 > 
 > If you understand and are okay with this, I'll be happy to get this script set up for you. I will need the following information from you for this:
 > 
-> 1) What's a good email address for us to have these reports sent to?
+> 1\) What's a good email address for us to have these reports sent to?
 > 
-> 2) Typically we configure this script to run a check every two hours and only report if changes are detected. Let us know if you want this configured any differently.
+> 2\) Typically we configure this script to run a check every two hours and only report if changes are detected. Let us know if you want this configured any differently.
 > 
 > I look forward to hearing back from you regarding this.
 
@@ -34,7 +34,7 @@ Please note that while there might be instances where these examples could be us
 > 
 > I have put the script that I had mentioned in place as promised and configured it to run for the next 45 days. Let us know if you need us to exclude any specific files or directories from being checked due to them generating too many false positives.
 > 
-> Email messages from this script should arrive from the address root@[SERVER NAME] and have the subject line "Stat Watch - File changes on [SERVER NAME]". There is the potential that they will end up in your junk mail folder, so please be sure to check there. If you would like me to send a test message that you can reference, let me know and I will do so.
+> Email messages from this script should arrive from the address root@\[SERVER NAME\] and have the subject line "Stat Watch - File changes on \[SERVER NAME\]". There is the potential that they will end up in your junk mail folder, so please be sure to check there. If you would like me to send a test message that you can reference, let me know and I will do so.
 > 
 > If there are any malicious or unwanted files that you would like for us to look into further, let us know and we can do so. I did want to state once again that we cannot make the assessment regarding whether a file is malicious or unwanted; that determination will need to be made by you or someone on your end.
 > 
@@ -44,10 +44,11 @@ Please note that while there might be instances where these examples could be us
 
 ### Example message for the top of each email message:
 
-By modifying the files ./[JOB NAME]_message_head.txt and ./[JOB NAME]_message_foot.txt, you can add a message to the beginning or end (respectively) of each email Stat Watch sends. It's recommended that you add a message here as well to remind the customer of these expectations.
+By modifying the files ./\[JOB NAME\]\_message\_head.txt and ./\[JOB NAME\]\_message\_foot.txt, you can add a message to the beginning or end (respectively) of each email Stat Watch sends. It's recommended that you add a message here as well to remind the customer of these expectations.
 
 > Hello,
 > 
-> This is an automated message from your server, sent by the script that we set up in ticket #[TICKET NUMBER] regarding the files that were being created in [DIRECTORY]. Please assess the changes listed below to see if they are anticipated or desired. If you determine that any of the files or changes to files listed here are unwanted, let us know (along with the details provided) and we can disable those files and investigate further in hopes of seeing what caused the change.
+> This is an automated message from your server, sent by the script that we set up in ticket #\[TICKET NUMBER\] regarding the files that were being created in \[DIRECTORY\]. Please assess the changes listed below to see if they are anticipated or desired. If you determine that any of the files or changes to files listed here are unwanted, let us know (along with the details provided) and we can disable those files and investigate further in hopes of seeing what caused the change.
 > 
-> If you want us to exclude any files or directories from future checks in order to eliminate potential false positives, just let us know in ticket #[TICKET NUMBER] and we will be happy to make those changes for you.
+> If you want us to exclude any files or directories from future checks in order to eliminate potential false positives, just let us know in ticket #\[TICKET NUMBER\] and we will be happy to make those changes for you.
+
