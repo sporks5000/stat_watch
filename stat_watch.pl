@@ -6,7 +6,7 @@
 use strict;
 use warnings;
 
-my $v_VERSION = "1.2.0";
+my $v_VERSION = "1.3.0";
 
 use Cwd 'abs_path';
 use POSIX 'strftime';
@@ -63,14 +63,14 @@ sub fn_check_file {
 ### Check a file to see if it matches any of the ignore lists
 ### $_[0] is the full path to the file
 	my $v_file = $_[0];
-	my $v_file_escape = $v_file;
+	my $v_file_escape;
 	if ($b_verbose) {
-		$v_file_escape =~ s/'/'\\''/g;
+		$v_file_escape = fn_escape_filename($v_file);
 	}
 	for my $_string (@v_temp_ignore){
 		if ( $v_file eq $_string ) {
 			if ($b_verbose) {
-				print STDERR "IGNORED: '" . $v_file_escape. "'\n";
+				print STDERR "IGNORED: " . $v_file_escape. "\n";
 			}
 			return 0;
 		}
@@ -78,7 +78,7 @@ sub fn_check_file {
 	for my $_string (@v_temp_rignore) {
 		if ( $v_file =~ m/$_string/ ) {
 			if ($b_verbose) {
-				print STDERR "IGNORED: '" . $v_file_escape . "'\n";
+				print STDERR "IGNORED: " . $v_file_escape . "\n";
 			}
 			return 0;
 		}
@@ -86,7 +86,7 @@ sub fn_check_file {
 	for my $_string (@v_temp_star_ignore){
 		if ( $v_file =~ m/$_string/ ) {
 			if ($b_verbose) {
-				print STDERR "IGNORED: '" . $v_file_escape . "'\n";
+				print STDERR "IGNORED: " . $v_file_escape . "\n";
 			}
 			return 0;
 		}
@@ -132,9 +132,8 @@ sub fn_report_line {
 ### Given a file name, output the necessary data for a "--record" style report
 	my $v_file = $_[0];
 	my $v_timestamp = $_[1];
-	my $v_file_escape = $v_file;
-	$v_file_escape =~ s/'/'\\''/g;
-	my $v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z '$v_file_escape' 2> /dev/null`;
+	my $v_file_escape = fn_shell_escape_filename($v_file);
+	my $v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z $v_file_escape 2> /dev/null`;
 	chomp( $v_line );
 	$v_line .= fn_check_md5($v_file);
 	$v_file = fn_get_file_name($v_file, $v_timestamp);
@@ -147,9 +146,8 @@ sub fn_stat_watch {
 	my $v_dir = $_[0];
 	my $v_timestamp = $_[1];
 	if ($b_verbose) {
-		my $v_dir_escape = $v_dir;
-		$v_dir_escape =~ s/'/'\\''/g;
-		print STDERR "Directory: '" . $v_dir_escape . "'\n";
+		my $v_dir_escape = fn_escape_filename($v_dir);
+		print STDERR "Directory: " . $v_dir_escape . "\n";
 	}
 	if ( -e $v_dir && ! -d $v_dir ) {
 	### If we were given a file instead of a directory
@@ -211,12 +209,10 @@ sub fn_diff {
 	my $f_diff1 = $_[0];
 	my $f_diff2 = $_[1];
 	### Make the file names quote safe
-	my $diff1_escape = $f_diff1;
-	$diff1_escape =~ s/'/'\\''/g;
-	my $diff2_escape = $f_diff2;
-	$diff2_escape =~ s/'/'\\''/g;
+	my $diff1_escape = fn_shell_escape_filename($f_diff1);
+	my $diff2_escape = fn_shell_escape_filename($f_diff2);
 	### With the file sizes we're looking at, most of the time the diff binary will be quicker than any tool Perl itself can provide
-	my @v_diff = `diff '$diff1_escape' '$diff2_escape' 2> /dev/null`;
+	my @v_diff = `diff $diff1_escape $diff2_escape 2> /dev/null`;
 	@v_diff = fn_diff_check_lines( 2, undef, @v_diff );
 	### Separate out just the file names from the diff
 	my @v_deep_dirs;
@@ -231,7 +227,7 @@ sub fn_diff {
 					pop(@v_line);
 					shift(@v_line);
 					my $v_file = join( "'", @v_line );
-					push( @v_deep_dirs, $v_file );
+					push( @v_deep_dirs, fn_escape_filename($v_file) );
 				}
 				next;
 			}
@@ -241,9 +237,8 @@ sub fn_diff {
 			### Most files won't have single quotes in them, but just in case...
 			my $v_file = join( "'", @v_line );
 			if ( ! exists $ref_diff->{$v_file} ) {
-				my $v_file_escape = $v_file;
-				$v_file_escape =~ s/'/'\\''/g;
-				$ref_diff->{$v_file}->{'escape'} = "'" . $v_file_escape . "'";
+				my $v_file_escape = fn_escape_filename($v_file);
+				$ref_diff->{$v_file}->{'escape'} = $v_file_escape;
 			}
 			$ref_diff->{$v_file}->{$v_first}->{'line'} = $_line;
 			@v_line = split( m/ -- /, $v_line );
@@ -624,9 +619,8 @@ sub fn_diff_check_lines {
 	if ($b_file) {
 	### If we're reading from a file
 		my $f_read = shift(@_);
-		my $f_read_escape = $f_read;
-		$f_read_escape =~ s/'/'\\''/g;
-		$v_error = "File '" . $f_read_escape . "' does not appear to be a Stat Watch file\n";
+		my $f_read_escape = fn_escape_filename($f_read);
+		$v_error = "File " . $f_read_escape . " does not appear to be a Stat Watch file\n";
 		if ( open( my $fh_read, "<", $f_read ) ) {
 			while (<$fh_read>) {
 				my $v_line = $_;
@@ -675,7 +669,7 @@ sub fn_backup_initial {
 				$b_md5_all = 1;
 			}
 		}
-		fn_backup_file($v_file, $d_backup, 1);
+		fn_backup_file($v_file, $d_backup);
 		$b_md5_all = 0;
 	}
 }
@@ -695,9 +689,8 @@ sub fn_check_retention {
 		my $v_file = $v_dir . "/" . $v_files[$v_count];
 		my $v_stamp = (split( m/_/, $v_files[$v_count] ))[-1];
 		if ( (time() - $v_stamp) > (86400 * $v_retention_min_days) ) {
-			my $v_file_escape = $v_file;
-			$v_file_escape =~ s/'/'\\''/g;
-			fn_log("Removing backed-up file '" . $v_file_escape . "'\n");
+			my $v_file_escape = fn_escape_filename($v_file);
+			fn_log("Removing backed-up file " . $v_file_escape . "\n");
 			unlink( $v_file );
 		}
 		$v_count++;
@@ -709,8 +702,7 @@ sub fn_prune_backups {
 ### $_[0] is the backup directory
 	my $v_dir = $_[0];
 	if ($b_verbose) {
-		my $v_dir_escape = $v_dir;
-		$v_dir_escape =~ s/'/'\\''/g;
+		my $v_dir_escape = fn_escape_filename($v_dir);
 		print STDERR "Directory: " . $v_dir_escape . "\n";
 	}
 	if ( -e $v_dir && -d $v_dir ) {
@@ -742,15 +734,11 @@ sub fn_prune_backups {
 
 sub fn_backup_file {
 ### Check to make sure that a file matches the desired regex, then make a copy of the file
-### $_[0] is the file we're copying, $_[1] is the backup directory, $_[2] is whether or not the current file chould be checked against a previous file
+### $_[0] is the file we're copying, $_[1] is the backup directory
 	my $v_file = $_[0];
 	my $d_backup = $d_backup;
 	if ( $_[1] ) {
 		$d_backup = $_[1];
-	}
-	my $b_check;
-	if ( $_[2] ) {
-		$b_check = $_[2];
 	}
 	my $b_continue;
 	if ( ! -f $v_file && ! -l $v_file ) {
@@ -781,15 +769,12 @@ sub fn_backup_file {
 				chmod( 0700, $d_backup );
 			}
 		}
-		my $v_file_escape = $v_file;
-		$v_file_escape =~ s/'/'\\''/g;
+		my $v_file_escape = fn_escape_filename($v_file);
 		if ( -d $d_backup ) {
-			if ( $b_check ) {
-				$b_continue = fn_compare_backup($v_file, $d_backup);
-				if ( $b_continue ) {
-					### No need to back it up, because it already matches
-					return 1;
-				}
+			$b_continue = fn_compare_backup($v_file, $d_backup);
+			if ( $b_continue ) {
+				### No need to back it up, because it already matches
+				return 1;
 			}
 			$d_backup .= "/" . $v_name . "_" . time();
 			### When ever running a command with backticks, we need to make sure arguments we're passing to it are quote safe:
@@ -797,20 +782,19 @@ sub fn_backup_file {
 			### Test if the files was successfully copied
 			if ( -f $d_backup || -l $d_backup ) {
 				if ($b_verbose) {
-					my $d_backup_escape = $d_backup;
-					$d_backup_escape =~ s/'/'\\''/g;
-					print STDERR "'" . $v_file_escape . "' -> '" . $d_backup_escape . "'\n";
+					my $d_backup_escape = fn_escape_filename($d_backup);
+					print STDERR $v_file_escape . " -> " . $d_backup_escape . "\n";
 				}
-				fn_log("Backed up file '" . $v_file_escape . "'\n");
+				fn_log("Backed up file " . $v_file_escape . "\n");
 				if ($b_retention) {
 					fn_check_retention( $d_backup .= "/" . $v_name );
 				}
 				return 1;
 			}
 		}
-		fn_log("Failed to backup file '" . $v_file_escape . "'\n");
+		fn_log("Failed to backup file " . $v_file_escape . "\n");
 		if ($b_verbose) {
-			print STDERR "Failed to backup file '" . $v_file_escape . "'\n";
+			print STDERR "Failed to backup file " . $v_file_escape . "\n";
 		}
 	}
 	return 0;
@@ -925,17 +909,16 @@ sub fn_list_file {
 		push( @v_files, @v_files2 );
 	}
 	### Output the details
-	my $v_file_escape = $v_file;
-	$v_file_escape =~ s/'/'\\''/g;
-	print "\nAvailable Backups for '" . $v_file_escape . "':\n";
+	my $v_file_escape = fn_escape_filename($v_file);
+	print "\nAvailable Backups for " . $v_file_escape . ":\n";
 	if (@v_files) {
 		@v_files = sort {$a cmp $b} @v_files;
 		for my $_file (@v_files) {
 			my $v_stamp = (split( m/_/, $_file ))[-1];
 			$v_stamp = strftime( '%Y-%m-%d %T %z', localtime($v_stamp) );
-			my $_file_escape = $_file;
-			$_file_escape =~ s/'/'\\''/g;
-			print "  '" . $_file_escape . "' -- Timestamp: " . $v_stamp . "\n";
+			my $v_size = (stat($_file))[7];
+			my $_file_escape = fn_escape_filename($_file);
+			print "  " . $_file_escape . " -- Timestamp: " . $v_stamp . " -- " . $v_size . " bytes\n";
 		}
 	} else {
 		print "There are no backups of this file\n"
@@ -951,9 +934,8 @@ sub fn_get_include {
 ### $_[0] is the file in question.
 	my $f_ignore = $_[0];
 	if ( ! -r $f_ignore ) {
-		my $f_ignore_escape = $f_ignore;
-		$f_ignore_escape =~ s/'/'\\''/g;
-		print STDERR "Cannot read file '" . $f_ignore_escape . "'\n";
+		my $f_ignore_escape = fn_escape_filename($f_ignore);
+		print STDERR "Cannot read file " . $f_ignore_escape . "\n";
 	}
 	### Make sure we don't read a file twice
 	for my $_include (@v_includes) {
@@ -988,31 +970,31 @@ sub fn_get_include {
 				$_line =~ s/\/$//;
 				if ( substr( $_line,0,1 ) eq "/" ) {
 				### Ignore files with this exact name
-					push( @v_ignore, abs_path($_line) );
+					push( @v_ignore, $_line );
 				} elsif ( $_line =~ m/^\*\s*\// ) {
 				### Ignore all files whose full path starts with this string
 					$_line =~ s/^\*\s*//;
-					push( @v_star_ignore, abs_path($_line) );
+					push( @v_star_ignore, $_line );
 				} elsif ( $_line =~ m/^Include\s*\// ) {
 				### Process these files as additional include/ignore lists
 					$_line =~ s/^Include\s*//;
-					fn_get_include( abs_path($_line) );
+					fn_get_include( $_line );
 				} elsif ( $_line =~ m/^I\s*\// ) {
 				### Also report on these files / directories
 					$_line =~ s/^I\s*//;
-					push( @v_dirs, abs_path($_line) );
+					push( @v_dirs, $_line );
 				} elsif ( $_line =~ m/^BackupD\s*\// ) {
 				### Set a directory to back up to
 					$_line =~ s/^BackupD\s*//;
-					$d_backup = abs_path($_line);
+					$d_backup = $_line;
 				} elsif ( $_line =~ m/^Backup\+\s*\// ) {
 				### Specify a file that should be backed up if there are changes
 					$_line =~ s/^Backup\+\s*//;
-					push(@v_backup_plus, abs_path($_line));
+					push(@v_backup_plus, $_line);
 				} elsif ( $_line =~ m/^MD5\s*\// ) {
 				### Specify a file that we want to capture the md5 sum of
 					$_line =~ s/^MD5\s*//;
-					push(@v_md5, abs_path($_line));
+					push(@v_md5, $_line);
 				} elsif ( $_line eq "MD5" ) {
 				### If we just want to md5sum everything...
 					$b_md5_all = 1;
@@ -1034,11 +1016,11 @@ sub fn_get_include {
 				} elsif ( $_line =~ m/^Log\s*\// ) {
 				### Where to log actions
 					$_line =~ s/^Log\s*//;
-					$f_log = abs_path($_line);
+					$f_log = $_line;
 				} elsif ( $_line =~ m/^Time-\s*\// ) {
 				### Specify a file that we should be unconcerned about changes to the timestamps
 					$_line =~ s/^Time-\s*//;
-					push(@v_time_minus, abs_path($_line));
+					push(@v_time_minus, $_line);
 				}
 			}
 		}
@@ -1113,9 +1095,8 @@ sub fn_sort_prep {
 	if ( defined $f_output && open( $fh_output, ">", $f_output ) ) {
 		return 1;
 	} elsif ( defined $f_output ) {
-		my $f_output_escape = $f_output;
-		$f_output_escape =~ s/'/'\\''/g;
-		print STDERR "Cannot open file '" . $f_output_escape . "' for writing\n";
+		my $f_output_escape = fn_escape_filename($f_output);
+		print STDERR "Cannot open file " . $f_output_escape . " for writing\n";
 		exit 1;
 	} else {
 		$fh_output = \*STDOUT;
@@ -1223,9 +1204,117 @@ sub fn_report_unknown {
 	sleep( 2 );
 }
 
+sub fn_escape_filename {
+### Given a file name that might have unprintable characters, appropriately escape and quote everything
+	my $v_file = $_[0];
+	if ( $v_file =~ m/'/ ) {
+		### replace all single quotes with a single quote, a backslash, and then two single quotes
+		$v_file =~ s/'/'\\''/g;
+	}
+	if ( $v_file =~ m/[\001-\037\x7F]/ ) {
+		### For blocks of unprintable characters, place "'$'" at the start, and "'" at the end
+		$v_file =~ s/([\x01-\x1F\x7F]+)/'\$'$1''/g;
+		### Replace unprintable characters with their hex value or special character
+		$v_file =~ s/\001/\\001/g;
+		$v_file =~ s/\002/\\002/g;
+		$v_file =~ s/\003/\\003/g;
+		$v_file =~ s/\004/\\004/g;
+		$v_file =~ s/\005/\\005/g;
+		$v_file =~ s/\006/\\006/g;
+		$v_file =~ s/\007/\\a/g;
+		$v_file =~ s/\010/\\b/g;
+		$v_file =~ s/\011/\\t/g;
+		$v_file =~ s/\012/\\n/g;
+		$v_file =~ s/\013/\\v/g;
+		$v_file =~ s/\014/\\f/g;
+		$v_file =~ s/\015/\\r/g;
+		$v_file =~ s/\016/\\016/g;
+		$v_file =~ s/\017/\\017/g;
+		$v_file =~ s/\020/\\020/g;
+		$v_file =~ s/\021/\\021/g;
+		$v_file =~ s/\022/\\022/g;
+		$v_file =~ s/\023/\\023/g;
+		$v_file =~ s/\024/\\024/g;
+		$v_file =~ s/\025/\\025/g;
+		$v_file =~ s/\026/\\026/g;
+		$v_file =~ s/\027/\\027/g;
+		$v_file =~ s/\030/\\030/g;
+		$v_file =~ s/\031/\\031/g;
+		$v_file =~ s/\032/\\032/g;
+		$v_file =~ s/\033/\\033/g;
+		$v_file =~ s/\034/\\034/g;
+		$v_file =~ s/\035/\\035/g;
+		$v_file =~ s/\036/\\036/g;
+		$v_file =~ s/\037/\\037/g;
+		$v_file =~ s/\x7F/\\177/g;
+	}
+	### Add a quote at the start of the file name
+	$v_file = "'" . $v_file . "'";
+	return $v_file;
+}
+
+sub fn_shell_escape_filename {
+	my $v_file = $_[0];
+	$v_file =~ s/'/'\\''/g;
+	$v_file = "'" . $v_file . "'";
+	return $v_file;
+}
+
+sub fn_unescape_filename {
+	my $v_file = $_[0];
+	while ( $v_file =~ m/'\$'[\\0-7abtnvfr]+''/ ) {
+	### for each block of escaped hex characters
+		### separate out the block, and use a null character as a place holder
+		my $v_file2 = substr( $&, 3, -2 );
+		$v_file = $` . "\000" . $';
+		### Replace all of the escaped characters
+		$v_file2 =~ s/\\001/\001/g;
+		$v_file2 =~ s/\\002/\002/g;
+		$v_file2 =~ s/\\003/\003/g;
+		$v_file2 =~ s/\\004/\004/g;
+		$v_file2 =~ s/\\005/\005/g;
+		$v_file2 =~ s/\\006/\006/g;
+		$v_file2 =~ s/\\a/\007/g;
+		$v_file2 =~ s/\\b/\010/g;
+		$v_file2 =~ s/\\t/\011/g;
+		$v_file2 =~ s/\\n/\012/g;
+		$v_file2 =~ s/\\v/\013/g;
+		$v_file2 =~ s/\\f/\014/g;
+		$v_file2 =~ s/\\r/\015/g;
+		$v_file2 =~ s/\\016/\016/g;
+		$v_file2 =~ s/\\017/\017/g;
+		$v_file2 =~ s/\\020/\020/g;
+		$v_file2 =~ s/\\021/\021/g;
+		$v_file2 =~ s/\\022/\022/g;
+		$v_file2 =~ s/\\023/\023/g;
+		$v_file2 =~ s/\\024/\024/g;
+		$v_file2 =~ s/\\025/\025/g;
+		$v_file2 =~ s/\\026/\026/g;
+		$v_file2 =~ s/\\027/\027/g;
+		$v_file2 =~ s/\\030/\030/g;
+		$v_file2 =~ s/\\031/\031/g;
+		$v_file2 =~ s/\\032/\032/g;
+		$v_file2 =~ s/\\033/\033/g;
+		$v_file2 =~ s/\\034/\034/g;
+		$v_file2 =~ s/\\035/\035/g;
+		$v_file2 =~ s/\\036/\036/g;
+		$v_file2 =~ s/\\037/\037/g;
+		$v_file2 =~ s/\\177/\x7F/g;
+		### Put the block of non-printable characters back in place
+		$v_file =~ s/\000/$v_file2/;
+	}
+	if ( $v_file =~ m/'\\''/ ) {
+		$v_file =~ s/'\\''/'/g;
+	}
+	### Remove the first and last character, because they're single quotes
+	$v_file = substr( $v_file, 1, -1 );
+	return $v_file;
+}
+
 sub fn_get_working {
 ### Given the full path to the program, return the name of an appropriate working directory
 	my $v_program = $_[0];
+	$v_program = ( readlink($v_program) || $v_program );
 	my @v_working = split( m/\//, $v_program );
 	my $v_name = pop( @v_working );
 	$v_name =~ s/\.pl$//;
@@ -1273,6 +1362,43 @@ sub fn_mod_check {
 		return 0;
 	}
 	return 1;
+}
+
+sub fn_test_for_bin {
+### This tests if there's a binary command available within $PATH and returns the full path of the first such binary found.
+### $_[0] is the name of the binary that we're checking for.
+	if( exists $ENV{PATH} && defined $ENV{PATH} ) {
+		my @v_paths = split( m/:/, $ENV{PATH} );
+		for ( @v_paths ) {
+			if ( -f ( $_ . "/" . $_[0] ) && -x ( $_ . "/" . $_[0] ) ) {
+				return ( $_ . "/" . $_[0] );
+			}
+		}
+	}
+	return;
+}
+
+sub fn_bin_check {
+### Given an array of necessary external programs, ler the end user know if any are missing
+	my @ext_progs = @_;
+
+	### Check all of the programs and make a list of the missing ones.
+	my @missing_progs;
+	for my $prog ( @ext_progs ) {
+		if ( ! fn_test_for_bin( $prog ) ) {
+			push( @missing_progs, $prog );
+		}
+	}
+
+	### Warn the user if any are missing.
+	if ( @missing_progs ) {
+		print "This script relies on the following external programs that do not appear to be installed:\n";
+		for ( @missing_progs ) {
+			print $_, "\n";
+		}
+		print "\n";
+		exit 1;
+	}
 }
 
 sub fold_print {
@@ -1349,6 +1475,10 @@ sub fn_version {
 print "Current Version: $v_VERSION\n";
 my $v_message = <<'EOF';
 
+Version 1.3.0 (2018-08-24) -
+    - Any time a file name is output (not including the "--record" report) The file name is appropriately escaped to show non-printing characters
+    - Less liberal use of abs_path. There were definitely circumstances where I didn't need it but was using it anyway.
+
 Version 1.2.0 (2018-08-19) -
     - Added the "--md5" flag, as well as a few control strings
     - Added a maximum depth for the script to recurse to
@@ -1385,7 +1515,8 @@ my $v_usage = <<'EOF';
 USAGE
 
 ./stat_watch.pl --record [DIRECTORY] ([DIRECTORY 2] ...)
-    - Outputs stat data for all of the files under the directory specified (you probably want to use the "-o" flag or redirect output to a file)
+    - Creates a Stat Watch report of all of the files within the directories specified (and the subdirectories thereof) including their current stat data
+        - You probably want to use the "-o" flag or redirect output to a file
     - The "-v" or "--verbose" flag can be used to have the directories output to STDERR
     - The "-i" or "--include" flag can be used to specify an ignore/include file
     - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
@@ -1400,10 +1531,10 @@ USAGE
         - For example, running "./stat_watch.pl --record /home/account --as-dir "/home/different/path" will result in the file "/home/account/file.txt" to be listed as "/home/different/path/file.txt"
         - This is useful for situations where you want to capture information for backed-up files and compare them to files in place.
 
-./stat_watch.pl --diff [FILE 1] [FILE 2]
+./stat_watch.pl --diff [REPORT FILE 1] [REPORT FILE 2]
     - Compare two Stat Watch report files, weed out files that match ignore rules, output information on what has changed
     - The "--ignore" flag can be used to specify a specific file or directory that you want to ignore
-        - This is functionally the same as the "BackupD" control string in an include/ignore file
+        - This is functionally the same as listing a file without a control string in an include/ignore file
     - The "-i" or "--include" flag can be used to specify an ignore/include file
     - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
     - The "-f" or "--format" flag allows you to choose a number of options for how the details should be output:
@@ -1418,7 +1549,7 @@ USAGE
     - The "--before" and "--after" flags can be used to specify which is the earlier Stat Watch report file and which is the later
         - Without these flags, the mtimes of the files are used to determine which is which
 
-./stat_watch.pl --backup [FILE]
+./stat_watch.pl --backup [REPORT FILE]
     - Create backups of files specified using a Stat Watch report file and the settings within an ignore/include file
     - The file must be a Stat Watch report file
     - The "-i" or "--include" flag can be used to specify an ignore/include file and that file must have "BackupD" and "BackupR" or "Backup+" control strings present
@@ -1432,7 +1563,7 @@ USAGE
         - However, files that are no longer matched will not be removed
 
 ./stat_watch.pl --list [FILE]
-    - This will list the available backups for a specific file
+    - This will list the available backups that Stat Watch has taken of a specific file
     - It is not necessary to specify an includde file, Stat Watch will check all directories that it has ever backed up to in hopes of giving the most comprehensive answer possible.
 
 ./stat_watch.pl --prune [FILE]
@@ -1440,6 +1571,9 @@ USAGE
     - The file must be a Stat Watch report file
     - The "-i" or "--include" flag must be used to specify an ignore/include file and that file must have "BackupD" string present
     - Any files outside of the range specified by the "BackupMD" and "BackupMC" control strings will be removed
+
+./stat_watch.pl --md5-test
+    - Test to see if everything necessary is in place for checking the md5sum of files
 
 ./stat_watch.pl --help
 ./stat_watch.pl -h
@@ -1449,6 +1583,9 @@ USAGE
 ./stat-watch.pl --help-includes
 ./stat-watch.pl --help-backups
     - Outputs information regarding the specific aspect of Stat Watch requested
+
+./stat_watch.pl --version
+    - Outputs version and changelog information
 
 EOF
 my $v_include = <<'EOF';
@@ -1470,12 +1607,12 @@ Control Strings:
         - "Include" - Interpret the contents of the following file as if it was listed at the command line as an include/ignore file
         - "BackupR" - If a file matches the regular expression that follows, and the appropriate flags are set, they will be backed up
         - "Backup+" - In any instance where there are changes to the following file, it will be backed up
-        - "Time-" - Stat changes to this file will not be reported if the only change is to mtime or ctime
+        - "Time-" - Stat changes to this file will not be reported by "--diff" if the only change is to mtime or ctime
             - Useful if a file is regularly getting touched by a process, but still want to track changes to it otherwise
         - "MD5R" - If a file matches the regular expression that follows, also capture the file's MD5 sum for comparison
         - "MD5" -
             - If a file's name and full path matches the exact string that follows, also capture the file's MD5 sum for comparison
-            - If this is alone on a line, then capture MD5 sums for everything (as if the "--md5" flag was used)
+            - If "MD5" is alone on a line, then capture MD5 sums for everything (as if the "--md5" flag was used)
             - This will require that the .stat_watch/md5.pm file be present, as well as the perl modules 'Digest::MD5' and 'Digest::MD5::File'
     - Lines beginning with the following control strings have special meanings, but only the last declaration will be interpreted:
         - "BackupD" - This specifies the directory to backup files to. The directory must already exist and be writable, or Stat Watch will error out
@@ -1686,14 +1823,14 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	} elsif ( $b_use_md5 ) {
 		require( $d_working . '/md5.pm' );
 	}
+	### Check to make sure that the necessary binaries are here
+	fn_bin_check ('stat', 'diff');
 	### Sort the relevant arrays
 	my $b_close = fn_sort_prep();
 	fn_document_backup();
-	my $v_file1_escape = $v_file1;
-	$v_file1_escape =~ s/'/'\\''/g;
-	my $v_file2_escape = $v_file2;
-	$v_file2_escape =~ s/'/'\\''/g;
-	fn_log("Processing diff of files '" . $v_file1_escape . "' and '" . $v_file2_escape . "'\n");
+	my $v_file1_escape = fn_escape_filename($v_file1);
+	my $v_file2_escape = fn_escape_filename($v_file2);
+	fn_log("Processing diff of files " . $v_file1_escape . " and " . $v_file2_escape . "\n");
 	fn_diff( $v_file1, $v_file2 );
 	fn_log("Finished processing diff\n");
 	if ($b_close) {
@@ -1778,11 +1915,23 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		require( $d_working . '/md5.pm' );
 	}
 	### Output to the log and begin the job
-	my $d_backup_escape = $d_backup;
-	$d_backup_escape =~ s/'/'\\''/g;
-	fn_log("Checking to see if there are files that need to be backed up '" . $d_backup_escape . "'\n");
+	my $d_backup_escape = fn_escape_filename($d_backup);
+	fn_log("Checking to see if there are files that need to be backed up " . $d_backup_escape . "\n");
 	fn_document_backup();
 	fn_backup_initial($v_file);
+} elsif ( defined $args[0] && $args[0] eq "--md5-test" ) {
+	if ( -f $d_working . '/md5.pm' ) {
+		fn_mod_check( 'Digest::MD5', 'Digest::MD5::File' );
+		require( $d_working . '/md5.pm' );
+		### Check to make sure that the necessary binaries are here
+		fn_bin_check ('stat', 'diff');
+		print "It looks as if everything you need is in place for MD5 functionality\n";
+		exit;
+	} else {
+		print STDERR "\nCannot check md5sums without module '" . $d_working . "/md5.pm':\n";
+		print STDERR "https://raw.githubusercontent.com/sporks5000/stat_watch/master/.stat_watch/md5.pm\n\n";
+		exit 1;
+	}
 } elsif ( defined $args[0] && $args[0] eq "--prune" ) {
 	shift( @args );
 	while ( defined $args[0] ) {
@@ -1792,9 +1941,8 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		fn_report_unknown(@v_unknown);
 	}
 	if ($d_backup) {
-		my $d_backup_escape = $d_backup;
-		$d_backup_escape =~ s/'/'\\''/g;
-		fn_log("Pruning old backups from directory '" . $d_backup_escape . "'\n");
+		my $d_backup_escape = fn_escape_filename($d_backup);
+		fn_log("Pruning old backups from directory " . $d_backup_escape . "\n");
 		fn_prune_backups($d_backup);
 	}
 } elsif ( defined $args[0] && ($args[0] eq "--record" || substr($args[0],0,2) ne "--") ) {
@@ -1839,6 +1987,8 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			sleep 2;
 		}
 	}
+	### Check to make sure that the necessary binaries are here
+	fn_bin_check ('stat', 'diff');
 	### Process those directories
 	for my $_dir ( @v_dirs ) {
 		$v_current_dir = $_dir;
@@ -1848,9 +1998,8 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		fn_check_strings( $_dir );
 		if ( -d $_dir ) {
 			### Individual files can be listed as well, but there's no need to log the fact we're looking at those. Just directories will suffice
-			my $_dir_escape = $_dir;
-			$_dir_escape =~ s/'/'\\''/g;
-			fn_log("Running a report for directory '" . $_dir_escape . "'\n");
+			my $_dir_escape = fn_escape_filename($_dir);
+			fn_log("Running a report for directory " . $_dir_escape . "\n");
 		}
 		fn_stat_watch( $_dir, $v_timestamp );
 	}

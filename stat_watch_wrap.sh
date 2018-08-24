@@ -13,8 +13,9 @@ v_MAX_RUN=3600
 v_LOG_MAX=10485760
 
 ### Find out where we are and make sure that stat_watch.pl is here too
-v_PROGRAMDIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-v_PROGRAMNAME="$( basename "${BASH_SOURCE[0]}" )"
+v_PROGRAMNAME="$( readlink "${BASH_SOURCE[0]}" )"
+v_PROGRAMDIR="$( cd -P "$( dirname "$v_PROGRAMNAME" )" && pwd )"
+v_PROGRAMNAME="$( basename "$v_PROGRAMNAME" )"
 v_PERL="/usr/bin/perl"
 v_CPAN="/usr/bin/cpan"
 if [[ ! -f "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" ]]; then
@@ -91,13 +92,13 @@ $v_PROGRAMNAME is a wrapper script for $f_PERL_SCRIPT, designed with the goal of
 USAGE
 
 ./$v_PROGRAMNAME
-    - Asks the user key questions in order to create a Stat Watch job to watch and backup key user files
+    - Asks the user key questions in order to create a Stat Watch job file with the information necessary to watch and backup key user files
     - By default, this will enable backup for files that end with the following: .php, .php4, .php5, .php7, .pl, .pm, .py, .js, .json, .css, .cgi .htm, .html, .htaccess, .htpasswd, .sh, .rb
     - What files are being checked and what files are being backed up can be modified by editing the .job file that this script creates
 
-./$v_PROGRAMNAME --run [FILE]
+./stat_watch_wrap.sh --run [JOB FILE]
     - Runs the necessary commands to complete a Stat Watch job, including checking the stats of files, determining th edifferences, and backing up files when necessary
-    - FILE is the .job file created by $v_PROGRAMNAME
+    - [JOB FILE] is the .job file created by $v_PROGRAMNAME without flags
     - Adding the "--errors" flag after the file will prevent errors from $v_PROGRAMDIR/$f_PERL_SCRIPT from being routed to /dev/null
 
 ./$v_PROGRAMNAME --email-test [EMAIL ADDRESS]
@@ -106,6 +107,9 @@ USAGE
 ./$v_PROGRAMNAME --help
 ./$v_PROGRAMNAME -h
     - Outputs this text
+
+./$v_PROGRAMNAME --version
+    - Outputs version and changelog information
 
 
 CONTROL STRINGS
