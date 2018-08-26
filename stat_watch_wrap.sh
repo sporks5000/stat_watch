@@ -13,9 +13,15 @@ v_MAX_RUN=3600
 v_LOG_MAX=10485760
 
 ### Find out where we are and make sure that stat_watch.pl is here too
+
+##### I thought that these would work, but they did not. Better double check and figure out why
 v_PROGRAMNAME="$( readlink "${BASH_SOURCE[0]}" )"
+if [[ -z $v_PROGRAMNAME ]]; then
+	v_PROGRAMNAME="${BASH_SOURCE[0]}"
+fi
 v_PROGRAMDIR="$( cd -P "$( dirname "$v_PROGRAMNAME" )" && pwd )"
 v_PROGRAMNAME="$( basename "$v_PROGRAMNAME" )"
+
 v_PERL="/usr/bin/perl"
 v_CPAN="/usr/bin/cpan"
 if [[ ! -f "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" ]]; then
