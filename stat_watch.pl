@@ -54,6 +54,7 @@ my $v_max_depth = 20;
 my $v_cur_depth = 0;
 my $v_as_dir;
 my $v_current_dir;
+my $b_links;
 
 #===================#
 #== Report Output ==#
@@ -145,6 +146,7 @@ sub fn_stat_watch {
 ### $_[0] is the directory in question; $_[1] is the timestamp associated with this process
 	my $v_dir = $_[0];
 	my $v_timestamp = $_[1];
+	my $c_links = 0;
 	if ($b_verbose) {
 		my $v_dir_escape = fn_escape_filename($v_dir);
 		print STDERR "Directory: " . $v_dir_escape . "\n";
@@ -153,10 +155,16 @@ sub fn_stat_watch {
 	### If we were given a file instead of a directory
 		my $v_file = $v_dir;
 		if ( fn_check_file($v_file) ) {
-			fn_report_line($v_file, $v_timestamp);
+			if ($b_links) {
+				if ( -l $v_dir ) {
+					print "1 - " . fn_escape_filename($v_dir) . "\n";
+				}
+			} else {
+				fn_report_line($v_file, $v_timestamp);
+			}
 		}
 	} elsif ( -e $v_dir ) {
-		if ( $v_dir eq $v_current_dir ) {
+		if ( $v_dir eq $v_current_dir && ! $b_links ) {
 			fn_report_line($v_dir, $v_timestamp);
 		}
 		### Open the directory and get a file list
@@ -175,8 +183,17 @@ sub fn_stat_watch {
 					if ( -d $v_file && ! -l $v_file ) {
 						push( @dirs, $v_file );
 					}
-					fn_report_line($v_file, $v_timestamp);
+					if ($b_links) {
+						if ( -l $v_file ) {
+							$c_links++;
+						}
+					} else {
+						fn_report_line($v_file, $v_timestamp);
+					}
 				}
+			}
+			if ( $c_links ) {
+				print $c_links . " - " . fn_escape_filename($v_dir) . "\n";
 			}
 			for my $_dir (@dirs) {
 			### For each of the directories we found, go through RECURSIVELY!
@@ -1478,6 +1495,7 @@ my $v_message = <<'EOF';
 Version 1.3.0 (2018-08-24) -
     - Any time a file name is output (not including the "--record" report) The file name is appropriately escaped to show non-printing characters
     - Less liberal use of abs_path. There were definitely circumstances where I didn't need it but was using it anyway.
+    - Added functionality to output the number of symlinks in each directory
 
 Version 1.2.0 (2018-08-19) -
     - Added the "--md5" flag, as well as a few control strings
@@ -1530,6 +1548,10 @@ USAGE
     - The "--as-dir" flag can be followed by a string of text that will be used to replace the directory name when recording the full file path
         - For example, running "./stat_watch.pl --record /home/account --as-dir "/home/different/path" will result in the file "/home/account/file.txt" to be listed as "/home/different/path/file.txt"
         - This is useful for situations where you want to capture information for backed-up files and compare them to files in place.
+
+./stat_watch.pl --links [DIRECTORY] ([DIRECTORY 2] ...)
+    - Outputs the number of symlinks in each directory
+    - Otherwise follows all of the same rules as "--record"
 
 ./stat_watch.pl --diff [REPORT FILE 1] [REPORT FILE 2]
     - Compare two Stat Watch report files, weed out files that match ignore rules, output information on what has changed
@@ -1945,7 +1967,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		fn_log("Pruning old backups from directory " . $d_backup_escape . "\n");
 		fn_prune_backups($d_backup);
 	}
-} elsif ( defined $args[0] && ($args[0] eq "--record" || substr($args[0],0,2) ne "--") ) {
+} elsif ( defined $args[0] && ($args[0] eq "--record" || $args[0] eq "--links" || substr($args[0],0,2) ne "--") ) {
 ### The part where we capture the stats of files
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
@@ -1958,6 +1980,9 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		} elsif ( -e $v_arg ) {
 			push( @v_dirs, abs_path($v_arg) );
 		} elsif ( $v_arg eq "--record" ) {
+		} elsif ( $v_arg eq "--links" ) {
+			$b_ignore_on_record = 1;
+			$b_links = 1;
 		} else {
 			push ( @v_unknown, $v_arg );
 		}
@@ -1994,9 +2019,11 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		$v_current_dir = $_dir;
 		my $v_timestamp = time();
 		my $v_output_dir = fn_get_file_name($_dir);
-		print $fh_output "Processing: '" . $v_output_dir . "' - " . $v_timestamp . "\n";
+		if ( ! $b_links ) {
+			print $fh_output "Processing: '" . $v_output_dir . "' - " . $v_timestamp . "\n";
+		}
 		fn_check_strings( $_dir );
-		if ( -d $_dir ) {
+		if ( -d $_dir && ! $b_links ) {
 			### Individual files can be listed as well, but there's no need to log the fact we're looking at those. Just directories will suffice
 			my $_dir_escape = fn_escape_filename($_dir);
 			fn_log("Running a report for directory " . $_dir_escape . "\n");
