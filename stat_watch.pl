@@ -6,7 +6,7 @@
 use strict;
 use warnings;
 
-my $v_VERSION = "1.3.0";
+my $v_VERSION = "1.3.1";
 
 use Cwd 'abs_path';
 use POSIX 'strftime';
@@ -886,10 +886,7 @@ sub fn_list_file {
 	}
 	{
 	### Find all of the backup directories that have been used
-		my @v_dir = split( m/\//, $v_program );
-		pop( @v_dir );
-		my $v_dir = join( '/', @v_dir );
-		$v_dir = $v_dir . "/.stat_watch";
+		my $v_dir = $d_working;
 		if ( ! -d $v_dir ) {
 			mkdir( $v_dir );
 		}
@@ -1332,6 +1329,7 @@ sub fn_get_working {
 ### Given the full path to the program, return the name of an appropriate working directory
 	my $v_program = $_[0];
 	$v_program = ( readlink($v_program) || $v_program );
+	$v_program = ( abs_path($v_program) || $v_program );
 	my @v_working = split( m/\//, $v_program );
 	my $v_name = pop( @v_working );
 	$v_name =~ s/\.pl$//;
@@ -1418,70 +1416,13 @@ sub fn_bin_check {
 	}
 }
 
-sub fold_print {
-### Given a message to print to the terminal, line-break that message at word breaks
-### $_[0] is the message; $_[1] is the number of columns to use if columns can't be determined.
-	### Determine how many columns we're working with
-	my $v_columns;
-	if( exists $ENV{PATH} && defined $ENV{PATH} ) {
-		my @v_paths = split( m/:/, $ENV{PATH} );
-		for ( @v_paths ) {
-			if ( -f ( $_ . "/tput" ) && -x ( $_ . "/tput" ) ) {
-				my $v_exe =  $_ . "/tput";
-				$v_columns = `$v_exe cols`;
-				chomp $v_columns;
-				if ( $v_columns =~ m/^[0-9]+$/ ) {
-					last;
-				}
-			}
-		}
-	}
-	if ( $v_columns && $v_columns !~ m/^[0-9]+$/ ) {
-		if ( $_[1] ) {
-			$v_columns = $_[1];
-		} else {
-			return $_[0];
-		}
+sub fn_import_fold_print {
+	if ( $d_working . '/fold_print.pm' ) {
+		require( $d_working . '/fold_print.pm' );
+		print fn_fold_print($_[0]);
 	} else {
-		$v_columns--;
+		print $_[0];
 	}
-
-	### Go through each line of the message and make sure it's breaks appropriately
-	my @v_message = split( m/\n/, ( $_[0] . "\n" . "last" ) );
-	for my $_line ( @v_message ) {
-		chomp( $_line );
-		$_line =~ s/\t/     /g;
-		$_line = $_line . "\n";
-		next if length( $_line ) <= $v_columns;
-		my $v_remaining = length( $_line ) - 1;
-		my $v_complete = 0;
-		my $v_spaces = "";
-		for my $_character ( 0 .. ( $v_remaining - 1 ) ) {
-			if ( substr( $_line, $_character, 1 ) =~ m/[ *-]/ ) {
-				$v_spaces = $v_spaces . " ";
-			} else {
-				last;
-			}
-		}
-		my $v_length_spaces = length( $v_spaces );
-		while ( $v_remaining >= $v_columns ) {
-			for my $_character ( reverse( ( $v_complete + $v_length_spaces ) .. ( $v_complete + $v_columns ) ) ) {
-				if ( substr( $_line, $_character, 1 ) eq " "  ) {
-					$_line = substr( $_line, 0, $_character ) . "\n" . $v_spaces . substr( $_line, ($_character + 1) );
-					$v_remaining = ( length( $_line ) - 1 - $_character + 1 );
-					$v_complete = ( $_character + 1 );
-					last;
-				}
-				if ( $_character == ( $v_complete + $v_length_spaces ) ) {
-					$v_remaining -= $v_columns;
-					$v_complete += $v_columns;
-				}
-			}
-		}
-	}
-	pop @v_message;
-	$v_message[$#v_message] = substr( $v_message[$#v_message], 0, (length( $v_message[$#v_message] ) - 1 ) );
-	return @v_message;
 }
 
 #=============================#
@@ -1491,6 +1432,9 @@ sub fold_print {
 sub fn_version {
 print "Current Version: $v_VERSION\n";
 my $v_message = <<'EOF';
+
+Version 1.3.1 (2018-08-29) -
+    - Fixed a bug where under some circumstances it would fail to find the list of backup directories
 
 Version 1.3.0 (2018-08-24) -
     - Any time a file name is output (not including the "--record" report) The file name is appropriately escaped to show non-printing characters
@@ -1518,7 +1462,7 @@ Version 1.0.0 (2018-08-04) -
     - Original Version
 
 EOF
-print fold_print($v_message);
+fn_import_fold_print($v_message);
 exit 0;
 }
 
@@ -1686,13 +1630,13 @@ Report any errors, unexpected behaviors, comments, or feedback to acwilliams@liq
 EOF
 
 if ( ! $_[0] ) {
-	print fold_print($v_header . $v_usage . $v_include . $v_backup . $v_feedback);
+	fn_import_fold_print($v_header . $v_usage . $v_include . $v_backup . $v_feedback);
 } elsif ( $_[0] eq "usage" ) {
-	print fold_print($v_header . $v_usage . $v_feedback);
+	fn_import_fold_print($v_header . $v_usage . $v_feedback);
 } elsif ( $_[0] eq "includes" ) {
-	print fold_print($v_header . $v_include . $v_feedback);
+	fn_import_fold_print($v_header . $v_include . $v_feedback);
 } elsif ( $_[0] eq "backups" ) {
-	print fold_print($v_header . $v_backup . $v_feedback);
+	fn_import_fold_print($v_header . $v_backup . $v_feedback);
 }
 exit 0;
 }

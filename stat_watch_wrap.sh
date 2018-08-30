@@ -2,7 +2,7 @@
 ### A wrapper script for stat_watch.pl
 ### Created by ACWilliams
 
-v_VERSION="1.1.0";
+v_VERSION="1.1.1";
 
 f_PERL_SCRIPT="stat_watch.pl"
 d_WORKING="stat_watch"
@@ -11,16 +11,16 @@ v_PRUNE_MAX=10
 v_PRUNE_CHANCE=1
 v_MAX_RUN=3600
 v_LOG_MAX=10485760
+v_EMAIL_RETAIN=20
 
 ### Find out where we are and make sure that stat_watch.pl is here too
-
-##### I thought that these would work, but they did not. Better double check and figure out why
 v_PROGRAMNAME="$( readlink "${BASH_SOURCE[0]}" )"
 if [[ -z $v_PROGRAMNAME ]]; then
 	v_PROGRAMNAME="${BASH_SOURCE[0]}"
 fi
 v_PROGRAMDIR="$( cd -P "$( dirname "$v_PROGRAMNAME" )" && pwd )"
 v_PROGRAMNAME="$( basename "$v_PROGRAMNAME" )"
+f_JOBS="$v_PROGRAMDIR"/."$d_WORKING"/wrap_jobs_created
 
 v_PERL="/usr/bin/perl"
 v_CPAN="/usr/bin/cpan"
@@ -90,7 +90,7 @@ function fn_get_direc {
 }
 
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then
-cat << EOF | fold -s -w $(( $(tput cols) - 1 )) > /dev/stdout
+cat << EOF | "$v_PROGRAMDIR/.$d_WORKING"/fold_out.pl > /dev/stdout
 
 $v_PROGRAMNAME is a wrapper script for $f_PERL_SCRIPT, designed with the goal of automating the most common processes and workflows anticipated for usage of $f_PERL_SCRIPT. Both of these scripts are part of the Stat Watch project
 
@@ -129,7 +129,8 @@ The help output for "$v_PROGRAMDIR/$f_PERL_SCRIPT" explains a number of control 
     - "Prune-chance" - Pruning old backups will occur X out of every Y runs. "Prune-chance" designates the "X". Without this set, the default is 1.
     - "Email-no-changes" - If this control string is present, send emails even if there are no changes.
     - "Log-max" - A number following this control string will designate the maximum size (in bytes) of the log before it's trimmed. Without this set, the default is 10485760.
-    - There are four control strings that allow the user to run a custom script at various points during the process of a typical Stat Watch job run: "Run-start", "Run-post", "Run-end", "Run-pre-e", and "Run-post-e":
+    - "Email-retain" - the number of days to retain old email messages. If this is set to "0", old email messages will never be deleted.
+    - There are five control strings that allow the user to run a custom script at various points during the process of a typical Stat Watch job run: "Run-start", "Run-post", "Run-end", "Run-pre-e", and "Run-post-e":
         - For any of these, the full path to the script must be used.
         - Anything following the control string (and any whitespace after it) will be interpreted by the "eval" command
         - "Run-start" - The script specified here will run immediately previous to the first $f_PERL_SCRIPT "--record" "--backup" or "--diff" command
@@ -185,7 +186,7 @@ There are a number of files assiciated with each Stat Watch job. Here is an expl
 
 OTHER DETAILS
 
-1) A list of jobs created by this script will be stored in the file "$v_PROGRAMDIR/.$d_WORKING/wrap_jobs_created".
+1) A list of jobs created by this script will be stored in the file "$f_JOBS".
 
 2) For a better understanding of what functions are available under $f_PERL_SCRIPT, run "$v_PROGRAMDIR/$f_PERL_SCRIPT --help" for more information.
 
@@ -198,10 +199,16 @@ EOF
 #'#"# in #'#"
 exit
 elif [[ "$1" == "--version" ]]; then
-cat << EOF | fold -s -w $(( $(tput cols) - 1 )) > /dev/stdout
+cat << EOF | "$v_PROGRAMDIR/.$d_WORKING"/fold_out.pl > /dev/stdout
 Current Version: $v_VERSION
 
 Version Notes:
+
+1.1.1 (2018-08-29) -
+    - Changed how help and version text is output
+    - Job names are required to be unique
+    - You can refer to the job either by the name or by the job file with "--run"
+    - Added the "Email-Retain" control string
 
 1.1.0 (2018-08-17) -
     - Added the ability to turn off error supression
@@ -220,8 +227,16 @@ elif [[ "$1" == "--run" ]]; then
 ### Here's the part for if we're running a job
 	f_JOB="$2"
 	if [[ ! -f "$f_JOB" ]]; then
-		echo "No such file"
-		exit
+		if [[ -f "$f_JOBS" ]]; then
+			$f_JOB="$( egrep "^$f_JOB:" "$f_JOBS" | cut -d ":" -f2- | sed "s/ - Created .*$//" )"
+			if [[ -z "$f_JOB" || ! -f "$f_JOB" ]]; then
+				echo "No such file"
+				exit
+			fi
+		else
+			echo "No such file"
+			exit
+		fi
 	fi
 	v_ERROR_OUT="/dev/null"
 	if [[ -n $3 && "$3" == "--errors" ]]; then
@@ -386,6 +401,20 @@ elif [[ "$1" == "--run" ]]; then
 		if [[ $(( $v_PRUNE_CHANCE + RANDOM % $v_PRUNE_MAX )) -le $v_PRUNE_CHANCE ]]; then
 			nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --prune -i "$f_JOB" 2> "$v_ERROR_OUT"
 		fi
+
+		### Remove old email messages
+		fn_get_direc "Email-retain"; v_EMAIL_RETAIN2="$v_DIREC"
+		if [[ -n $v_EMAIL_RETAIN2 && $( echo "$v_EMAIL_RETAIN2" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
+			v_EMAIL_RETAIN="$v_EMAIL_RETAIN2"
+		fi
+		if [[ "$v_EMAIL_RETAIN" -ne 0 ]]; then
+			v_EMAIL_RETAIN="$(( $v_EMAIL_RETAIN * 86400 ))"
+			for i in $( \ls -1 "$v_DIR" | egrep "^$v_NAME""_changes_" | sed -E "s/^.*[^0-9]([0-9]+).txt$/\1/" ); do
+				if [[ $(( $( date +%s ) - $v_EMAIL_RETAIN )) -gt "$i" ]]; then
+					rm -f "$v_DIR"/"$v_NAME"_changes_"$i".txt
+				fi
+			done
+		fi
 	fi
 
 	### Trim lines from the beginning of the log if necessary
@@ -439,10 +468,24 @@ if [[ -z $v_MONITOR ]]; then
 		exit
 	fi
 fi
-read -ep "Is there a specific name you want to use for this job (leave blank for \"$v_ACCOUNT\")? " v_NAME
-if [[ -z $v_NAME ]]; then
-	v_NAME="$v_ACCOUNT"
-fi
+
+function fn_name {
+	read -ep "Is there a specific name you want to use for this job (leave blank for \"$v_ACCOUNT\")? " v_NAME
+	if [[ -z $v_NAME ]]; then
+		v_NAME="$v_ACCOUNT"
+	fi
+	if [[ $( echo "$v_NAME" | egrep -c "^[0-9a-zA-Z]+$" ) -lt 1 ]]; then
+		echo "The name should only contain letters and numbers"
+		fn_name
+	fi
+	if [[ -f "$f_JOBS" ]]; then
+		if [[ $( egrep -c "^$v_NAME:" "$f_JOBS" ) -gt 0 ]]; then
+			echo "That name has already been used"
+			fn_name
+		fi
+	fi
+}
+fn_name
 
 ### And figure out where we're going to store this job
 if [[ $( stat -c %n /*/"$d_WORKING"/ 2> /dev/null | wc -l ) -gt 0 ]]; then
@@ -500,6 +543,7 @@ Log $v_DIR/$v_NAME.log
 
 ### These lines specific to the functionality of $v_PROGRAMNAME
 Name $v_NAME
+Email-retain 20
 EOF
 if [[ -n $v_EMAIL ]]; then
 	echo "Email $v_EMAIL" >> "$f_JOB"
@@ -514,9 +558,12 @@ echo "$( date +%Y-%m-%d" "%T" "%z ) - Job \"$f_JOB\" created by $v_PROGRAMNAME" 
 ### Create a working directory and a file to document jobs created
 mkdir -p $v_PROGRAMDIR/."$d_WORKING"
 f_TEMP=$( mktemp )
-grep -E -v "^$f_JOB - Created " "$v_PROGRAMDIR"/."$d_WORKING"/wrap_jobs_created > "$f_TEMP" 2> /dev/null
-echo "$f_JOB - Created $( date +%Y-%m-%d" "%T" "%z )" >> "$f_TEMP"
-mv -f "$f_TEMP" "$v_PROGRAMDIR"/."$d_WORKING"/wrap_jobs_created
+### Copy all of the other jobs into a temp file
+grep -E -v "^$f_JOB - Created " "$f_JOBS" > "$f_TEMP" 2> /dev/null
+### Add this job to the temp file
+echo "$v_NAME"":""$f_JOB - Created $( date +%Y-%m-%d" "%T" "%z )" >> "$f_TEMP"
+### Replace the temp file
+mv -f "$f_TEMP" "$f_JOBS"
 
 ### Output text telling the user what next steps they need to take
 echo
