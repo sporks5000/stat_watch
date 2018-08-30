@@ -55,6 +55,7 @@ my $v_cur_depth = 0;
 my $v_as_dir;
 my $v_current_dir;
 my $b_links;
+my $b_new_lines;
 
 #===================#
 #== Report Output ==#
@@ -159,12 +160,16 @@ sub fn_stat_watch {
 				if ( -l $v_dir ) {
 					print "1 - " . fn_escape_filename($v_dir) . "\n";
 				}
+			} elsif ( $b_new_lines ) {
+				if ( $v_dir =~ m/\n/ ) {
+					print fn_escape_filename($v_dir) . "\n";
+				}
 			} else {
 				fn_report_line($v_file, $v_timestamp);
 			}
 		}
 	} elsif ( -e $v_dir ) {
-		if ( $v_dir eq $v_current_dir && ! $b_links ) {
+		if ( $v_dir eq $v_current_dir && ! $b_links && ! $b_new_lines ) {
 			fn_report_line($v_dir, $v_timestamp);
 		}
 		### Open the directory and get a file list
@@ -186,6 +191,10 @@ sub fn_stat_watch {
 					if ($b_links) {
 						if ( -l $v_file ) {
 							$c_links++;
+						}
+					} elsif ( $b_new_lines ) {
+						if ( $v_file =~ m/\n/ ) {
+							print fn_escape_filename($v_file) . "\n";
 						}
 					} else {
 						fn_report_line($v_file, $v_timestamp);
@@ -1435,11 +1444,12 @@ my $v_message = <<'EOF';
 
 Version 1.3.1 (2018-08-29) -
     - Fixed a bug where under some circumstances it would fail to find the list of backup directories
+    - Added the "--new-lines" flag to output all file names that contain a new line character
 
 Version 1.3.0 (2018-08-24) -
     - Any time a file name is output (not including the "--record" report) The file name is appropriately escaped to show non-printing characters
     - Less liberal use of abs_path. There were definitely circumstances where I didn't need it but was using it anyway.
-    - Added functionality to output the number of symlinks in each directory
+    - Added the "--links" flag to output the number of symlinks in each directory
 
 Version 1.2.0 (2018-08-19) -
     - Added the "--md5" flag, as well as a few control strings
@@ -1495,6 +1505,10 @@ USAGE
 
 ./stat_watch.pl --links [DIRECTORY] ([DIRECTORY 2] ...)
     - Outputs the number of symlinks in each directory
+    - Otherwise follows all of the same rules as "--record"
+
+./stat_watch.pl --new_lines [DIRECTORY] ([DIRECTORY 2] ...)
+    - Outputs every file that has a new line in its name, appropriately escaped so that it can be printed on one line
     - Otherwise follows all of the same rules as "--record"
 
 ./stat_watch.pl --diff [REPORT FILE 1] [REPORT FILE 2]
@@ -1911,7 +1925,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		fn_log("Pruning old backups from directory " . $d_backup_escape . "\n");
 		fn_prune_backups($d_backup);
 	}
-} elsif ( defined $args[0] && ($args[0] eq "--record" || $args[0] eq "--links" || substr($args[0],0,2) ne "--") ) {
+} elsif ( defined $args[0] && ($args[0] eq "--record" || $args[0] eq "--links" || $args[0] eq "--new-lines" || substr($args[0],0,2) ne "--") ) {
 ### The part where we capture the stats of files
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
@@ -1927,6 +1941,9 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		} elsif ( $v_arg eq "--links" ) {
 			$b_ignore_on_record = 1;
 			$b_links = 1;
+		} elsif ( $v_arg eq "--new-lines" ) {
+			$b_ignore_on_record = 1;
+			$b_new_lines = 1;
 		} else {
 			push ( @v_unknown, $v_arg );
 		}
@@ -1963,11 +1980,11 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		$v_current_dir = $_dir;
 		my $v_timestamp = time();
 		my $v_output_dir = fn_get_file_name($_dir);
-		if ( ! $b_links ) {
+		if ( ! $b_links && ! $b_new_lines ) {
 			print $fh_output "Processing: '" . $v_output_dir . "' - " . $v_timestamp . "\n";
 		}
 		fn_check_strings( $_dir );
-		if ( -d $_dir && ! $b_links ) {
+		if ( -d $_dir && (! $b_links || ! $b_new_lines) ) {
 			### Individual files can be listed as well, but there's no need to log the fact we're looking at those. Just directories will suffice
 			my $_dir_escape = fn_escape_filename($_dir);
 			fn_log("Running a report for directory " . $_dir_escape . "\n");

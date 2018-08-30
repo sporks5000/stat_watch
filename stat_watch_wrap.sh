@@ -302,6 +302,7 @@ elif [[ "$1" == "--run" ]]; then
 			exit
 		fi
 	fi
+	### Find all of the scripts we might want to run
 	fn_get_script "Run-start"; v_RUN_START="$v_SCRIPT"
 	fn_get_script "Run-post"; v_RUN_POST="$v_SCRIPT"
 	fn_get_script "Run-pre-e"; v_RUN_PRE_E="$v_SCRIPT"
