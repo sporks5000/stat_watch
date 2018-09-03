@@ -157,12 +157,12 @@ sub fn_stat_watch {
 		my $v_file = $v_dir;
 		if ( fn_check_file($v_file) ) {
 			if ($b_links) {
-				if ( -l $v_dir ) {
-					print "1 - " . fn_escape_filename($v_dir) . "\n";
+				if ( -l $v_file ) {
+					print "1 - " . fn_escape_filename($v_file) . "\n";
 				}
 			} elsif ( $b_new_lines ) {
-				if ( $v_dir =~ m/\n/ ) {
-					print fn_escape_filename($v_dir) . "\n";
+				if ( $v_file =~ m/[\001-\037\x7F\n]/ ) {
+					print fn_escape_filename($v_file) . "\n";
 				}
 			} else {
 				fn_report_line($v_file, $v_timestamp);
@@ -193,7 +193,7 @@ sub fn_stat_watch {
 							$c_links++;
 						}
 					} elsif ( $b_new_lines ) {
-						if ( $v_file =~ m/\n/ ) {
+						if ( $v_file =~ m/[\001-\037\x7F\n]/ ) {
 							print fn_escape_filename($v_file) . "\n";
 						}
 					} else {
@@ -214,7 +214,7 @@ sub fn_stat_watch {
 				if ( $v_cur_depth <= $v_max_depth ) {
 					fn_stat_watch( $_dir, $v_timestamp);
 				} else {
-					fn_log("Maximum depth reached at '" . $_dir . "'\n");
+					fn_log("Maximum depth reached at " . fn_escape_filename($v_dir) . "\n");
 					### If it contains a newline character, then it needs to be processed specially
 					my $v_dir_name = fn_get_file_name($_dir, $v_timestamp);
 					print $fh_output "Maximum depth reached at '" . $v_dir_name . "' - " . $v_timestamp . "\n";
@@ -1221,9 +1221,9 @@ sub fn_report_unknown {
 ### Given an array of arguments that didn't match known arguments, report those arguments as unknown
 	print STDERR "The following arguments were not recognized:\n";
 	for my $_arg (@_) {
-		print "  '" . $_arg . "'\n";
+		print STDERR "  '" . $_arg . "'\n";
 	}
-	print "\n";
+	print STDERR "\n";
 	sleep( 2 );
 }
 
@@ -1507,8 +1507,8 @@ USAGE
     - Outputs the number of symlinks in each directory
     - Otherwise follows all of the same rules as "--record"
 
-./stat_watch.pl --new_lines [DIRECTORY] ([DIRECTORY 2] ...)
-    - Outputs every file that has a new line in its name, appropriately escaped so that it can be printed on one line
+./stat_watch.pl --new-lines [DIRECTORY] ([DIRECTORY 2] ...)
+    - Outputs every file that has a new line or non-printing character in its name, appropriately escaped so that it can be printed on one line
     - Otherwise follows all of the same rules as "--record"
 
 ./stat_watch.pl --diff [REPORT FILE 1] [REPORT FILE 2]
@@ -1936,7 +1936,8 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		} elsif ( $v_arg eq "--as-dir" && defined $args[0] ) {
 			$v_as_dir = shift( @args );
 		} elsif ( -e $v_arg ) {
-			push( @v_dirs, abs_path($v_arg) );
+			my $v_dir = (abs_path($v_arg) || $v_arg );
+			push( @v_dirs, $v_dir );
 		} elsif ( $v_arg eq "--record" ) {
 		} elsif ( $v_arg eq "--links" ) {
 			$b_ignore_on_record = 1;

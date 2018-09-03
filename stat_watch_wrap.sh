@@ -250,6 +250,7 @@ elif [[ "$1" == "--run" ]]; then
 	v_DIR="$( echo "$f_JOB" | rev | cut -d "/" -f2- | rev )"
 	fn_get_direc "Expire"; v_EXPIRE="$v_DIREC"
 	### Create a directory to stand as an indicator that a job is running
+	local v_EXIT=false
 	mkdir "$v_DIR"/"$v_NAME"_run 2> "$v_ERROR_OUT" || v_EXIT=true
 	if [[ $v_EXIT == true ]]; then
 		### This won't be 100% effective, but it should prevent most instances of this running twice at the same time
