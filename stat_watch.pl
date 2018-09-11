@@ -6,12 +6,13 @@
 use strict;
 use warnings;
 
-my $v_VERSION = "1.3.1";
+my $v_VERSION = "1.3.2";
 
 use Cwd 'abs_path';
 use POSIX 'strftime';
 
 my $v_program = __FILE__;
+my $d_program;
 my $d_working;
 
 ### Arrays to hold files and directories to check against and ignore strings
@@ -1342,12 +1343,12 @@ sub fn_get_working {
 	my @v_working = split( m/\//, $v_program );
 	my $v_name = pop( @v_working );
 	$v_name =~ s/\.pl$//;
-	my $d_working = join( '/', @v_working );
-	$d_working .= "/." . $v_name;
+	my $d_program = join( '/', @v_working );
+	my $d_working = $d_program . "/." . $v_name;
 	if ( ! -d $d_working ) {
 		mkdir( $d_working, 0755 );
 	}
-	return $d_working;
+	return( $d_working, $d_program );
 }
 
 sub fn_mod_check {
@@ -1426,8 +1427,8 @@ sub fn_bin_check {
 }
 
 sub fn_import_fold_print {
-	if ( $d_working . '/fold_print.pm' ) {
-		require( $d_working . '/fold_print.pm' );
+	if ( $d_program . '/scripts/fold_print.pm' ) {
+		require( $d_program . '/scripts/fold_print.pm' );
 		print fn_fold_print($_[0]);
 	} else {
 		print $_[0];
@@ -1441,6 +1442,9 @@ sub fn_import_fold_print {
 sub fn_version {
 print "Current Version: $v_VERSION\n";
 my $v_message = <<'EOF';
+
+Version 1.3.2 (2018-09-10) -
+    - The expected install path is now /usr/local/stat_watch
 
 Version 1.3.1 (2018-08-29) -
     - Fixed a bug where under some circumstances it would fail to find the list of backup directories
@@ -1494,7 +1498,7 @@ USAGE
     - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
     - This is the default functionality. Technically the "--record" flag is not necessary
     - The "--md5" flag will result in the MD5 sums of all files being captured in addition to their stats
-        - This will require that the .stat_watch/md5.pm file be present, as well as the perl modules 'Digest::MD5' and 'Digest::MD5::File'
+        - This will require that the ./scripts/md5.pm file be present, as well as the perl modules 'Digest::MD5' and 'Digest::MD5::File'
         - This will cause the process to take longer and generally isn't necessary - the combination of mtime, ctime, and file size is usually enough to detect if a change has occurred
     - The "--ignore-on-record" flag will result in individual files being checked against ignore rules
         - Otherwise only directories are checked against this rules, and weeding out things to be ignored only occurrs during "--diff"
@@ -1593,7 +1597,7 @@ Control Strings:
         - "MD5" -
             - If a file's name and full path matches the exact string that follows, also capture the file's MD5 sum for comparison
             - If "MD5" is alone on a line, then capture MD5 sums for everything (as if the "--md5" flag was used)
-            - This will require that the .stat_watch/md5.pm file be present, as well as the perl modules 'Digest::MD5' and 'Digest::MD5::File'
+            - This will require that the ./scripts/md5.pm file be present, as well as the perl modules 'Digest::MD5' and 'Digest::MD5::File'
     - Lines beginning with the following control strings have special meanings, but only the last declaration will be interpreted:
         - "BackupD" - This specifies the directory to backup files to. The directory must already exist and be writable, or Stat Watch will error out
         - "BackupMD" - A number specified here will set the minumum number of days a backed up file should be kept
@@ -1660,7 +1664,7 @@ exit 0;
 #==================================#
 
 ### Find the working directory, in case it's needed
-$d_working = fn_get_working($v_program);
+($d_working,$d_program) = fn_get_working($v_program);
 
 ### Process all of the universal arguments first
 my @args;
@@ -1798,10 +1802,10 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	}
 	### Check if the ability to use md5sums is present
 	$b_use_md5 = fn_mod_check( 'Digest::MD5', 'Digest::MD5::File', 0 );
-	if ( $b_use_md5 && ! -f $d_working . '/md5.pm' ) {
+	if ( $b_use_md5 && ! -f $d_program . '/scripts/md5.pm' ) {
 		$b_use_md5 = 0;
 	} elsif ( $b_use_md5 ) {
-		require( $d_working . '/md5.pm' );
+		require( $d_program . '/scripts/md5.pm' );
 	}
 	### Check to make sure that the necessary binaries are here
 	fn_bin_check ('stat', 'diff');
@@ -1889,10 +1893,10 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	}
 	### Check if the ability to use md5sums is present
 	$b_use_md5 = fn_mod_check( 'Digest::MD5', 'Digest::MD5::File', 0 );
-	if ( $b_use_md5 && ! -f $d_working . '/md5.pm' ) {
+	if ( $b_use_md5 && ! -f $d_program . '/scripts/md5.pm' ) {
 		$b_use_md5 = 0;
 	} elsif ( $b_use_md5 ) {
-		require( $d_working . '/md5.pm' );
+		require( $d_program . '/scripts/md5.pm' );
 	}
 	### Output to the log and begin the job
 	my $d_backup_escape = fn_escape_filename($d_backup);
@@ -1900,16 +1904,16 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	fn_document_backup();
 	fn_backup_initial($v_file);
 } elsif ( defined $args[0] && $args[0] eq "--md5-test" ) {
-	if ( -f $d_working . '/md5.pm' ) {
+	if ( -f $d_program . '/scripts/md5.pm' ) {
 		fn_mod_check( 'Digest::MD5', 'Digest::MD5::File' );
-		require( $d_working . '/md5.pm' );
+		require( $d_program . '/scripts/md5.pm' );
 		### Check to make sure that the necessary binaries are here
 		fn_bin_check ('stat', 'diff');
 		print "It looks as if everything you need is in place for MD5 functionality\n";
 		exit;
 	} else {
-		print STDERR "\nCannot check md5sums without module '" . $d_working . "/md5.pm':\n";
-		print STDERR "https://raw.githubusercontent.com/sporks5000/stat_watch/master/.stat_watch/md5.pm\n\n";
+		print STDERR "\nCannot check md5sums without module '" . $d_program . "/scripts/md5.pm':\n";
+		print STDERR "https://raw.githubusercontent.com/sporks5000/stat_watch/master/scripts/md5.pm\n\n";
 		exit 1;
 	}
 } elsif ( defined $args[0] && $args[0] eq "--prune" ) {
@@ -1964,13 +1968,13 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	my $b_close = fn_sort_prep();
 	### If we're supposed to be getting md5sums, check to ensure that that's possible
 	if ( @v_md5r || $b_md5_all || @v_md5 ) {
-		if ( -f $d_working . '/md5.pm' ) {
+		if ( -f $d_program . '/scripts/md5.pm' ) {
 			fn_mod_check( 'Digest::MD5', 'Digest::MD5::File' );
-			require( $d_working . '/md5.pm' );
+			require( $d_program . '/scripts/md5.pm' );
 			$b_use_md5 = 1;
 		} else {
-			print STDERR "\nCannot check md5sums without module '" . $d_working . "/md5.pm':\n";
-			print STDERR "https://raw.githubusercontent.com/sporks5000/stat_watch/master/.stat_watch/md5.pm\n\n";
+			print STDERR "\nCannot check md5sums without module '" . $d_program . "/scripts/md5.pm':\n";
+			print STDERR "https://raw.githubusercontent.com/sporks5000/stat_watch/master/scripts/md5.pm\n\n";
 			sleep 2;
 		}
 	}

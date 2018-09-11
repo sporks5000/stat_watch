@@ -1,0 +1,90 @@
+f_STAT_WATCH="$d_STATWATCH"/stat_watch.pl
+if [[ ! -f "$f_STAT_WATCH" ]]; then
+	echo "stat_watch.pl must be present and executable one directory level up from the directory where this script exists"
+	exit 1;
+fi
+
+function fn_make_files_1 {
+	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing
+	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing2
+	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing/subdir
+	echo "1234" > "$d_STATWATCH_TESTS_WORKING"/testing/123.php
+	echo "1234" > "$d_STATWATCH_TESTS_WORKING"/testing/123.php"' -- d"
+	echo "1234" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/123.php
+	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/123'456.php"
+	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/123\"456.php"
+	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/123?456.php"
+	echo "1234" > "$d_STATWATCH_TESTS_WORKING"'/testing/123!456.php'
+	echo "1234" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/123\n456.php" )"
+	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/123ᡘ456.php"
+	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php"
+	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/abc.txt"
+	echo "1234" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/abc.txt
+	echo "1234" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0010456.html" )"
+	echo "1234" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0033456.html" )"
+	rm -f "$d_STATWATCH_TESTS_WORKING"/testing/subdir/456.php
+}
+
+function fn_change_files_1 {
+	rm -f "$d_STATWATCH_TESTS_WORKING"/testing/123.php
+	echo "1235" > "$d_STATWATCH_TESTS_WORKING"/testing/123.php"' -- d"
+	echo "1235" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/123.php
+	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123'456.php"
+	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123\"456.php"
+	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123?456.php"
+	echo "1235" > "$d_STATWATCH_TESTS_WORKING"'/testing/123!456.php'
+	echo "1235" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/123\n456.php" )"
+	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123ᡘ456.php"
+	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php"
+	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/abc.txt"
+	echo "1235" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/abc.txt
+	echo "1235" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0010456.html" )"
+	echo "1235" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0033456.html" )"
+	echo "1235" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/456.php
+}
+
+function fn_remove_files {
+	rm -rf "$d_STATWATCH_TESTS_WORKING"/testing
+	rm -rf "$d_STATWATCH_TESTS_WORKING"/testing2
+	rm -f "$d_STATWATCH_TESTS_WORKING"/.stat_watch/backup_locations
+}
+
+function fn_fail {
+	echo -e "\e[91m""Test $1 FAILED""\e[0m"
+	echo
+	echo "To assist with troubleshooting, it might be helpful to run the following command:"
+	echo "     d_STATWATCH=\"$d_STATWATCH\"; d_STATWATCH_TESTS=\"$d_STATWATCH_TESTS\"; d_STATWATCH_TESTS_WORKING=\"$d_STATWATCH_TESTS_WORKING\"; f_STAT_WATCH=\"\$d_STATWATCH\"/stat_watch.pl"
+	echo
+	exit 1;
+}
+
+function fn_pass {
+	echo -e "\e[32m""Test $1 SUCCESS""\e[0m"
+}
+
+function fn_md5_modules {
+	local v_MODULES=''
+	if [[ $( /usr/bin/perl -e "use Digest::MD5;" 2>&1 | head -n1 | grep -E -c "^Can't locate" ) -gt 0 ]]; then
+		v_MODULES="$v_MODULES Digest::MD5"
+	fi
+	if [[ $( /usr/bin/perl -e "use Digest::MD5::File;" 2>&1 | head -n1 | grep -E -c "^Can't locate" ) -gt 0 ]]; then
+		v_MODULES="$v_MODULES Digest::MD5::File"
+	fi
+	if [[ -n $v_MODULES ]]; then
+		echo
+		echo "Attempting to install the necessary perl modules"
+		echo
+		sleep 2
+		/usr/bin/cpan -i $v_MODULES
+		if [[ $? -ne 0 ]]; then
+			echo "Failed to install perl modules" > /dev/stderr
+			exit 1;
+		fi
+		echo
+	fi
+	if [[ ! -f "$d_STATWATCH"/scripts/md5.pm ]]; then
+		echo "File \"$v_d_STATWATCH/scripts/md5.pm\" is missing"
+		exit 1;
+	fi
+}

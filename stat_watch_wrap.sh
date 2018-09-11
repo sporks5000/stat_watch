@@ -2,7 +2,7 @@
 ### A wrapper script for stat_watch.pl
 ### Created by ACWilliams
 
-v_VERSION="1.1.1";
+v_VERSION="1.1.2";
 
 f_PERL_SCRIPT="stat_watch.pl"
 d_WORKING="stat_watch"
@@ -12,6 +12,8 @@ v_PRUNE_CHANCE=1
 v_MAX_RUN=3600
 v_LOG_MAX=10485760
 v_EMAIL_RETAIN=20
+
+export PATH=$PATH:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
 
 ### Find out where we are and make sure that stat_watch.pl is here too
 v_PROGRAMNAME="$( readlink "${BASH_SOURCE[0]}" )"
@@ -38,10 +40,10 @@ elif [[ -f /usr/local/cpanel/3rdparty/bin/perl ]]; then
 fi
 
 ### Check if the md5 module is present
-if [[ ! -f "$v_PROGRAMDIR"/."$d_WORKING"/md5.pm ]]; then
+if [[ ! -f "$v_PROGRAMDIR"/scripts/md5.pm ]]; then
 	echo
-	echo "\"$v_PROGRAMDIR/$f_PERL_SCRIPT\" might not function as expected without the file \"$v_PROGRAMDIR/.$d_WORKING/md5.pm\":"
-	echo "https://raw.githubusercontent.com/sporks5000/stat_watch/master/.stat_watch/md5.pm"
+	echo "\"$v_PROGRAMDIR/$f_PERL_SCRIPT\" might not function as expected without the file \"$v_PROGRAMDIR/scripts/md5.pm\":"
+	echo "https://raw.githubusercontent.com/sporks5000/stat_watch/master/scripts/md5.pm"
 	echo
 	sleep 2
 else
@@ -90,7 +92,7 @@ function fn_get_direc {
 }
 
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then
-cat << EOF | "$v_PROGRAMDIR/.$d_WORKING"/fold_out.pl > /dev/stdout
+cat << EOF | "$v_PROGRAMDIR"/scripts/fold_out.pl > /dev/stdout
 
 $v_PROGRAMNAME is a wrapper script for $f_PERL_SCRIPT, designed with the goal of automating the most common processes and workflows anticipated for usage of $f_PERL_SCRIPT. Both of these scripts are part of the Stat Watch project
 
@@ -199,10 +201,13 @@ EOF
 #'#"# in #'#"
 exit
 elif [[ "$1" == "--version" ]]; then
-cat << EOF | "$v_PROGRAMDIR/.$d_WORKING"/fold_out.pl > /dev/stdout
+cat << EOF | "$v_PROGRAMDIR"/scripts/fold_out.pl > /dev/stdout
 Current Version: $v_VERSION
 
 Version Notes:
+
+1.1.2 (2018-09-10) -
+    - The expected install directory for stat watch is now /usr/local/stat_watch
 
 1.1.1 (2018-08-29) -
     - Changed how help and version text is output
@@ -250,7 +255,7 @@ elif [[ "$1" == "--run" ]]; then
 	v_DIR="$( echo "$f_JOB" | rev | cut -d "/" -f2- | rev )"
 	fn_get_direc "Expire"; v_EXPIRE="$v_DIREC"
 	### Create a directory to stand as an indicator that a job is running
-	local v_EXIT=false
+	v_EXIT=false
 	mkdir "$v_DIR"/"$v_NAME"_run 2> "$v_ERROR_OUT" || v_EXIT=true
 	if [[ $v_EXIT == true ]]; then
 		### This won't be 100% effective, but it should prevent most instances of this running twice at the same time
@@ -441,6 +446,10 @@ elif [[ "$1" == "--email-test" ]]; then
 		echo "This is a test message to confirm that mesages from server $(hostname) are reaching the address \"$v_EMAIL\"."
 		echo
 		echo "If you were not expecting this message, please ignore it as it was likely sent in error."
+		if [[ -n "$3" ]]; then 
+			echo
+			echo "$3" 
+		fi
 	) | mail -s "Stat Watch - File changes on $(hostname)" $v_EMAIL
 	echo "Test message sent to \"$v_EMAIL\""
 	exit
@@ -491,7 +500,7 @@ fn_name
 
 ### And figure out where we're going to store this job
 if [[ $( stat -c %n /*/"$d_WORKING"/ 2> /dev/null | wc -l ) -gt 0 ]]; then
-	echo "There are currently stat_watch working directories in the following root-level directory:"
+	echo "There are currently stat_watch working directories in the following root-level directories:"
 	stat -c %n /*/"$d_WORKING"/ 2> /dev/null | sed "s/^/   /;s/\/$d_WORKING\/$//"
 	echo
 fi
