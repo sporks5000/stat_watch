@@ -51,7 +51,7 @@ function fn_remove_files {
 }
 
 function fn_fail {
-	echo -e "\e[91m""Test $1 FAILED""\e[0m"
+	echo -e "\e[91m""Test $1 FAILED""\e[00m"
 	echo
 	echo "To assist with troubleshooting, it might be helpful to run the following command:"
 	echo "     d_STATWATCH=\"$d_STATWATCH\"; d_STATWATCH_TESTS=\"$d_STATWATCH_TESTS\"; d_STATWATCH_TESTS_WORKING=\"$d_STATWATCH_TESTS_WORKING\"; f_STAT_WATCH=\"\$d_STATWATCH\"/stat_watch.pl"
@@ -60,7 +60,57 @@ function fn_fail {
 }
 
 function fn_pass {
-	echo -e "\e[32m""Test $1 SUCCESS""\e[0m"
+	echo -e "\e[32m""Test $1 SUCCESS""\e[00m"
+}
+
+function fn_sanitize {
+### Given a variable that we're gonig to run through an egrep, escape all special characters
+	v_OUTPUT="${1//\\/\\\\}"
+	v_OUTPUT="${v_OUTPUT//\*/\\*}"
+	v_OUTPUT="${v_OUTPUT//\./\\.}"
+	v_OUTPUT="${v_OUTPUT//[/\\[}"
+	v_OUTPUT="${v_OUTPUT//|/\\|}"
+	v_OUTPUT="${v_OUTPUT//\?/\\?}"
+	v_OUTPUT="${v_OUTPUT//\(/\\(}"
+	v_OUTPUT="${v_OUTPUT//)/\\)}"
+	v_OUTPUT="${v_OUTPUT//$/\\$}"
+	v_OUTPUT="${v_OUTPUT//+/\\+}"
+	v_OUTPUT="${v_OUTPUT//^/\\^}"
+	v_OUTPUT="${v_OUTPUT//{/\\{}"
+	echo "$v_OUTPUT"
+}
+
+function fn_username {
+	local v_USER="statwatch_$(( 1 + RANDOM % 9998 ))"
+	if [[ $( egrep -c "^$( fn_sanitize "$v_USER" ):" /etc/passwd ) -gt 0 ]]; then
+		v_USER="$( fn_username )"
+	fi
+	echo "$v_USER"
+}
+
+function fn_make_user {
+	v_USER="$( fn_username )"
+	useradd "$v_USER"
+	d_USER_HOME="$( egrep "^$( fn_sanitize "$v_USER" ):" /etc/passwd | cut -d ":" -f6 )"
+	if [[ -z "$d_USER_HOME" ]]; then
+		echo "Tried to create a user, but failed to find their homedir"
+		exit 1
+	fi
+	mkdir -p "$d_USER_HOME"
+	d_USER_STATWATCH="$d_USER_HOME"/"$( echo "$d_STATWATCH" | rev | cut -d "/" -f1 | rev )"
+	cp -a "$d_STATWATCH" "$d_USER_HOME"/
+	### I'm just going to assume here that the directory varialbes we have refer to directories stat_watch/tests/working. so long as test.sh doesn't change, this should be a safe bet.
+	chown -R "$v_USER":"$v_USER" "$d_USER_HOME"/
+	### This creates the user but does not delete it. Important to remember that this will need to be done.
+}
+
+function fn_unmake_user {
+	if [[ -n "$d_USER_HOME" && -d "$d_USER_HOME" ]]; then
+		rm -rf "$d_USER_HOME"
+	fi
+	if [[ -n "$d_USER" && $( egrep -c "^$( fn_sanitize "$v_USER" ):" /etc/passwd ) -gt 0 ]]; then
+		userdel "$d_USER"
+	fi
 }
 
 function fn_md5_modules {

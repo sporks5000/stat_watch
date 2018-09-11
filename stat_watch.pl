@@ -102,16 +102,28 @@ sub fn_check_md5 {
 	my $v_file = $_[0];
 	if ( $b_use_md5 && (-l $v_file || ! -d $v_file) ) {
 		if ($b_md5_all) {
-			return( ' -- ' . &sw_md5::get_md5($v_file) );
+			my $v_md5 = &sw_md5::get_md5($v_file);
+			if ( $v_md5 ) {
+				$v_md5 = ' -- ' . $v_md5;
+			}
+			return $v_md5;
 		}
 		for my $_string (@v_md5) {
 			if ( $v_file eq $_string ) {
-				return( ' -- ' . &sw_md5::get_md5($v_file) );
+				my $v_md5 = &sw_md5::get_md5($v_file);
+				if ( $v_md5 ) {
+					$v_md5 = ' -- ' . $v_md5;
+				}
+				return $v_md5;
 			}
 		}
 		for my $_string (@v_md5r) {
 			if ( $v_file =~ m/$_string/ ) {
-				return( ' -- ' . &sw_md5::get_md5($v_file) );
+				my $v_md5 = &sw_md5::get_md5($v_file);
+				if ( $v_md5 ) {
+					$v_md5 = ' -- ' . $v_md5;
+				}
+				return $v_md5;
 			}
 		}
 	}

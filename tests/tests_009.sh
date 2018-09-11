@@ -54,27 +54,5 @@ function fn_test_9 {
 	fn_pass "9.6"
 }
 
-function fn_test_10 {
-	echo -e "\n10. If there are backed-up files, does \"--list\" work as anticipated?"
-	if [[ $( "$f_STAT_WATCH" --list "$d_STATWATCH_TESTS_WORKING/"'testing/123?456.php' | fgrep -c "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"'/testing/123?456.php' ) -ne 2 ]]; then
-		fn_fail "10.1"
-	fi
-	fn_pass "10.1"
-	if [[ $( "$f_STAT_WATCH" --list "$d_STATWATCH_TESTS_WORKING/"/testing/subdir/abc.txt | fgrep -c "There are no backups of this file" ) -ne 1 ]]; then
-		fn_fail "10.2"
-	fi
-	fn_pass "10.2"
-	"$f_STAT_WATCH" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackupR ." )
-	if [[ $( "$f_STAT_WATCH" --list "$d_STATWATCH_TESTS_WORKING"/testing/subdir/abc.txt | fgrep -c "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"'/testing/subdir/abc.txt' ) -ne 1 ]]; then
-		fn_fail "10.3"
-	fi
-	fn_pass "10.3"
-	if [[ $( "$f_STAT_WATCH" --list "$d_STATWATCH_TESTS_WORKING"'/testing/123.php'\'' -- d' | egrep -c "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING""/testing/123.php'.'' -- d" ) -ne 1 ]]; then
-		fn_fail "10.4"
-	fi
-	fn_pass "10.4"
-}
-
 fn_make_files_1
 fn_test_9
-fn_test_10
