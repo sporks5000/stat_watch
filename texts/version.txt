@@ -1,0 +1,48 @@
+
+Current Version: 1.4.0
+
+Version 1.4.0 (2018-10-02) -
+    - Routed all Stat Watch commands through the wrapper script
+    - Separated out the wrapper script into a few smaller scripts
+    - Moved help and version intofmation into separate files
+    - Added the "--backup-file" flag
+    - When requesting backups of a symlink, show backups of both the symlink and what it links to
+
+Version 1.3.2 (2018-09-10) -
+    - The expected install path is now /usr/local/stat_watch
+
+Version 1.3.1 (2018-08-29) -
+    - Fixed a bug where under some circumstances it would fail to find the list of backup directories
+    - Added the "--new-lines" flag to output all file names that contain a new line character
+    - Changed how help and version text is output
+    - Job names are required to be unique
+    - You can refer to the job either by the name or by the job file with "--run"
+    - Added the "Email-Retain" control string
+
+Version 1.3.0 (2018-08-24) -
+    - Any time a file name is output (not including the "--record" report) The file name is appropriately escaped to show non-printing characters
+    - Less liberal use of abs_path. There were definitely circumstances where I didn't need it but was using it anyway.
+    - Added the "--links" flag to output the number of symlinks in each directory
+
+Version 1.2.0 (2018-08-19) -
+    - Added the "--md5" flag, as well as a few control strings
+    - Added a maximum depth for the script to recurse to
+        - The "--record" and "--diff" outputs now include instances where such directories are present
+    - Split out help text so that you can reference individual bits of it
+    - In "--diff" mode, check mtimes of the two reports we're comparing. Always make the newest file on the right for diff purposes
+        - Added the "--before" and "--after" flags for "--diff" mode to override this behavior
+    - When checking whether a file needs to be backed up, if the md5sum was captured initially, check against the md5sum of the backup as well.
+
+Version 1.1.0 (2018-08-17) -
+    - Added the ability to compare md5sums of files as well
+    - Fixed a bug where files might be being matched against incorrectly due to an added slash
+    - Added the ability to turn off error supression when running jobs
+    - Added the ability to run helper-scripts during various phases of the Stat Watch job
+
+Version 1.0.1 (2018-08-10) -
+    - Added the ability to capture data on files with names that include a newline character
+    - Liberal use of abs_path in hopes of ensuring that files are always referenced in the same manner
+    - Added log trimming to prevent the log from going out of control (like Dave Coulier)
+
+Version 1.0.0 (2018-08-04) -
+    - Original Version

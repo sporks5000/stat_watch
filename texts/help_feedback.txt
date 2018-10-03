@@ -1,0 +1,9 @@
+
+FEEDBACK
+
+The Stat Watch project is available at the following git repositories (one of which is public facing):
+    - https://github.com/sporks5000/stat_watch
+    - https://git.liquidweb.com/acwilliams/stat_watch
+
+Report any errors, unexpected behaviors, comments, or feedback to acwilliams@liquidweb.com
+

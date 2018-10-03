@@ -1,0 +1,108 @@
+
+USAGE AND COMMAND LINE FLAGS
+
+stat_watch --backup [REPORT FILE]
+    - Create backups of files specified using a Stat Watch report file and the settings within a job file
+    - The file must be a Stat Watch report file
+    - The "-i" or "--include" flag can be used to specify a job file and that file must have "BackupD" and "BackupR" or "Backup+" control strings present
+    - The "--backupd" flag can be used, followed by the directory that you want to back up to
+        - This is functionally the same as the "BackupD" control string in a job file
+    - The "--backup+" flag can be used, followed by the full path of a file that you wish to back up. This flag can be used more than once.
+        - This is functionally the same as the "Backup+" control string in a job file
+    - The "--backupr" flag can be used, followed by perl regular expression to match in order to decide what files to backup. This flag can be used more than once.
+        - This is functionally the same as the "BackupR" control string in a job file
+    - If you modify the "BackupR" or "Backup+" settings and re-run "--backup", it will compare stats of existing backups and only save files that are different / not present
+        - However, files that are no longer matched will not be removed
+
+stat-watch --backup-file [FULL PATH TO FILE]
+    - Create a backup of the specified file
+    - The "-i" or "--include" flag can be used to specify a job file and that file must have the "BackupD" control string present
+    - The "--backupd" flag can be used, followed by the directory that you want to back up to
+        - This is functionally the same as the "BackupD" control string in a job file
+
+stat_watch --create
+    - Asks the user key questions in order to create a Stat Watch job file with the information necessary to watch and backup key user files
+    - By default, this will enable backup for files that end with the following: .php, .php4, .php5, .php7, .pl, .pm, .py, .js, .json, .css, .cgi .htm, .html, .htaccess, .htpasswd, .sh, .rb
+    - What files are being checked and what files are being backed up can be modified by editing the .job file that is created
+
+stat_watch --diff [REPORT FILE 1] [REPORT FILE 2]
+    - Compare two Stat Watch report files, weed out files that match ignore rules, output information on what has changed
+    - The "--ignore" flag can be used to specify a specific file or directory that you want to ignore
+        - This is functionally the same as listing a file without a control string in a job file
+    - The "-i" or "--include" flag can be used to specify a job file
+    - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
+    - The "-f" or "--format" flag allows you to choose a number of options for how the details should be output:
+        - "text" separates out what has changed and how, and outputs in plain text format
+        - "html" separates out what has changed and how, and outputs in html format
+            - "html" is deprecated and will be removed in future versions
+        - "diff" outputs the lines that were different with "<" and ">" characters to indicate which file they came from. 
+    - The "--backup" flag will result in files being backed up. "BackupD" and "BackupR" or "Backup+" lines must be set in the job file for this to be successful
+    - The "--no-check-retention" flag mean that when creating backups, existing files will not be checked for retention
+        - This is optimal if you're regularly running Stat Watch with the "--prune" flag (as is done automatically with the "--run" flag)
+    - The "--no-ctime" flag tells the script to ignore differences in ctime. This is useful if you're comparing against a restored backup.
+    - The "--no-partial-seconds" limits the comparison of timestamps to full seconds
+    - The "--before" and "--after" flags can be used to specify which is the earlier Stat Watch report file and which is the later
+        - Without these flags, the mtimes of the files are used to determine which is which
+
+stat_watch --email-test [EMAIL ADDRESS]
+    - Sends a test message to the email address specified so that the end recipient can see an example
+
+stat_watch --links [DIRECTORY] ([DIRECTORY 2] ...)
+    - Outputs the number of symlinks in each directory
+    - Otherwise follows all of the same rules as "--record"
+    - This behavor is deprecated and will be removed in future versions
+
+stat_watch --list [FILE]
+    - This will list the available backups that Stat Watch has taken of a specific file
+    - It is not necessary to specify an includde file, Stat Watch will check all directories that it has ever backed up to in hopes of giving the most comprehensive answer possible.
+
+stat_watch --md5-test
+    - Test to see if everything necessary is in place for checking the md5sum of files
+
+stat_watch --new-lines [DIRECTORY] ([DIRECTORY 2] ...)
+    - Outputs every file that has a new line or non-printing character in its name, appropriately escaped so that it can be printed on one line
+    - Otherwise follows all of the same rules as "--record"
+    - This behavior is deprecated and will be removed in future versions
+
+stat_watch --prune [FILE]
+    - Go through the backup directory and remove files older files
+    - The file must be a Stat Watch report file
+    - The "-i" or "--include" flag must be used to specify a job file and that file must have "BackupD" string present
+    - Any files outside of the range specified by the "BackupMD" and "BackupMC" control strings will be removed
+
+stat_watch --record [DIRECTORY] ([DIRECTORY 2] ...)
+    - Creates a Stat Watch report of all of the files within the directories specified (and the subdirectories thereof) including their current stat data
+        - You probably want to use the "-o" flag or redirect output to a file
+    - The "-v" or "--verbose" flag can be used to have the directories output to STDERR
+    - The "-i" or "--include" flag can be used to specify a job file
+    - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
+    - This is the default functionality. Technically the "--record" flag is not necessary
+    - The "--md5" flag will result in the MD5 sums of all files being captured in addition to their stats
+        - This will require that the ./scripts/md5.pm file be present, as well as the perl modules 'Digest::MD5' and 'Digest::MD5::File'
+        - This will cause the process to take longer and generally isn't necessary - the combination of mtime, ctime, and file size is usually enough to detect if a change has occurred
+    - The "--ignore-on-record" flag will result in individual files being checked against ignore rules
+        - Otherwise only directories are checked against this rules, and weeding out things to be ignored only occurrs during "--diff"
+        - Use of this flag results in larger file sizes for Stat Watch reports, but generally reduces processing time overall
+    - The "--as-dir" flag can be followed by a string of text that will be used to replace the directory name when recording the full file path
+        - For example, running "./stat_watch.pl --record /home/account --as-dir "/home/different/path" will result in the file "/home/account/file.txt" to be listed as "/home/different/path/file.txt"
+        - This is useful for situations where you want to capture information for backed-up files and compare them to files in place.
+
+stat_watch --run [JOB FILE]
+    - Runs the necessary commands to complete a Stat Watch job, including checking the stats of files, determining th edifferences, and backing up files when necessary
+    - [JOB FILE] is the .job file created when running Stat Watch with the "--create" flag
+    - Adding the "--errors" flag after the file will prevent any errors from being routed to /dev/null
+
+stat_watch --help
+stat_watch -h
+    - Outputs basic help information
+
+stat_watch --help use-cases
+stat_watch --help flags
+stat_watch --help job
+stat_watch --help backups
+stat_watch --help job-files
+    - Outputs information regarding the specific aspect of Stat Watch requested
+
+stat_watch --version
+    - Outputs version and changelog information
+

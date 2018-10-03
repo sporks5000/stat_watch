@@ -1,0 +1,233 @@
+#! /bin/bash
+
+function fn_get_script {
+### Given an identifier from the job file, find the script and all command line arguments that follow
+	local a_SCRIPT=()
+	local v_SCRIPT_IDENT="$1"
+	v_SCRIPT="$( grep -E "^\s*$v_SCRIPT_IDENT" "$f_JOB" | tail -n1 | sed "s/^[[:blank:]]*$v_SCRIPT_IDENT[[:blank:]]*//;s/[[:blank:]]*$//" )"
+	if [[ -n $v_SCRIPT ]]; then
+		local word
+		for word in $( echo $v_SCRIPT ); do
+			a_SCRIPT[${#a_SCRIPT[@]}]="$word"
+		done
+		if [[ ${a_SCRIPT[0]:0:1} != "/" ]]; then
+			unset v_SCRIPT
+		elif [[ ! -n "${a_SCRIPT[0]}" || ! -f "${a_SCRIPT[0]}" || ! -x "${a_SCRIPT[0]}" ]]; then
+			unset v_SCRIPT
+		fi
+	fi
+}
+
+function fn_get_direc {
+	local v_DIREC_IDENT="$1"
+	v_DIREC="$( grep -E "^\s*$v_DIREC_IDENT" "$f_JOB" | tail -n1 | sed "s/^[[:blank:]]*$v_DIREC_IDENT[[:blank:]]*//;s/[[:blank:]]*$//" )"
+}
+
+function fn_run {
+	f_JOB="$1"
+	if [[ ! -f "$f_JOB" ]]; then
+		if [[ -f "$f_JOBS" ]]; then
+			$f_JOB="$( egrep "^$f_JOB:" "$f_JOBS" | cut -d ":" -f2- | sed "s/ - Created .*$//" )"
+			if [[ -z "$f_JOB" || ! -f "$f_JOB" ]]; then
+				echo "No such file"
+				exit
+			fi
+		else
+			echo "No such file"
+			exit
+		fi
+	fi
+	v_ERROR_OUT="/dev/null"
+	if [[ -n $2 && "$2" == "--errors" ]]; then
+		v_ERROR_OUT="/dev/stderr"
+	fi
+	fn_get_direc "Name"; v_NAME="$v_DIREC"
+	if [[ -z $v_NAME ]]; then
+		echo "Cannot find name in Job file. Exiting"
+		exit
+	fi
+	v_DIR="$( echo "$f_JOB" | rev | cut -d "/" -f2- | rev )"
+	fn_get_direc "Expire"; v_EXPIRE="$v_DIREC"
+	### Create a directory to stand as an indicator that a job is running
+	v_EXIT=false
+	mkdir "$v_DIR"/"$v_NAME"_run 2> "$v_ERROR_OUT" || v_EXIT=true
+	if [[ $v_EXIT == true ]]; then
+		### This won't be 100% effective, but it should prevent most instances of this running twice at the same time
+		sleep 0.$(( RANDOM % 10 ))
+		v_PID="$( cat "$v_DIR"/"$v_NAME"_run/pid 2> "$v_ERROR_OUT" )"
+		if [[ -n $v_PID && $( cat /proc/$v_PID/cmdline 2> "$v_ERROR_OUT" | grep -F -c "$v_PROGRAMDIR/$v_PROGRAMNAME" ) -gt 0 ]]; then
+			v_EPOCH="$( cat "$v_DIR"/"$v_NAME"_run/epoch 2> "$v_ERROR_OUT" )"
+			### check to see if the job has run for too long
+			fn_get_direc "Max-run"; v_MAX_RUN2="$v_DIREC"
+			if [[ -n $v_MAX_RUN2 && $( echo "$v_MAX_RUN" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
+				v_MAX_RUN="$v_MAX_RUN2"
+			fi
+			### Are there reasons to kill the job?
+			v_KILL=false
+			if [[ -z $v_EPOCH ]]; then
+				v_KILL=true
+			elif [[ $( echo "$v_EPOCH" | grep -E -c "^[0-9]+$" ) -lt 1 ]]; then
+				v_KILL=true
+			elif [[ $(( $( date +%s ) - $v_EPOCH )) -gt $v_MAX_RUN ]]; then
+				v_KILL=true
+			fi
+			### If so, let's kill it
+			if [[ $v_KILL == true ]]; then
+				kill -9 $v_PID
+				if [[ -n $v_EPOCH || $( echo "$v_EPOCH" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
+					echo "$( date +%Y-%m-%d" "%T" "%z ) - Job killed after running for $(( $( date +%s ) - $v_EPOCH )) seconds" >> "$v_DIR"/"$v_NAME".log
+				fi
+				rm -rf "$v_DIR"/"$v_NAME"_run
+				echo "Previous job ran too long. Exiting"
+				exit
+			else
+				echo "An existing iteration of this job is already running"
+				exit
+			fi
+		fi
+	fi
+	echo "$$" > "$v_DIR"/"$v_NAME"_run/pid
+	echo "$( date +%s )" > "$v_DIR"/"$v_NAME"_run/epoch
+	if [[ -n $v_EXPIRE && $( echo "$v_EXPIRE" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
+	### If the job was set to expire, see if we still need to run it
+		if [[ $( date +%s ) -gt $v_EXPIRE ]]; then
+			if [[ $( date --date="now - 15 days" +%s ) -gt $v_EXPIRE ]]; then
+			### If we're 15 days past expiration, delete everything
+				echo "$( date +%Y-%m-%d" "%T" "%z ) - Removing job \"$f_JOB\"" >> "$v_DIR"/"$v_NAME".log
+				rm -f "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_changes_*.txt "$v_DIR"/"$v_NAME"_message_head.txt "$v_DIR"/"$v_NAME"_message_foot.txt "$v_DIR"/"$v_NAME"_stamp
+				rm -rf "$v_DIR"/backup_"$v_NAME"
+				rm -f "$f_JOB"
+			fi
+			rm -rf "$v_DIR"/"$v_NAME"_run
+			exit
+		fi
+	fi
+	### Find all of the scripts we might want to run
+	fn_get_script "Run-start"; v_RUN_START="$v_SCRIPT"
+	fn_get_script "Run-post"; v_RUN_POST="$v_SCRIPT"
+	fn_get_script "Run-pre-e"; v_RUN_PRE_E="$v_SCRIPT"
+	fn_get_script "Run-post-e"; v_RUN_POST_E="$v_SCRIPT"
+	fn_get_script "Run-end"; v_RUN_END="$v_SCRIPT"
+	if [[ ! -f "$v_DIR"/"$v_NAME"_files.txt ]]; then
+	### If this is the first run, do an initial backup of files
+		eval "$v_RUN_START"
+		stat -c '%Y' "$f_JOB" > "$v_DIR"/"$v_NAME"_stamp
+		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --record -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files.txt -v 2> "$v_ERROR_OUT"
+		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --backup -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt 2> "$v_ERROR_OUT"
+		eval "$v_RUN_POST"
+	else
+	### If this is a later run, diff the reports, and if there were changes, email them out
+		eval "$v_RUN_START"
+		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --record -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
+		if [[ $( stat -c '%Y' "$f_JOB" ) -gt $( cat "$v_DIR"/"$v_NAME"_stamp 2> "$v_ERROR_OUT" ) ]]; then
+			### If the job file has been updated, there's a chance that we need to back up additional files
+			nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --backup -i "$f_JOB" "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
+			### ypdate the stat file so that we know not to do that next time
+			stat -c '%Y' "$f_JOB" > "$v_DIR"/"$v_NAME"_stamp
+		fi
+		v_STAMP="$( date +%s )"
+		nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --diff --no-check-retention -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> "$v_ERROR_OUT"
+		eval "$v_RUN_POST"
+		### this file should contain at least two lines
+		if [[ $( wc -l "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -gt 1 ]]; then
+			mv -f "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_files.txt
+			fn_get_direc "Email"; v_EMAIL="$v_DIREC"
+			if [[ $( wc -l "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -lt 2 ]]; then
+				### This is the one instances where we're getting a directive from the job file without fn_get_direc
+				v_NO_CHANGE="$( grep -E -c "^\s*Email-no-changes\s*$" "$f_JOB" )"
+				if [[ $v_NO_CHANGE -gt 1 ]]; then
+					if [[ -n $v_EMAIL ]]; then
+						eval "$v_RUN_PRE_E"
+						( 
+							if [[ -f "$v_DIR"/"$v_NAME"_message_head.txt ]]; then 
+								cat "$v_DIR"/"$v_NAME"_message_head.txt; 
+								echo
+							fi
+							echo "No changes were detected."
+							echo
+							if [[ -f "$v_DIR"/"$v_NAME"_message_foot.txt ]]; then 
+								cat "$v_DIR"/"$v_NAME"_message_foot.txt; 
+								echo
+							fi
+							echo "This output was generated by \"$v_PROGRAMDIR/$f_PERL_SCRIPT\" and \"$v_PROGRAMDIR/$v_PROGRAMNAME\" from the job file at \"$f_JOB\'"
+							if [[ -f "$v_DIR"/"$v_NAME"_message_end.txt ]]; then 
+								echo
+								cat "$v_DIR"/"$v_NAME"_message_end.txt; 
+							fi
+						) | mail -s "Stat Watch - No changed detected on $(hostname)" $v_EMAIL
+						eval "$v_RUN_POST_E"
+					fi
+				else
+					rm -f "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt
+				fi
+			else
+			### If there were changes, check if we have an email address and then send a message to it
+				if [[ -n $v_EMAIL ]]; then
+					eval "$v_RUN_PRE_E"
+					( 
+						if [[ -f "$v_DIR"/"$v_NAME"_message_head.txt ]]; then 
+							cat "$v_DIR"/"$v_NAME"_message_head.txt; 
+							echo
+						fi
+						cat "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt 
+						echo
+						if [[ -f "$v_DIR"/"$v_NAME"_message_foot.txt ]]; then 
+							cat "$v_DIR"/"$v_NAME"_message_foot.txt; 
+							echo
+						fi
+						echo "This output was generated by \"$v_PROGRAMDIR/$f_PERL_SCRIPT\" and \"$v_PROGRAMDIR/$v_PROGRAMNAME\" from the job file at \"$f_JOB\""
+						if [[ -f "$v_DIR"/"$v_NAME"_message_end.txt ]]; then 
+							echo
+							cat "$v_DIR"/"$v_NAME"_message_end.txt; 
+						fi
+					) | mail -s "Stat Watch - File changes on $(hostname)" $v_EMAIL
+					eval "$v_RUN_POST_E"
+				fi
+			fi
+		else
+			rm -f "$v_DIR"/"$v_NAME"_files2.txt
+		fi
+
+		### Check to see if the user set the prune variables to soemthing different
+		fn_get_direc "Prune-max"; v_PRUNE_MAX2="$v_DIREC"
+		if [[ -n $v_PRUNE_MAX2 && $( echo "$v_PRUNE_MAX2" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
+			v_PRUNE_MAX="$v_PRUNE_MAX2"
+		fi
+		fn_get_direc "Prune-chance"; v_PRUNE_CHANCE2="$v_DIREC"
+		if [[ -n $v_PRUNE_CHANCE2 && $( echo "$v_PRUNE_CHANCE2" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
+			v_PRUNE_CHANCE="$v_PRUNE_CHANCE2"
+		fi
+
+		### Determine whether or not we're purning old backups
+		if [[ $(( $v_PRUNE_CHANCE + RANDOM % $v_PRUNE_MAX )) -le $v_PRUNE_CHANCE ]]; then
+			nice -15 "$v_PROGRAMDIR"/"$f_PERL_SCRIPT" --prune -i "$f_JOB" 2> "$v_ERROR_OUT"
+		fi
+
+		### Remove old email messages
+		fn_get_direc "Email-retain"; v_EMAIL_RETAIN2="$v_DIREC"
+		if [[ -n $v_EMAIL_RETAIN2 && $( echo "$v_EMAIL_RETAIN2" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
+			v_EMAIL_RETAIN="$v_EMAIL_RETAIN2"
+		fi
+		if [[ "$v_EMAIL_RETAIN" -ne 0 ]]; then
+			v_EMAIL_RETAIN="$(( $v_EMAIL_RETAIN * 86400 ))"
+			for i in $( \ls -1 "$v_DIR" | egrep "^$v_NAME""_changes_" | sed -E "s/^.*[^0-9]([0-9]+).txt$/\1/" ); do
+				if [[ $(( $( date +%s ) - $v_EMAIL_RETAIN )) -gt "$i" ]]; then
+					rm -f "$v_DIR"/"$v_NAME"_changes_"$i".txt
+				fi
+			done
+		fi
+	fi
+
+	### Trim lines from the beginning of the log if necessary
+	fn_get_direc "Log-max"; v_LOG_MAX2="$v_DIREC"
+	if [[ -n $v_LOG_MAX2 && $( echo "$v_LOG_MAX2" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
+		v_LOG_MAX="$v_LOG_MAX2"
+	fi
+	if [[ $( stat -c %s "$v_DIR"/"$v_NAME".log ) -gt $v_LOG_MAX ]]; then
+		printf "%s\n" "1,1000d" w | ed -s "$v_DIR"/"$v_NAME".log 2> "$v_ERROR_OUT"
+	fi
+
+	eval "$v_RUN_POST"
+	rm -rf "$v_DIR"/"$v_NAME"_run
+	exit
+}

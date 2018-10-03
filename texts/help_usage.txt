@@ -1,0 +1,127 @@
+
+GENERAL USE CASES
+
+#==========================================#
+#== Capturing Stats Now, Comparing Later ==#
+#==========================================#
+
+If a customer's site has been hacked and they are concerned that it will happen again, you can expedite future investigations by capturing the stats of their files now so that we have something to compare them to in the future.
+
+Capture the current stats of files:
+```    /root/bin/stat_watch --record /home/account/public_html > /root/stat_watch1.txt```
+
+Note: If you add the "--verbose" flag, this will output every directory it's actively working within. This information isn't really all that USEFUL, but it's more exciting than staring at the terminal waiting for a command to finish
+
+When we want to check the stats of files on the account again, we just need to run another report and then assess the differences:
+```    /root/bin/stat_watch --record /home/account/public_html > /root/stat_watch2.txt
+    /root/bin/stat_watch --diff /root/stat_watch1.txt /root/stat_watch2.txt```
+
+#========================================#
+#== Comparing Current Files to Backups ==#
+#========================================#
+
+Imagine a customer's site was hacked and you want to know what was different before you overwrite everything with the contents of a backup. The customer's document root is located at '/home/account/public_html' and you've expanded the backups so that the equivalent folder is located at '/home/lwtemp/account/homedir/public_html'. Here is the process of comparing the stats of the files in those directories:
+
+Get the stats for the backup directory, using the "--as-dir" flag so that the output will show the files as if they came from the directory specified:
+```    /root/bin/stat_watch --record /home/lwtemp/account/homedir/public_html --as-dir /home/account/public_html > /root/stat_watch1.txt```
+
+Looking at the file that was created, the file paths will have been reported as '/home/account/public_html' rather than '/home/lwtemp/account/homedir/public_html'.
+
+Next get the stats for the current contents of the directory:
+```    /root/bin/stat_watch --record /home/account/public_html > /root/stat_watch2.txt```
+
+Run "stat_watch --diff" as was done in the earlier example:
+```    /root/bin/stat_watch --diff /root/stat_watch1.txt /root/stat_watch2.txt```
+
+Note: It's likely that the backups were stored in such a way that the ctime of the files will not have been retained, and that the mtime of the files will have been truncated to full seconds. In order to compensate for these things, you will likely want to use the "--no-ctime" and "--no-partial-seconds" flags
+
+Note: It's possible that there's a cache directory present where a lot of changes have occurred. If you want to avoid outputting changes from a specific directory, just use the "--ignore" flag with the full path to that directory after:
+```    /root/bin/stat_watch --diff /root/stat_watch1.txt /root/stat_watch2.txt --ignore /home/account/public_html/cache --no-ctime --no-partial-seconds```
+
+Now that we know what files have changed, we can use the Linux "diff" command to see how they differ and make an assessment on if those changes are malicious:
+```    diff /home/lwtemp/account/homedir/public_html/.htaccess /home/account/public_html/.htaccess```
+
+#==============================================#
+#== Comparing Files AFTER Restoring a Backup ==#
+#==============================================#
+
+In the example above, there was enough free hard drive space on the server to expand the backup and still have original site contents in place, but there are circumstances where that is not the case - where the original MUST be deleted before the backup can be uncompressed.
+
+In this situation, first capture the stats of the existing files:
+```    /root/bin/stat_watch --record /home/account/public_html > /root/stat_watch2.txt```
+
+Then once the backup is restored, capture the stats of the files as they were in the backup, then compare:
+```    /root/bin/stat_watch --record /home/account/public_html > /root/stat_watch1.txt```
+
+Be aware that "stat_watch --diff" will use the timestamps on the files it's given to determine which is older. This can make a big difference if a file is present in one place, but missing in the other - the output could say that it was removed rather than created.
+
+In this circumstance, we need to run it against the newer set of files first, so to eliminate confusion, you can use the "--before" and "--after" flags to indicate which file was which:
+```    /root/bin/stat_watch --diff --before /root/stat_watch1.txt --after /root/stat_watch2.txt```
+
+Note: As above, it's possible that you will want to use the "--no-ctime", "--no-partial-seconds", and "--ignore" flags
+
+We won't have access to any of the changed files in order to compare their contents, but we will at least have the relevant timestamps so that we can search relevant logs to see if there is anything there worthy of note.
+
+#====================#
+#== Advanced Rules ==#
+#====================#
+
+If there are specific files or file extensions that you want Stat Watch to include or ignore when generating a report, you can create a Stat Watch job file and specify that Stat Watch adhere to the rules outlined in that file by referencing it with the "-i" flag:
+```    /root/bin/stat_watch --record /home/account/public_html -i /root/include_file.txt > /root/stat_watch1.txt```
+
+For more information about what can be accomplished with the include/ignore file, run stat_watch with "--help job"
+```    /root/bin/stat_watch --help job```
+
+#=============================#
+#== Also Capturing MD5 Sums ==#
+#=============================#
+
+Typically the combination of mtime, ctime, and file size is enough to know if a file has changed, however there are circumstances where it's desirable to have more reassurance regarding whether there have been any changes to a file's contents. Under these circumstances, the "--md5" flag can be used to capture MD5 sums of all the files present:
+```    /root/bin/stat_watch --record /home/account/public_html --md5 > /root/stat_watch1.txt```
+
+Typically it is not recommended that this feature be used as it results in additional processing power and disk IO. The advanced features available with include/ignore files allow for singling out individual files for which this added level of detail is necessary.
+
+To capture any MD5 sums, whether using the "--md5" flag or settings within an include/ignore file, the perl modules 'Digest::MD5' and 'Digest::MD5::File' will need to be present. You can verify that everything you need for this is in place by running stat_watch with the "--md5-test" flag:
+```    /root/bin/stat_watch --md5-test```
+
+#======================#
+#== Backing Up Files ==#
+#======================#
+
+Using a Stat Watch report generated with the "--record" functionality, you can create backups of certain files in order to ensure that you have copies available for later.
+
+First you need to generate a Stat Watch report:
+```    /root/bin/stat_watch --record /home/account/public_html > /root/stat_watch1.txt```
+
+Then backup the files that you're interested in using the "--backup" flag in conjunction with the "--backupd", "--backup+", and "--backupr" flags. Here's an example that would backup all of the files found that end with extensions .php, .php4, .php5, .php7, .pl, .pm, .py, .js, .css, .htm, .html, .htaccess, .htpasswd, .sh, and .rb to the directory /home/stat_watch/temp_backup:
+```    mkdir -p /home/stat_watch/temp_backup
+    /root/bin/stat_watch --backup /root/stat_watch1.txt --backupr '\.(p(hp(4|5|7)?|[lym])|js|css|ht(ml?|access|passwd)|sh|rb)$' --backupd /home/stat_watch/temp_backup```
+
+The files will be stored with the backup directory specified with the "--backupd" functioning as the equivalent of "/", and with a unix timestamp appended to the end of their file name. Thus with the above command, the file '/home/account/public_html/directory/script.php' would have a backup located at '/home/stat_watch/temp_backup/home/account/public_html/directory/script.php_1533578720'. "cp -a" is used to make the copy, so all stat data except ctime should be retained.
+
+#=============================#
+#== Listing Backed-up Files ==#
+#=============================#
+
+Stat Watch maintains a list of all of the directories that it has backed up to, so it's easy to check from the command line if it has created a backup of a file.
+
+For example, to see all of the backups made of '/home/account/public_html/directory/script.php', you would run the following command:
+```    /root/bin/stat_watch --list /home/account/public_html/directory/script.php```
+
+And the output you receive would look something like the following:
+```    Available Backups for '/home/account/public_html/directory/script.php':
+      '/home/stat_watch/sporks50/backup_sporks50/home/account/public_html/directory/script.php_1533578720' -- Timestamp: 2018-08-06 14:05:20 -0400```
+
+With this output, you have the full path to both the current file and all backups, making it easy to compare them with "diff" or to use "cp -a" to overwrite the current file with one of the backups.
+
+#==========================#
+#== Watching a Directory ==#
+#==========================#
+
+Stat Watch has all of the components necessary to run repeated checks against the contents of a directory and detect if changes are being made. Running Stat Watch with the "--create" flag will walk you through creating a job that can be run via cron to repeatedly check and compare the contents of one or more directories:
+```    /root/bin/stat_watch --create```
+
+By default, the job that's created will backup all files ending in the following extensions: .php, .php4, .php5, .php7, .pl, .pm, .py, .js, .css, .htm, .html, .htaccess, .htpasswd, .sh, .rb. This can be modified to capture whatever is desired.
+
+Any time a change is detected, output will be generated specifying what what files were changed and which of their stats changed. If the file that changed has one of the extensions listed above, the new version of the file will be backed up. You can configure it to send an email that includes the details every time a change is detected.
+

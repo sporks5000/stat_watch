@@ -1,0 +1,18 @@
+
+REGARDING BACKUPS
+
+When do backups occur?
+    - For backups to occur, you must have a job file that contains lines with the control characters "BackupD" and "BackupR" or "Backup+"
+    - When Stat Watch is run in "--backup" mode, all files matching the "BackupR" or "Backup+" lines will have their file type, permissions, user, group, size, and mtime checked against the most recent backup (if any). If any of these are different, the file will be backed up
+    - When Stat Watch is run in "--diff" mode, any files with changes to their file type, permissions, user, group, size, mtime, or ctime will be backed up
+    - Changing the "BackupR" or "Backup+" lines and then running "--diff" without running "--backup" WILL NOT cause matching files to be backed up (until "--diff" recognizes that a change has happened)
+
+When are backups pruned?
+    - Every time a file is backed up, the directory is checked afterward for other backups of the same file
+    - Of those other backups, the newest X are ignored, where X is the number set by the "BackupMC" control string
+    - Any of the remaining backups that are older then Y days are removed, where Y is the number set by the BackupMD control string
+    - Because old backups will not typically be removed unles a new backup of the file is made, there is also the option to run stat_watch.pl with the "--prune" flag
+
+Automating backups
+    - Creating Stat Watch jobs wit hthe "--create" flag, and then setting up a cron job to run them wit the "--run" flag is the easiest way to automate creating backups with Stat Watch
+

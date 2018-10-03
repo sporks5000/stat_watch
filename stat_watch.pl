@@ -194,7 +194,7 @@ sub fn_stat_watch {
 				if ( $_file ne "." && $_file ne ".." ) {
 					my $v_file = $v_dir . "/" . $_file;
 					### Make sure that the file doesn't match any of the ignore lists
-					if ( $b_ignore_on_record && ! fn_check_file($v_file) ) {
+					if ( ($b_ignore_on_record || (-d $v_file && ! -l $v_file)) && ! fn_check_file($v_file) ) {
 						next;
 					}
 					### Capture it if it's a directory
@@ -219,10 +219,6 @@ sub fn_stat_watch {
 			}
 			for my $_dir (@dirs) {
 			### For each of the directories we found, go through RECURSIVELY!
-				### Make sure that the file doesn't match any of the ignore lists
-				if ( ! fn_check_file($_dir) ) {
-					next;
-				}
 				$v_cur_depth++;
 				if ( $v_cur_depth <= $v_max_depth ) {
 					fn_stat_watch( $_dir, $v_timestamp);
@@ -813,7 +809,7 @@ sub fn_backup_file {
 			$b_continue = fn_compare_backup($v_file, $d_backup);
 			if ( $b_continue ) {
 				### No need to back it up, because it already matches
-				return 1;
+				return $b_continue;
 			}
 			$d_backup .= "/" . $v_name . "_" . time();
 			### When ever running a command with backticks, we need to make sure arguments we're passing to it are quote safe:
@@ -828,7 +824,7 @@ sub fn_backup_file {
 				if ($b_retention) {
 					fn_check_retention( $d_backup .= "/" . $v_name );
 				}
-				return 1;
+				return $d_backup;
 			}
 		}
 		fn_log("Failed to backup file " . $v_file_escape . "\n");
@@ -849,9 +845,9 @@ sub fn_list_backups {
 	if ( opendir my $fh_dir, $v_dir ) {
 		my @files = readdir $fh_dir;
 		closedir $fh_dir;
-		$v_name = qr/^\Q$v_name\E_[0-9]+$/;
+		my $re_name = qr/^\Q$v_name\E_[0-9]+$/;
 		for my $_file (@files) {
-			if ( $_file =~ m/$v_name/ ) {
+			if ( $_file =~ m/$re_name/ ) {
 				push( @v_files, $_file );
 			}
 		}
@@ -892,7 +888,7 @@ sub fn_compare_backup {
 		my $v_line1 = fn_stat_line($v_file);
 		my $v_line2 = fn_stat_line($v_file2);
 		if ( $v_line1 eq $v_line2 ) {
-			return 1;
+			return $v_file2;
 		}
 	}
 	return 0;
@@ -952,21 +948,25 @@ sub fn_list_file {
 		for my $_file (@v_files) {
 			my $v_stamp = (split( m/_/, $_file ))[-1];
 			$v_stamp = strftime( '%Y-%m-%d %T %z', localtime($v_stamp) );
-			my $v_size = (stat($_file))[7];
+			my $v_size;
+			if ( -l $_file ) {
+				$v_size = (lstat($_file))[7];
+			} else {
+				$v_size = (stat($_file))[7];
+			}
 			my $_file_escape = fn_escape_filename($_file);
 			print "  " . $_file_escape . " -- Timestamp: " . $v_stamp . " -- " . $v_size . " bytes\n";
 		}
 	} else {
 		print "There are no backups of this file\n"
 	}
-	print "\n";
 }
-#================================#
-#== Processing the ignore file ==#
-#================================#
+#=============================#
+#== Processing the job file ==#
+#=============================#
 
 sub fn_get_include {
-### Read the ignore/include file and extract data from it
+### Read the job file and extract data from it
 ### $_[0] is the file in question.
 	my $f_ignore = $_[0];
 	if ( ! -r $f_ignore ) {
@@ -980,7 +980,7 @@ sub fn_get_include {
 		}
 	}
 	push( @v_includes, $f_ignore );
-	### Read the include file
+	### Read the job file
 	if ( open( my $fh_read, "<", $f_ignore ) ) {
 		while (<$fh_read>) {
 			my $_line = $_;
@@ -1012,7 +1012,7 @@ sub fn_get_include {
 					$_line =~ s/^\*\s*//;
 					push( @v_star_ignore, $_line );
 				} elsif ( $_line =~ m/^Include\s*\// ) {
-				### Process these files as additional include/ignore lists
+				### Process these files as additional job files
 					$_line =~ s/^Include\s*//;
 					fn_get_include( $_line );
 				} elsif ( $_line =~ m/^I\s*\// ) {
@@ -1067,7 +1067,7 @@ sub fn_get_include {
 sub fn_document_backup {
 ### Document the backup locations we've seen so that we can check all of them when necessary
 	if ( $d_backup ) {
-	### If the include file listed a backup directory, add that to the list of backup directories
+	### If the job file listed a backup directory, add that to the list of backup directories
 		my @v_backup_dirs;
 		### Open the list and read from it
 		if ( -f $d_working . "/backup_locations" ) {
@@ -1447,230 +1447,6 @@ sub fn_import_fold_print {
 	}
 }
 
-#=============================#
-#== Information Subroutines ==#
-#=============================#
-
-sub fn_version {
-print "Current Version: $v_VERSION\n";
-my $v_message = <<'EOF';
-
-Version 1.3.2 (2018-09-10) -
-    - The expected install path is now /usr/local/stat_watch
-
-Version 1.3.1 (2018-08-29) -
-    - Fixed a bug where under some circumstances it would fail to find the list of backup directories
-    - Added the "--new-lines" flag to output all file names that contain a new line character
-
-Version 1.3.0 (2018-08-24) -
-    - Any time a file name is output (not including the "--record" report) The file name is appropriately escaped to show non-printing characters
-    - Less liberal use of abs_path. There were definitely circumstances where I didn't need it but was using it anyway.
-    - Added the "--links" flag to output the number of symlinks in each directory
-
-Version 1.2.0 (2018-08-19) -
-    - Added the "--md5" flag, as well as a few control strings
-    - Added a maximum depth for the script to recurse to
-        - The "--record" and "--diff" outputs now include instances where such directories are present
-    - Split out help text so that you can reference individual bits of it
-    - In "--diff" mode, check mtimes of the two reports we're comparing. Always make the newest file on the right for diff purposes
-        - Added the "--before" and "--after" flags for "--diff" mode to override this behavior
-    - When checking whether a file needs to be backed up, if the md5sum was captured initially, check against the md5sum of the backup as well.
-
-Version 1.1.0 (2018-08-17) -
-    - Added the ability to compare md5sums of files as well
-    - Fixed a bug where files might be being matched against incorrectly due to an added slash
-
-Version 1.0.1 (2018-08-10) -
-    - Added the ability to capture data on files with names that include a newline character
-    - Liberal use of abs_path in hopes of ensuring that files are always referenced in the same manner
-
-Version 1.0.0 (2018-08-04) -
-    - Original Version
-
-EOF
-fn_import_fold_print($v_message);
-exit 0;
-}
-
-sub fn_help {
-my $v_header = <<'EOF';
-
-stat_watch.pl - a script for finding and reporting changes in files and directories
-
-EOF
-my $v_usage = <<'EOF';
-
-USAGE
-
-./stat_watch.pl --record [DIRECTORY] ([DIRECTORY 2] ...)
-    - Creates a Stat Watch report of all of the files within the directories specified (and the subdirectories thereof) including their current stat data
-        - You probably want to use the "-o" flag or redirect output to a file
-    - The "-v" or "--verbose" flag can be used to have the directories output to STDERR
-    - The "-i" or "--include" flag can be used to specify an ignore/include file
-    - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
-    - This is the default functionality. Technically the "--record" flag is not necessary
-    - The "--md5" flag will result in the MD5 sums of all files being captured in addition to their stats
-        - This will require that the ./scripts/md5.pm file be present, as well as the perl modules 'Digest::MD5' and 'Digest::MD5::File'
-        - This will cause the process to take longer and generally isn't necessary - the combination of mtime, ctime, and file size is usually enough to detect if a change has occurred
-    - The "--ignore-on-record" flag will result in individual files being checked against ignore rules
-        - Otherwise only directories are checked against this rules, and weeding out things to be ignored only occurrs during "--diff"
-        - Use of this flag results in larger file sizes for Stat Watch reports, but generally reduces processing time overall
-    - The "--as-dir" flag can be followed by a string of text that will be used to replace the directory name when recording the full file path
-        - For example, running "./stat_watch.pl --record /home/account --as-dir "/home/different/path" will result in the file "/home/account/file.txt" to be listed as "/home/different/path/file.txt"
-        - This is useful for situations where you want to capture information for backed-up files and compare them to files in place.
-
-./stat_watch.pl --links [DIRECTORY] ([DIRECTORY 2] ...)
-    - Outputs the number of symlinks in each directory
-    - Otherwise follows all of the same rules as "--record"
-
-./stat_watch.pl --new-lines [DIRECTORY] ([DIRECTORY 2] ...)
-    - Outputs every file that has a new line or non-printing character in its name, appropriately escaped so that it can be printed on one line
-    - Otherwise follows all of the same rules as "--record"
-
-./stat_watch.pl --diff [REPORT FILE 1] [REPORT FILE 2]
-    - Compare two Stat Watch report files, weed out files that match ignore rules, output information on what has changed
-    - The "--ignore" flag can be used to specify a specific file or directory that you want to ignore
-        - This is functionally the same as listing a file without a control string in an include/ignore file
-    - The "-i" or "--include" flag can be used to specify an ignore/include file
-    - The "-o" or "--output" flag will specify a file to poutput to, otherwise /dev/stdout will be used
-    - The "-f" or "--format" flag allows you to choose a number of options for how the details should be output:
-        - "text" separates out what has changed and how, and outputs in plain text format
-        - "html" separates out what has changed and how, and outputs in html format
-        - "diff" outputs the lines that were different with "<" and ">" characters to indicate which file they came from. 
-    - The "--backup" flag will result in files being backed up. "BackupD" and "BackupR" or "Backup+" lines must be set in the include file for this to be successful
-    - The "--no-check-retention" flag mean that when creating backups, existing files will not be checked for retention
-        - This is optimal if you're regularly running this script with the "--prune" flag
-    - The "--no-ctime" flag tells the script to ignore differences in ctime. This is useful if you're comparing against a restored backup.
-    - The "--no-partial-seconds" limits the comparison of timestamps to full seconds
-    - The "--before" and "--after" flags can be used to specify which is the earlier Stat Watch report file and which is the later
-        - Without these flags, the mtimes of the files are used to determine which is which
-
-./stat_watch.pl --backup [REPORT FILE]
-    - Create backups of files specified using a Stat Watch report file and the settings within an ignore/include file
-    - The file must be a Stat Watch report file
-    - The "-i" or "--include" flag can be used to specify an ignore/include file and that file must have "BackupD" and "BackupR" or "Backup+" control strings present
-    - The "--backupd" flag can be used, followed by the directory that you want to back up to
-        - This is functionally the same as the "BackupD" control string in an include/ignore file
-    - The "--backup+" flag can be used, followed by the full path of a file that you wish to back up. This flag can be used more than once.
-        - This is functionally the same as the "Backup+" control string in an include/ignore file
-    - The "--backupr" flag can be used, followed by perl regular expression to match in order to decide what files to backup. This flag can be used more than once.
-        - This is functionally the same as the "BackupR" control string in an include/ignore file
-    - If you modify the "BackupR" or "Backup+" settings and re-run "--backup", it will compare stats of existing backups and only save files that are different / not present
-        - However, files that are no longer matched will not be removed
-
-./stat_watch.pl --list [FILE]
-    - This will list the available backups that Stat Watch has taken of a specific file
-    - It is not necessary to specify an includde file, Stat Watch will check all directories that it has ever backed up to in hopes of giving the most comprehensive answer possible.
-
-./stat_watch.pl --prune [FILE]
-    - Go through the backup directory and remove files older files
-    - The file must be a Stat Watch report file
-    - The "-i" or "--include" flag must be used to specify an ignore/include file and that file must have "BackupD" string present
-    - Any files outside of the range specified by the "BackupMD" and "BackupMC" control strings will be removed
-
-./stat_watch.pl --md5-test
-    - Test to see if everything necessary is in place for checking the md5sum of files
-
-./stat_watch.pl --help
-./stat_watch.pl -h
-    - Outputs full help information
-
-./stat-watch.pl --help-usage
-./stat-watch.pl --help-includes
-./stat-watch.pl --help-backups
-    - Outputs information regarding the specific aspect of Stat Watch requested
-
-./stat_watch.pl --version
-    - Outputs version and changelog information
-
-EOF
-my $v_include = <<'EOF';
-
-REGARDING THE IGNORE/INCLUDE FILE
-
-Default Usage:
-    - All files or directories need to be referred to by full path (Beginning with "/") unless specified otherwise
-    - Any line beginning with a file or directory will result in that file or directory (and all files within) being passed over
-    - You can include any amount of whitespace at the start or end of a line, it will not be interpreted
-    - Spaces and special characters don't need to be quoted or escaped
-    - All other lines that don't match this or the control strings described below will be ignored.
-
-Control Strings:
-    - Lines beginning with the following control strings have special meanings and can be declared multiple times: 
-        - "*" - Pass over all files and directories whose full path begins with the string that follows
-        - "R" - Pass over all files and directories that match the following Perl interpreted regex
-        - "I" - Add the following file or directory to the list of files and directories to be checked (as if it was listed at the command line). Has no effect with "--diff"
-        - "Include" - Interpret the contents of the following file as if it was listed at the command line as an include/ignore file
-        - "BackupR" - If a file matches the regular expression that follows, and the appropriate flags are set, they will be backed up
-        - "Backup+" - In any instance where there are changes to the following file, it will be backed up
-        - "Time-" - Stat changes to this file will not be reported by "--diff" if the only change is to mtime or ctime
-            - Useful if a file is regularly getting touched by a process, but still want to track changes to it otherwise
-        - "MD5R" - If a file matches the regular expression that follows, also capture the file's MD5 sum for comparison
-        - "MD5" -
-            - If a file's name and full path matches the exact string that follows, also capture the file's MD5 sum for comparison
-            - If "MD5" is alone on a line, then capture MD5 sums for everything (as if the "--md5" flag was used)
-            - This will require that the ./scripts/md5.pm file be present, as well as the perl modules 'Digest::MD5' and 'Digest::MD5::File'
-    - Lines beginning with the following control strings have special meanings, but only the last declaration will be interpreted:
-        - "BackupD" - This specifies the directory to backup files to. The directory must already exist and be writable, or Stat Watch will error out
-        - "BackupMD" - A number specified here will set the minumum number of days a backed up file should be kept
-        - "BackupMC" - A number here will set the maximum number of copies of a file that should be backed up (after the minumum retention has been met)
-        - "Log" - Placing a full path to a file after this will tell Stat Watch where to log
-        - "Max-depth" - A number here will set the maximum depth of directories that the script can recurse into (default 20)
-            - Any directories deeper than this will be logged on each run, assuming that the "Log" control string is used
-    - Control strings can have any amount of whitespace before or after them on the line. It will not be interpreted.
-    - When a file is included via "Include", the entirety of that file will be interpreted before the going on to interpret the next line
-    - For "*" or "R", any line matching a directory will result in that directory and all files and subdirectories it contains being passed over
-
-Other Rules:
-    - Any line that doesn't match what's described above will be ignored
-    - Lines cannot begin with more than one control string
-    - If a directory is included with "I" or given at the command line that would otherwise be ignored due to entries in the file, those entries will be ignored while it is being checked
-
-EOF
-my $v_backup =  <<'EOF';
-
-REGARDING BACKUPS
-
-When do backups occur?
-    - For backups to occur, you must have an include/ignore file that contains lines with the control characters "BackupD" and "BackupR" or "Backup+"
-    - When Stat Watch is run in "--backup" mode, all files matching the "BackupR" or "Backup+" lines will have their file type, permissions, user, group, size, and mtime checked against the most recent backup (if any). If any of these are different, the file will be backed up
-    - When Stat Watch is run in "--diff" mode, any files with changes to their file type, permissions, user, group, size, mtime, or ctime will be backed up
-    - Changing the "BackupR" or "Backup+" lines and then running "--diff" without running "--backup" WILL NOT cause matching files to be backed up (until "--diff" recognizes that a change has happened)
-
-When are backups pruned?
-    - Every time a file is backed up, the directory is checked afterward for other backups of the same file
-    - Of those other backups, the newest X are ignored, where X is the number set by the "BackupMC" control string
-    - Any of the remaining backups that are older then Y days are removed, where Y is the number set by the BackupMD control string
-    - Because old backups will not typically be removed unles a new backup of the file is made, there is also the option to run stat_watch.pl with the "--prune" flag
-
-Automating backups
-    - The Stat Watch project includes a script named stat_watch_wrap.sh. This is the most straight-forward way to set up reoccurring Stat Watch checks including backups and email notifications.
-
-EOF
-my $v_feedback = <<'EOF';
-
-FEEDBACK
-
-The Stat Watch project is available at the following git repositories (one of which is public facing):
-    - https://github.com/sporks5000/stat_watch
-    - https://git.liquidweb.com/acwilliams/stat_watch
-
-Report any errors, unexpected behaviors, comments, or feedback to acwilliams@liquidweb.com
-
-EOF
-
-if ( ! $_[0] ) {
-	fn_import_fold_print($v_header . $v_usage . $v_include . $v_backup . $v_feedback);
-} elsif ( $_[0] eq "usage" ) {
-	fn_import_fold_print($v_header . $v_usage . $v_feedback);
-} elsif ( $_[0] eq "includes" ) {
-	fn_import_fold_print($v_header . $v_include . $v_feedback);
-} elsif ( $_[0] eq "backups" ) {
-	fn_import_fold_print($v_header . $v_backup . $v_feedback);
-}
-exit 0;
-}
-
 #==================================#
 #== Parse command line arguments ==#
 #==================================#
@@ -1701,18 +1477,6 @@ while ( defined $ARGV[0] ) {
 		for my $a (@v_args) {
 			unshift( @ARGV, $a );
 		}
-	} elsif ( $v_arg eq "--help" || $v_arg eq "-h" ) {
-		fn_help();
-		exit 0;
-	} elsif ( $v_arg eq "--help-usage" ) {
-		fn_help('usage');
-		exit 0;
-	} elsif ( $v_arg eq "--help-includes" ) {
-		fn_help('includes');
-		exit 0;
-	} elsif ( $v_arg eq "--help-backups" ) {
-		fn_help('backups');
-		exit 0;
 	} elsif ( $v_arg eq "--ignore" ) {
 		if ( defined $ARGV[0] ) {
 			$v_file = fn_test_file(shift( @ARGV ), 1);
@@ -1740,9 +1504,6 @@ while ( defined $ARGV[0] ) {
 		} else {
 			print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
 		}
-	} elsif ( $v_arg eq "--version" ) {
-		fn_version();
-		exit 0;
 	} elsif ( $v_arg eq "-v" || $v_arg eq "--verbose" ) {
 		if (!$b_verbose) {
 			$b_verbose = 1;
@@ -1834,28 +1595,41 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	}
 } elsif ( defined $args[0] && $args[0] eq "--list" ) {
 	shift( @args );
-	my $v_file;
+	my @v_files;
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
-		my $v_file2 = fn_test_file($v_arg, 0, 'f');
-		if ( $v_file2 ) {
-			$v_file = $v_file2;
+		if ( $v_arg && -e $v_arg && ! -p $v_arg ) {
+			my @v_dirs = split( m/\//, $v_arg );
+			my $v_name = pop( @v_dirs );
+			my $v_file = join( '/', @v_dirs );
+			$v_file = ( abs_path( $v_file ) || $v_file ) . "/" . $v_name;
+			push( @v_files, $v_file );
+			if ( -l $v_file ) {
+				$v_file = fn_test_file($v_file, 0, 'f');
+				if ( $v_file ) {
+					push( @v_files, $v_file );
+				}
+			}
 		} else {
-			push ( @v_unknown, $v_arg );
+			push( @v_unknown, $v_arg );
 		}
 	}
 	if (@v_unknown) {
 		fn_report_unknown(@v_unknown);
 	}
-	if ( ! $v_file ) {
+	if ( ! @v_files ) {
 		print STDERR "A file must be given to look for\n";
 		exit 1;
 	}
-	fn_list_file($v_file);
-} elsif ( defined $args[0] && $args[0] eq "--backup" ) {
-### Backup files from "--report" output.
-	shift( @args );
+	for my $_file (@v_files) {
+		fn_list_file($_file);
+	}
+	print "\n";
+} elsif ( defined $args[0] && ( $args[0] eq "--backup" || $args[0] eq "--backup-file" ) ) {
+### Backup files from "--report" output. or backup a single file
+	my $v_type = shift( @args );
 	my $v_file;
+	my @v_files;
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
 		if ( $v_arg eq "--backupd" ) {
@@ -1883,7 +1657,11 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 				print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
 			}
 		} elsif ( -e $v_arg ) {
-			$v_file = $v_arg;
+			if ( $v_type eq "--backup" ) {
+				$v_file = $v_arg;
+			} else {
+				push( @v_files, $v_arg );
+			}
 		} else {
 			push ( @v_unknown, $v_arg );
 		}
@@ -1893,8 +1671,13 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	}
 	$b_retention = 0;
 	if ( ! $d_backup || (! @v_backupr && ! @v_backup_plus) ) {
-		print STDERR "The include file must have \"BackupD\" and \"BackupR\" or \"Backup+\" control strings present\n";
-		exit 1;
+		if ( $v_type eq "--backup" ) {
+			print STDERR "The job file must have \"BackupD\" and \"BackupR\" or \"Backup+\" control strings present\n";
+			exit 1;
+		} elsif ( ! $d_backup ) {
+			print STDERR "The job file must have the \"BackupD\" control string present\n";
+			exit 1;
+		}
 	} elsif ( ! -d $d_backup || ! -w $d_backup ) {
 		print STDERR "The backup directory does not exist or is not writable\n";
 		exit 1;
@@ -1911,10 +1694,21 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		require( $d_program . '/scripts/md5.pm' );
 	}
 	### Output to the log and begin the job
-	my $d_backup_escape = fn_escape_filename($d_backup);
-	fn_log("Checking to see if there are files that need to be backed up " . $d_backup_escape . "\n");
-	fn_document_backup();
-	fn_backup_initial($v_file);
+	if ( $v_type eq "--backup" ) {
+		my $d_backup_escape = fn_escape_filename($d_backup);
+		fn_log("Checking to see if there are files that need to be backed up " . $d_backup_escape . "\n");
+		fn_document_backup();
+		fn_backup_initial($v_file);
+	} else {
+		for my $_file ( @v_files ) {
+			if ( $b_use_md5 ) {
+				$b_md5_all = 1;
+			}
+			@v_backup_plus = ($_file);
+			my $f_backup = fn_backup_file( $_file, $d_backup );
+			print $f_backup . "\n";
+		}
+	}
 } elsif ( defined $args[0] && $args[0] eq "--md5-test" ) {
 	if ( -f $d_program . '/scripts/md5.pm' ) {
 		fn_mod_check( 'Digest::MD5', 'Digest::MD5::File' );

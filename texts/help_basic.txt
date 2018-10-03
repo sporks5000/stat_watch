@@ -1,0 +1,18 @@
+
+BASIC DETAILS
+
+For information on general use cases for Stat Watch:
+    stat_watch --help use-cases
+
+For information on command line flags and arguments that can be used for Stat Watch:
+    stat_watch --help flags
+
+For information on the Stat Watch job file and control strings that can be used within:
+    stat_watch --help job
+
+For information on how Stat Watch backs up files:
+    stat_watch --help backups
+
+For information on the files that are present for a Stat Watch job:
+    stat_watch --help job-files
+
