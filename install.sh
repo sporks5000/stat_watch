@@ -36,9 +36,12 @@ if [[ -z "$d_PROGRAM" || -z "$d_INST_R" || -z "$d_INST" || -z "$v_OUT" ]]; then
 	exit 1
 fi
 
-### If there's a zip file, remove it
+### If there's a zip file or git information, remove it
 if [[ -f "$d_PROGRAM"/../stat_watch.tar.gz ]]; then
 	rm -f "$d_PROGRAM"/../stat_watch.tar.gz
+fi
+if [[ -d "$d_PROGRAM"/.git ]]; then
+	rm -rf "$d_PROGRAM"/.git
 fi
 
 ### Make sure that we're not already in the installation directory
@@ -96,6 +99,6 @@ fi
 
 ### Delete the things that need to be removed
 rm -f "$d_INST"/install.sh 2> "$v_OUT"
-rm -fv "$d_PROGRAM" "$d_INST"_old 2> "$v_OUT"
+rm -rf "$d_PROGRAM" "$d_INST"_old 2> "$v_OUT"
 
 echo "Installed successfully"

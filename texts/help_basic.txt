@@ -16,3 +16,6 @@ For information on how Stat Watch backs up files:
 For information on the files that are present for a Stat Watch job:
     stat_watch --help job-files
 
+For information on files that are part of Stat Watch:
+    stat_watch --help files
+

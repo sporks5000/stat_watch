@@ -6,8 +6,6 @@
 use strict;
 use warnings;
 
-my $v_VERSION = "1.3.2";
-
 use Cwd 'abs_path';
 use POSIX 'strftime';
 

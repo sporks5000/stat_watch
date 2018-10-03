@@ -1,6 +1,12 @@
 
 USAGE AND COMMAND LINE FLAGS
 
+stat_watch --assume [JOB_FILE] [DIRECTORY]
+    - From this point forward, when ever Stat Watch is run within a directory or one of its subdirectories, assume that a specific job file should be included (as if with the "-i" or "--include" flag)
+    - If Stat Watch is run within the directory specified with the "-i" or "--include" flags or with the "--no-assume" flag, these assumptions will be ignored
+    - Only one job file can be specified as being assumed for each directory - running "--assume" again and specifying the same directory will overwrite the job file to use
+    - The PWD will be chedked first, followed by its parent directory and so on - thus if both '/var' and '/var/log' are specified, and a Stat Watch command is run within the directory '/var/log/tmp', the assumptions for '/var/log' will be used and the assumptions for '/var' will be ignored
+
 stat_watch --backup [REPORT FILE]
     - Create backups of files specified using a Stat Watch report file and the settings within a job file
     - The file must be a Stat Watch report file
@@ -104,6 +110,7 @@ stat_watch --help flags
 stat_watch --help job
 stat_watch --help backups
 stat_watch --help job-files
+stat_watch --help files
     - Outputs information regarding the specific aspect of Stat Watch requested
 
 stat_watch --version

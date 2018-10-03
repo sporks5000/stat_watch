@@ -2,8 +2,6 @@
 ### A wrapper script for stat_watch.pl
 ### Created by ACWilliams
 
-v_VERSION="1.1.2";
-
 f_PERL_SCRIPT="stat_watch.pl"
 d_WORKING="stat_watch"
 ### Set a one in 10 chance of us pruning old backups
@@ -83,6 +81,8 @@ for (( c=0; c<=$(( ${#a_CL_ARGUMENTS[@]} - 1 )); c++ )); do
 			"$v_PROGRAMDIR"/scripts/fold_out.pl "$v_PROGRAMDIR"/texts/help_header.txt "$v_PROGRAMDIR"/texts/help_backups.txt "$v_PROGRAMDIR"/texts/help_feedback.txt
 		elif [[ "${a_CL_ARGUMENTS[$c + 1]}" == "job-files" ]]; then
 			"$v_PROGRAMDIR"/scripts/fold_out.pl "$v_PROGRAMDIR"/texts/help_header.txt "$v_PROGRAMDIR"/texts/help_job_files.txt "$v_PROGRAMDIR"/texts/help_feedback.txt
+		elif [[ "${a_CL_ARGUMENTS[$c + 1]}" == "files" ]]; then
+			"$v_PROGRAMDIR"/scripts/fold_out.pl "$v_PROGRAMDIR"/texts/help_header.txt "$v_PROGRAMDIR"/texts/help_files.txt "$v_PROGRAMDIR"/texts/help_feedback.txt
 		else
 			"$v_PROGRAMDIR"/scripts/fold_out.pl "$v_PROGRAMDIR"/texts/help_header.txt "$v_PROGRAMDIR"/texts/help_basic.txt "$v_PROGRAMDIR"/texts/help_feedback.txt
 		fi
@@ -97,32 +97,40 @@ if [[ "$1" == "--run" ]]; then
 ### Here's the part for if we're running a job
 	source "$v_PROGRAMDIR"/includes/run.shf
 	shift
-	fn_run "$@"
-elif [[ "$1" == "--email-test" ]]; then
-	if [[ -z "$2" ]]; then
-		echo "Please provide an email address to test sending messages to"
-		exit
+	if [[ -n "$1" ]]; then
+		fn_run "$@"
+	else
+		source "$v_PROGRAMDIR"/includes/assume.shf
+		f_ASSUME="$( fn_find_pwd )"
+		fn_run "$f_ASSUME"
 	fi
-	v_EMAIL="$2"
-	(  
-		echo "This is a test message to confirm that mesages from server $(hostname) are reaching the address \"$v_EMAIL\"."
-		echo
-		echo "If you were not expecting this message, please ignore it as it was likely sent in error."
-		if [[ -n "$3" ]]; then 
-			echo
-			echo "$3" 
-		fi
-	) | mail -s "Stat Watch - File changes on $(hostname)" $v_EMAIL
-	echo "Test message sent to \"$v_EMAIL\""
-	exit
+elif [[ "$1" == "--email-test" ]]; then
+	source "$v_PROGRAMDIR"/includes/email_test.shf
+	shift
+	fn_email_test "$@"
+elif [[ "$1" == "--assume" ]]; then
+	source "$v_PROGRAMDIR"/includes/assume.shf
+	shift
+	fn_create_assumption "$@"
 elif [[ "$1" == "--record" || "$1" == "--links" || "$1" == "--new-lines" || "$1" == "--diff" || "$1" == "--" || "$1" == "--backup" || "$1" == "--list" || "$1" == "--prune" || "$1" == "--md5-test" || "$1" == "--backup-file" || ( -n "$1" && "${1:0:2}" != "--" ) ]]; then
-	"$v_PROGRAMDIR"/"$f_PERL_SCRIPT" "$@"
+	source "$v_PROGRAMDIR"/includes/assume.shf
+	f_ASSUME="$( fn_find_pwd )"
+
+	b_ADD_INCLUDE=true
+	if [[ -n "$f_ASSUME" ]]; then
+		fn_assume_include "$@"
+	fi
+
+	if [[ "$b_ADD_INCLUDE" == true ]]; then
+		"$v_PROGRAMDIR"/"$f_PERL_SCRIPT" "$@" --include "$f_ASSUME"
+	else
+		"$v_PROGRAMDIR"/"$f_PERL_SCRIPT" "$@"
+	fi
 elif [[ -z "$1" || "$1" == "--create" ]]; then
 	source "$v_PROGRAMDIR"/includes/create.shf
 	fn_create
 elif [[ -n "$1" ]]; then
 	echo "Unrecognized argument \"$1\""
-	exit
 fi
 
 

@@ -1,0 +1,56 @@
+
+FILES AND DIRECTORIES
+
+This is not a comprehensive list of all of the files and directories that are part of Stat Watch, but the list should be detailed enough to give a general idea of what most things do.
+
+
+DIRECTORIES
+
+/usr/local/stat_watch -
+    - This is the default installation directory. If Stat Watch has been installed elsewhere, assume that path in place of '/usr/local/stat_watch' for all of the below entires
+
+/usr/local/stat_watch/includes -
+    - This contains files with separate functions that are part fo the Stat Watch wrapper script
+
+/usr/local/stat_watch/info -
+    - This contains additional information regarding or related to Stat Watch
+
+/usr/local/stat_watch/scripts -
+    - This contains helper scripts or modules that Stat Watch uses to provide additional functionality
+
+/usr/local/stat_watch/.stat_watch -
+    - This is where Stat Watch stores its working files
+
+/usr/local/stat_watch/tests -
+    - Tests to confirm the functionality of Stat Watch
+
+/usr/local/stat_watch/texts -
+    - Information such as help documentation, version information, etc.
+
+
+FILES
+
+/usr/local/stat_watch/README.md -
+    - A markdown file providing a general overview of the project
+
+/usr/local/stat_watch/stat_watch.pl -
+    - This script contains all of the core functionality of Stat Watch
+
+/usr/local/stat_watch/stat_watch_wrap.sh -
+    - A wrapper script for stat_watch.pl, just because some functionality is easier to do in bash
+
+/usr/local/stat_watch/tests/test.sh -
+    - A script that automates running tests to verify the functionality of Stat Watch
+
+/usr/local/stat_watch/.stat_watch/wrap_jobs_created -
+    - A file that stores a list of jobs that were created using "--create"
+
+/usr/local/stat_watch/.stat_watch/backup_locations -
+    - A file containing a list of all the directories that stat_watch.pl has seen designated as backup locations
+
+/usr/local/stat_watch/.stat_watch/assumptions -
+    - A file containing a list of all of the assumptions created with the "--assume" flag
+
+/usr/local/stat_watch/info/expectations.md -
+    - A markdown file with examples of verbiage to use when Stat Watch has been set up to send emails to customer-facing addresses
+

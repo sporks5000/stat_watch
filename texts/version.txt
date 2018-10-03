@@ -1,5 +1,8 @@
 
-Current Version: 1.4.0
+Current Version: 1.4.1
+
+Version 1.4.1 (2018-10-03) -
+    - Added assumption functionality
 
 Version 1.4.0 (2018-10-02) -
     - Routed all Stat Watch commands through the wrapper script
