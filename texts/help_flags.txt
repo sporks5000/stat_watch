@@ -16,9 +16,12 @@ stat_watch --backup [REPORT FILE]
 
 stat-watch --backup-file [FULL PATH TO FILE]
     - Create a backup of the specified file
+    - If multiple files are specified, they will all be backed up
     - The "-i" or "--include" flag can be used to specify a job file and that file must have the "BackupD" control string present
     - The "--backupd" flag can be used, followed by the directory that you want to back up to
         - This is functionally the same as the "BackupD" control string in a job file
+    - The "--comment" flag can be used followed by a comment to provide details about the backup that's being performed
+        - If multiple files are specified for backup, the comment will be applied to all of those files
 
 stat_watch --create
     - Asks the user key questions in order to create a Stat Watch job file with the information necessary to watch and backup key user files

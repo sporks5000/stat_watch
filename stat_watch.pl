@@ -727,6 +727,9 @@ sub fn_check_retention {
 			my $v_file_escape = fn_escape_filename($v_file);
 			fn_log("Removing backed-up file " . $v_file_escape . "\n");
 			unlink( $v_file );
+			if ( -f $v_file . "_comment" ) {
+				unlink( $v_file . "_comment" );
+			}
 		}
 		$v_count++;
 	}
@@ -956,6 +959,9 @@ sub fn_list_file {
 			}
 			my $_file_escape = fn_escape_filename($_file);
 			print "  " . $_file_escape . " -- Timestamp: " . $v_stamp . " -- " . $v_size . " bytes\n";
+			if ( -f $_file . "_comment" ) {
+				fn_print_files( $_file . "_comment" );
+			}
 		}
 	} else {
 		print "There are no backups of this file\n"
@@ -1438,15 +1444,6 @@ sub fn_bin_check {
 	}
 }
 
-sub fn_import_fold_print {
-	if ( $d_program . '/scripts/fold_print.pm' ) {
-		require( $d_program . '/scripts/fold_print.pm' );
-		print fn_fold_print($_[0]);
-	} else {
-		print $_[0];
-	}
-}
-
 #==================================#
 #== Parse command line arguments ==#
 #==================================#
@@ -1621,6 +1618,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		print STDERR "A file must be given to look for\n";
 		exit 1;
 	}
+	require( $d_program . '/scripts/fold_print.pm' );
 	for my $_file (@v_files) {
 		fn_list_file($_file);
 	}
@@ -1630,6 +1628,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	my $v_type = shift( @args );
 	my $v_file;
 	my @v_files;
+	my $v_comment;
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
 		if ( $v_arg eq "--backupd" ) {
@@ -1655,6 +1654,14 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 				push( @v_backupr, shift( @args ) );
 			} else {
 				print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
+			}
+		} elsif ( $v_arg eq "--comment" && $v_type eq "--backup-file" ) {
+			if ( $v_comment ) {
+				print STDERR "Only one comment can be specified\n";
+			} elsif ( defined $args[0] ) {
+				$v_comment =  shift( @args );
+			} else {
+				print STDERR "Argument '" . $v_arg . "' must be followed by a comment\n";
 			}
 		} elsif ( -e $v_arg ) {
 			if ( $v_type eq "--backup" ) {
@@ -1706,7 +1713,14 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			}
 			@v_backup_plus = ($_file);
 			my $f_backup = fn_backup_file( $_file, $d_backup );
-			print $f_backup . "\n";
+			if ( $b_verbose ) {
+				print $f_backup . "\n"; ##### Is this good enough?
+			}
+			if ($v_comment) {
+				if ( open( my $fh_write, ">>", $f_backup . "_comment" ) ) {
+					print $fh_write "    - " . $v_comment . "\n";
+				}
+			}
 		}
 	}
 } elsif ( defined $args[0] && $args[0] eq "--md5-test" ) {
