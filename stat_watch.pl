@@ -6,7 +6,7 @@
 use strict;
 use warnings;
 
-use Cwd 'abs_path';
+use Cwd qw(abs_path getcwd);
 use POSIX 'strftime';
 
 my $v_program = __FILE__;
@@ -708,25 +708,32 @@ sub fn_backup_initial {
 }
 
 sub fn_check_retention {
-### Given the name of a backed-up file, check to ensure that there aren't old copies that exceed the retention limits
+### Given the name of a backed-up file, check to ensure that there aren't old copies that exceed the retention limits. If there are, remove them
 ### $_[0] is the full path to that file in the backup directory, but with the trailing underscore and timestamp removed
 	my $v_file = $_[0];
 	my @v_dirs = split( m/\//, $v_file );
 	my $v_name = pop(@v_dirs);
 	my $v_dir = join( '/', @v_dirs );
 	my @v_files = fn_list_backups($v_name, $v_dir);
-	### Sort the matching files in reverse, then skip over the retention count. delete anything after that point that's too old
+	### Sort the matching files in reverse
 	@v_files = sort {$b cmp $a} @v_files;
+	### skip over the most recent X files, where X is the retention count
 	my $v_count = $v_retention_max_copies + 1;
 	while ( defined $v_files[$v_count] ) {
 		my $v_file = $v_dir . "/" . $v_files[$v_count];
 		my $v_stamp = (split( m/_/, $v_files[$v_count] ))[-1];
 		if ( (time() - $v_stamp) > (86400 * $v_retention_min_days) ) {
-			my $v_file_escape = fn_escape_filename($v_file);
-			fn_log("Removing backed-up file " . $v_file_escape . "\n");
-			unlink( $v_file );
-			if ( -f $v_file . "_comment" ) {
-				unlink( $v_file . "_comment" );
+			### Delete anything outside of the retention count that's too old and that doesn't have a "_hold" file
+			if ( ! -f $v_file . "_hold" ) {
+				my $v_file_escape = fn_escape_filename($v_file);
+				fn_log("Removing backed-up file " . $v_file_escape . "\n");
+				unlink( $v_file );
+				if ( -f $v_file . "_comment" ) {
+					unlink( $v_file . "_comment" );
+				}
+				if ( -f $v_file . "_ctime" ) {
+					unlink( $v_file . "_ctime" );
+				}
 			}
 		}
 		$v_count++;
@@ -747,18 +754,30 @@ sub fn_prune_backups {
 			my @files = readdir $fh_dir;
 			closedir $fh_dir;
 			my @dirs;
+			my @files2;
 			for my $_file (@files) {
-				if ( -d $_file && ! -l $_file && $_file ne "." && $_file ne ".." ) {
-					push( @dirs, $_file );
+				if ( $_file eq "." || $_file eq ".." ) {
+					next;
+				} elsif ( -d ($v_dir . "/" . $_file) && ! -l ($v_dir . "/" . $_file) ) {
+					push( @dirs, ($v_dir . "/" . $_file) );
+					next;
+				} elsif ( $_file =~ m/_(c(omment|time)|hold)$/ ) {
+					### If there's a comment or ctime file present, but the base file isn't there anymore, remove it
+					$_file = $v_dir . "/" . $_file;
+					my $v_base = $_file;
+					$v_base =~ s/_(c(omment|time)|hold)$//;
+					if ( ! -f $v_base ) {
+						unlink( $_file );
+					}
+					next;
 				}
 				$_file =~ s/_[0-9]+$//;
+				push( @files2, $_file );
 			}
-			@files = fn_uniq(@files);
+			@files = fn_uniq(@files2);
 			for my $_file (@files) {
-				if ( $_file ne "." && $_file ne ".." ) {
-					$_file = $v_dir . "/" . $_file;
-					fn_check_retention($_file);
-				}
+				$_file = $v_dir . "/" . $_file;
+				fn_check_retention($_file);
 			}
 			for my $_dir (@dirs) {
 			### For each of the directories we found, go through RECURSIVELY!
@@ -812,20 +831,31 @@ sub fn_backup_file {
 				### No need to back it up, because it already matches
 				return $b_continue;
 			}
-			$d_backup .= "/" . $v_name . "_" . time();
-			### When ever running a command with backticks, we need to make sure arguments we're passing to it are quote safe:
-			system( "cp", "-a", $v_file, $d_backup );
+			my $f_backup = $d_backup . "/" . $v_name . "_" . time();
+			### Copy the file
+			system( "cp", "-a", $v_file, $f_backup );
 			### Test if the files was successfully copied
-			if ( -f $d_backup || -l $d_backup ) {
+			if ( -f $f_backup || -l $f_backup ) {
+				if ( open( my $fh_write, ">", $f_backup . "_ctime" ) ) {
+					### Copying the file won't copy the ctime, so we need to store this separately
+					my $v_stat;
+					if ( -l $v_file ) {
+						$v_stat = (lstat( $v_file ))[10];
+					} else {
+						$v_stat = (stat( $v_file ))[10];
+					}
+					print $fh_write $v_stat;
+					close( $fh_write );
+				}
 				if ($b_verbose) {
-					my $d_backup_escape = fn_escape_filename($d_backup);
-					print STDERR $v_file_escape . " -> " . $d_backup_escape . "\n";
+					my $f_backup_escape = fn_escape_filename($f_backup);
+					print STDERR $v_file_escape . " -> " . $f_backup_escape . "\n";
 				}
 				fn_log("Backed up file " . $v_file_escape . "\n");
 				if ($b_retention) {
-					fn_check_retention( $d_backup .= "/" . $v_name );
+					fn_check_retention( $f_backup .= "/" . $v_name );
 				}
-				return $d_backup;
+				return $f_backup;
 			}
 		}
 		fn_log("Failed to backup file " . $v_file_escape . "\n");
@@ -884,12 +914,35 @@ sub fn_compare_backup {
 	my @v_files = fn_list_backups($v_name, $v_dir);
 	if (@v_files) {
 		@v_files = sort {$b cmp $a} @v_files;
-		### Since I don't anticipate this needing to be human readable, there's no reason to use the stat binary
 		my $v_file2 = $v_dir . "/" . $v_files[0];
 		my $v_line1 = fn_stat_line($v_file);
 		my $v_line2 = fn_stat_line($v_file2);
 		if ( $v_line1 eq $v_line2 ) {
-			return $v_file2;
+			### If we compared md5sums, it's safe to assume that the backup matches
+			if ( $b_md5_all ) {
+				return $v_file2;
+			}
+			### We know that all the stats other than ctime match - let's check ctime as well
+			### First get the ctime of the file
+			my $v_ctime;
+			if ( -l $v_file ) {
+				$v_ctime = (lstat( $v_file ))[10];
+			} else {
+				$v_ctime = (stat( $v_file ))[10];
+			}
+			### Then get the ctime of the backup (stored in  different file, because the act of creating a backup resulted in it having a different ctime than the original)
+			my $v_ctime2;
+			if ( -f $v_file2 . "_ctime" && open( my $fh_read, "<", $v_file2 . "_ctime" ) ) {
+				my @v_ctime2 = <$fh_read>;
+				if ( defined $v_ctime2[0] ) {
+					$v_ctime2 = $v_ctime2[0];
+					chomp( $v_ctime2 );
+				}
+			}
+			### If the two ctimes match, then it's safe to assume that the backup was good
+			if ( $v_ctime2 eq $v_ctime ) {
+				return $v_file2;
+			}
 		}
 	}
 	return 0;
@@ -956,7 +1009,11 @@ sub fn_list_file {
 				$v_size = (stat($_file))[7];
 			}
 			my $_file_escape = fn_escape_filename($_file);
-			print "  " . $_file_escape . " -- Timestamp: " . $v_stamp . " -- " . $v_size . " bytes\n";
+			print "  " . $_file_escape . " -- Timestamp: " . $v_stamp . " -- " . $v_size . " bytes";
+			if ( -f $_file . "_hold" ) {
+				print " -- HELD"
+			}
+			print "\n";
 			if ( -f $_file . "_comment" ) {
 				fn_print_files( $_file . "_comment" );
 			}
@@ -1192,14 +1249,26 @@ sub fn_test_file {
 ### Given a file name, test against it. Does it exist? What's it's file type?
 ### $_[0] is the path to the file; $_[1] is whether or not it needs to exist; $_[2] is whether it needs to test as a certain type.
 	my $v_file = $_[0];
+	my $v_orig_file = $v_file;
 	my $b_exist = ( $_[1] || 0 );
 	my $v_type = ( $_[2] || 0 );
+	### Make sure that it's a file
 	if ( ! -p $v_file ) {
-		$v_file = ( abs_path( $v_file ) || $v_file );
+		### Get the full path to that file
+		if ( substr( $v_file, 0, 1 ) ne "/" ) {
+			$v_file = getcwd() . "/" . $v_file;
+		}
+		my @v_dirs = split( m/\//, $v_file );
+		my $v_name = pop( @v_dirs );
+		my $v_dirs = ( abs_path( join( '/', @v_dirs ) ) || '' );
+		if ( $v_dirs ) {
+			$v_file = $v_dirs . "/" . $v_name;
+		}
 	}
 	if ( $b_exist ) {
 		if ( ! -e $v_file ) {
-			return 0;
+			print STDERR "File " . fn_escape_filename($v_orig_file) . " Does not appear to exist\n";
+			exit 1;
 		}
 	}
 	if ( $v_type ) {
@@ -1208,11 +1277,13 @@ sub fn_test_file {
 			### Sometimes files are pipes.
 				return $v_file;
 			} elsif ( ! -f $v_file && -e $v_file ) {
-				return 0;
+				print STDERR fn_escape_filename($v_orig_file) . " is not a file\n";
+				exit 1;
 			}
 		} elsif ( $v_type eq "d" ) {
 			if ( ! -d $v_file && -e $v_file ) {
-				return 0;
+				print STDERR fn_escape_filename($v_orig_file) . " is not a directory\n";
+				exit 1;
 			}
 		}
 	}
@@ -1538,16 +1609,16 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			if ($v_file1) {
 				$v_file2 = $v_file1;
 			}
-			$v_file1 = shift( @args );
+			$v_file1 = fn_test_file( shift(@args), 1, 'f');
 			$b_no_sort = 1;
 		} elsif ( $v_arg eq "--after" && defined $args[0] ) {
-			$v_file2 = shift( @args );
+			$v_file2 = fn_test_file( shift(@args), 1, 'f');
 			$b_no_sort = 1;
 		} elsif ( -e $v_arg ) {
 			if (! $v_file1) {
-				$v_file1 = $v_arg;
+				$v_file1 = fn_test_file( $v_arg, 1, 'f');
 			} else {
-				$v_file2 = $v_arg;
+				$v_file2 = fn_test_file( $v_arg, 1, 'f');
 			}
 		} else {
 			push ( @v_unknown, $v_arg );
@@ -1594,13 +1665,10 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
 		if ( $v_arg && -e $v_arg && ! -p $v_arg ) {
-			my @v_dirs = split( m/\//, $v_arg );
-			my $v_name = pop( @v_dirs );
-			my $v_file = join( '/', @v_dirs );
-			$v_file = ( abs_path( $v_file ) || $v_file ) . "/" . $v_name;
+			my $v_file = fn_test_file($v_arg, 0, 'f');
 			push( @v_files, $v_file );
 			if ( -l $v_file ) {
-				$v_file = fn_test_file($v_file, 0, 'f');
+				$v_file = ( abs_path($v_file) || '' );
 				if ( $v_file ) {
 					push( @v_files, $v_file );
 				}
@@ -1627,6 +1695,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	my $v_file;
 	my @v_files;
 	my $v_comment;
+	my $b_hold = 0;
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
 		if ( $v_arg eq "--backupd" ) {
@@ -1661,11 +1730,13 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			} else {
 				print STDERR "Argument '" . $v_arg . "' must be followed by a comment\n";
 			}
+		} elsif ( $v_arg eq "--hold" && $v_type eq "--backup-file" ) {
+			$b_hold = 1;
 		} elsif ( -e $v_arg ) {
 			if ( $v_type eq "--backup" ) {
-				$v_file = $v_arg;
+				$v_file = fn_test_file($v_arg, 1, 'f');
 			} else {
-				push( @v_files, $v_arg );
+				push( @v_files, fn_test_file($v_arg, 1, 'f') );
 			}
 		} else {
 			push ( @v_unknown, $v_arg );
@@ -1711,12 +1782,19 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			}
 			@v_backup_plus = ($_file);
 			my $f_backup = fn_backup_file( $_file, $d_backup );
+			if ( $b_hold && ! -f $f_backup . "_hold" ) {
+				if ( open( my $fh_write, ">>", $f_backup . "_hold" ) ) {
+					print $fh_write time();
+					close( $fh_write );
+				}
+			}
 			if ( $b_verbose ) {
 				print $f_backup . "\n"; ##### Is this good enough?
 			}
 			if ($v_comment) {
 				if ( open( my $fh_write, ">>", $f_backup . "_comment" ) ) {
 					print $fh_write "    - " . $v_comment . "\n";
+					close( $fh_write );
 				}
 			}
 		}
@@ -1731,7 +1809,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		exit;
 	} else {
 		print STDERR "\nCannot check md5sums without module '" . $d_program . "/scripts/md5.pm':\n";
-		print STDERR "https://raw.githubusercontent.com/sporks5000/stat_watch/master/scripts/md5.pm\n\n";
+		print STDERR "Reinstall Stat Watch to get this module\n\n";
 		exit 1;
 	}
 } elsif ( defined $args[0] && $args[0] eq "--prune" ) {
@@ -1758,7 +1836,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		} elsif ( $v_arg eq "--as-dir" && defined $args[0] ) {
 			$v_as_dir = shift( @args );
 		} elsif ( -e $v_arg ) {
-			my $v_dir = (abs_path($v_arg) || $v_arg );
+			my $v_dir = fn_test_file( $v_arg, 0, 'd');
 			push( @v_dirs, $v_dir );
 		} elsif ( $v_arg eq "--record" ) {
 		} elsif ( $v_arg eq "--links" ) {
@@ -1790,10 +1868,6 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			fn_mod_check( 'Digest::MD5', 'Digest::MD5::File' );
 			require( $d_program . '/scripts/md5.pm' );
 			$b_use_md5 = 1;
-		} else {
-			print STDERR "\nCannot check md5sums without module '" . $d_program . "/scripts/md5.pm':\n";
-			print STDERR "https://raw.githubusercontent.com/sporks5000/stat_watch/master/scripts/md5.pm\n\n";
-			sleep 2;
 		}
 	}
 	### Check to make sure that the necessary binaries are here

@@ -57,6 +57,9 @@ else
 				echo "Failed to copy working directory from previous install"
 				exit 1
 			fi
+			if [[ -f "$d_PROGRAM"/.stat_watch/perl_modules ]]; then
+				rm -f "$d_PROGRAM"/.stat_watch/perl_modules
+			fi
 		fi
 
 		### Move the previous install out of the way

@@ -42,14 +42,17 @@ FILES
 /usr/local/stat_watch/tests/test.sh -
     - A script that automates running tests to verify the functionality of Stat Watch
 
-/usr/local/stat_watch/.stat_watch/wrap_jobs_created -
-    - A file that stores a list of jobs that were created using "--create"
+/usr/local/stat_watch/.stat_watch/assumptions -
+    - A file containing a list of all of the assumptions created with the "--assume" flag
 
 /usr/local/stat_watch/.stat_watch/backup_locations -
     - A file containing a list of all the directories that stat_watch.pl has seen designated as backup locations
 
-/usr/local/stat_watch/.stat_watch/assumptions -
-    - A file containing a list of all of the assumptions created with the "--assume" flag
+/usr/local/stat_watch/.stat_watch/perl_modules -
+    - The presence of this file indicates that we have tested for all of the necessary perl modules and do not need to test again
+
+/usr/local/stat_watch/.stat_watch/wrap_jobs_created -
+    - A file that stores a list of jobs that were created using "--create"
 
 /usr/local/stat_watch/info/expectations.md -
     - A markdown file with examples of verbiage to use when Stat Watch has been set up to send emails to customer-facing addresses

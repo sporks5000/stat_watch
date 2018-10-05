@@ -28,6 +28,7 @@ stat-watch --backup-file [FULL PATH TO FILE]
         - This is functionally the same as the "BackupD" control string in a job file
     - The "--comment" flag can be used followed by a comment to provide details about the backup that's being performed
         - If multiple files are specified for backup, the comment will be applied to all of those files
+    - The "--hold" flag can be used to prevent Stat Watch from removing this file as part of file pruning
 
 stat_watch --create
     - Asks the user key questions in order to create a Stat Watch job file with the information necessary to watch and backup key user files
@@ -73,9 +74,8 @@ stat_watch --new-lines [DIRECTORY] ([DIRECTORY 2] ...)
     - Otherwise follows all of the same rules as "--record"
     - This behavior is deprecated and will be removed in future versions
 
-stat_watch --prune [FILE]
+stat_watch --prune
     - Go through the backup directory and remove files older files
-    - The file must be a Stat Watch report file
     - The "-i" or "--include" flag must be used to specify a job file and that file must have "BackupD" string present
     - Any files outside of the range specified by the "BackupMD" and "BackupMC" control strings will be removed
 

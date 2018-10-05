@@ -88,7 +88,7 @@ function fn_create {
 	touch $v_DIR/$v_NAME.log
 	f_JOB="$v_DIR/$v_NAME".job
 	cat << EOF > "$f_JOB"
-	### This file created by $v_PROGRAMNAME
+	### This file created by $f_PROGRAM
 	I $v_MONITOR
 	BackupD $v_DIR/backup_$v_NAME
 	### back up the following extensions: .php, .php4, .php5, .php7, .pl, .pm, .py, .js, .json, .css, .cgi .htm, .html, .htaccess, .htpasswd, .sh, .rb
@@ -97,7 +97,7 @@ function fn_create {
 	BackupMC 4
 	Log $v_DIR/$v_NAME.log
 
-	### These lines specific to the functionality of $v_PROGRAMNAME
+	### These lines specific to the functionality of $f_PROGRAM
 	Name $v_NAME
 	Email-retain 20
 	EOF
@@ -109,10 +109,10 @@ function fn_create {
 	fi
 
 	### Log that the job was created by this script
-	echo "$( date +%Y-%m-%d" "%T" "%z ) - Job \"$f_JOB\" created by $v_PROGRAMNAME" >> "$v_DIR"/"$v_NAME".log
+	echo "$( date +%Y-%m-%d" "%T" "%z ) - Job \"$f_JOB\" created by $f_PROGRAM" >> "$v_DIR"/"$v_NAME".log
 
 	### Create a working directory and a file to document jobs created
-	mkdir -p $v_PROGRAMDIR/."$d_WORKING"
+	mkdir -p $d_PROGRAM/."$d_WORKING"
 	f_TEMP=$( mktemp )
 	### Copy all of the other jobs into a temp file
 	grep -E -v "^$f_JOB - Created " "$f_JOBS" > "$f_TEMP" 2> /dev/null
@@ -124,14 +124,14 @@ function fn_create {
 	### Output text telling the user what next steps they need to take
 	echo
 	echo -e "A job file has been created at \"\e[92m$f_JOB\e[0m\""
-	echo "Run \"$v_PROGRAMDIR/$f_PERL_SCRIPT --help\" for further information on how it can be edited to suit your needs"
+	echo "Run \"$d_PROGRAM/$f_PERL_SCRIPT --help\" for further information on how it can be edited to suit your needs"
 	echo "Once you have that file organized as you need it, run the following command:"
 	echo
-	echo "$v_PROGRAMDIR/$v_PROGRAMNAME --run \"$f_JOB\""
+	echo "$d_PROGRAM/$f_PROGRAM --run \"$f_JOB\""
 	echo
 	echo "Then add the following line to root's crontab (adjusting times if necessary):"
 	echo
 	### set a random minute from 1 to 59 for the cron job to run
-	echo "$(( 1 + RANDOM % 58 )) */2 * * * $v_PROGRAMDIR/$v_PROGRAMNAME --run "$f_JOB" > /dev/null 2>&1"
+	echo "$(( 1 + RANDOM % 58 )) */2 * * * $d_PROGRAM/$f_PROGRAM --run "$f_JOB" > /dev/null 2>&1"
 	echo
 }

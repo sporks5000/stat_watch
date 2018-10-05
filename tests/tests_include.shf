@@ -108,8 +108,8 @@ function fn_unmake_user {
 	if [[ -n "$d_USER_HOME" && -d "$d_USER_HOME" ]]; then
 		rm -rf "$d_USER_HOME"
 	fi
-	if [[ -n "$d_USER" && $( egrep -c "^$( fn_sanitize "$v_USER" ):" /etc/passwd ) -gt 0 ]]; then
-		userdel "$d_USER"
+	if [[ -n "$v_USER" && $( egrep -c "^$( fn_sanitize "$v_USER" ):" /etc/passwd ) -gt 0 ]]; then
+		userdel "$v_USER"
 	fi
 }
 

@@ -22,7 +22,7 @@ Control Strings:
         - "MD5" -
             - If a file's name and full path matches the exact string that follows, also capture the file's MD5 sum for comparison
             - If "MD5" is alone on a line, then capture MD5 sums for everything (as if the "--md5" flag was used)
-            - This will require that the ./scripts/md5.pm file be present, as well as the perl modules 'Digest::MD5' and 'Digest::MD5::File'
+            - This will require that the perl modules 'Digest::MD5' and 'Digest::MD5::File' are installed
     - Lines beginning with the following control strings have special meanings, but only the last declaration will be interpreted:
         - "BackupD" - This specifies the directory to backup files to. The directory must already exist and be writable, or Stat Watch will error out
         - "BackupMD" - A number specified here will set the minumum number of days a backed up file should be kept
@@ -30,8 +30,8 @@ Control Strings:
         - "Log" - Placing a full path to a file after this will tell Stat Watch where to log
         - "Max-depth" - A number here will set the maximum depth of directories that the script can recurse into (default 20)
             - Any directories deeper than this will be logged on each run, assuming that the "Log" control string is used
-    - Lines beginning with the following control strings have special functionality for running a Stat Watch job (using the "--run" flag)
-        - "Name" - This is used to designate the name of the job. Without this set, $v_PROGRAMNAME will not run
+    - Lines beginning with the following control strings have special functionality for running a Stat Watch job (using the "--run" flag). Only the last declaration of these will be interpreted
+        - "Name" - This is used to designate the name of the job. Without this set, Stat Watch will not run this job
         - "Email" - This is used to designate an email adress (or multiple space separated email addresses) for results to be sent to 
         - "Expire" - When this is followed by a unix timestamp, the job will stop running after that timestamp is reached, and all associated files (except for the log file) will be deleted fifteen days later
         - "Max-run" - If a job is started only to find an earlier iteration of itself running, and that earlier iteration has been running for more than this number of seconds, that job will be killed
@@ -40,14 +40,15 @@ Control Strings:
         - "Email-no-changes" - If this control string is present, send emails even if there are no changes.
         - "Log-max" - A number following this control string will designate the maximum size (in bytes) of the log before it's trimmed. Without this set, the default is 10485760.
         - "Email-retain" - the number of days to retain old email messages. If this is set to "0", old email messages will never be deleted.
+        - "Nice" - The niceness at which to run any potentially processor intensive commands. By default this is 15.
         - There are five control strings that allow the user to run a custom script at various points during the process of a typical Stat Watch job run: "Run-start", "Run-post", "Run-end", "Run-pre-e", and "Run-post-e":
             - For any of these, the full path to the script must be used.
             - Anything following the control string (and any whitespace after it) will be interpreted by the "eval" command
-            - "Run-start" - The script specified here will run immediately previous to the first $f_PERL_SCRIPT "--record" "--backup" or "--diff" command
-            - "Run-post" - The script specified here will run immediately after all of the $f_PERL_SCRIPT "--record" "--backup" or "--diff" commands
+            - "Run-start" - The script specified here will run immediately previous to the first "--record" "--backup" or "--diff" command
+            - "Run-post" - The script specified here will run immediately after all of the "--record" "--backup" or "--diff" commands have completed
             - "Run-pre-e" - The script here will run immediately previous to sending an email message (Only if there's reason to send one)
             - "Run-post-e" - The script here will run immediately after sending an email message (Only if there's reason to send one)
-            - "Run-end" - The script specified here will run immediately before $v_PROGRAMNAME exits
+            - "Run-end" - The script specified here will run immediately before the job exits
     - Control strings can have any amount of whitespace before or after them on the line. It will not be interpreted.
     - When a file is included via "Include", the entirety of that file will be interpreted before the going on to interpret the next line
     - For "*" or "R", any line matching a directory will result in that directory and all files and subdirectories it contains being passed over
