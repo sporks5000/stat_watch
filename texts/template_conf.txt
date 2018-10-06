@@ -1,0 +1,35 @@
+### Location of the perl and cpan binaries (automatically detected on installation, but can be changed to suit your needs if necessary)
+
+PERL = ####PERL_BINARY####
+CPAN = ####CPAN_BINARY####
+
+### The values below can be set on a per-job basis, this file just sets what they are at the default
+
+### Set a one in ten chance of us pruning old backups
+PRUNE_CHANCE = ####PRUNE_CHANCE####
+PRUNE_MAX = ####PRUNE_MAX####
+
+### When jobs are run, what niceness should they run at (from "-20" to "19")
+NICE = ####NICE####
+
+### The maximum time any job should run without being kill -9'd
+MAX_RUN = ####MAX_RUN####
+
+### The maximum number of bytes that the log should contain before being trimmed
+LOG_MAX = ####LOG_MAX####
+
+### How many previous emails should be retained
+EMAIL_RETAIN = ####EMAIL_RETAIN####
+
+### The minimum number of days that a backup should be kept before it's pruned out (as with the BackupMD control string)
+BACKUP_MIN_DAYS = ####BACKUP_MIN_DAYS####
+
+### The maximum number of backed up copies of a file that should be kept before they're elidgible to be pruned out (as with the BackupMC control string)
+BACKUP_MAX_COPIES = ####BACKUP_MAX_COPIES####
+
+### When comparing the stats of files, should fractions of seconds for m-time and c-time be taken into consideration?
+### "0" will disable checking partial seconds, anything else will enable it
+PARTIAL_SECONDS = ####PARTIAL_SECONDS####
+
+### What is the maximum directory depth that "--record" should descend to
+MAX_DEPTH = ####MAX_DEPTH####

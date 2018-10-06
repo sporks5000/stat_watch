@@ -39,7 +39,7 @@ function fn_test_7 {
 		fi
 		fn_pass "7.5"
 		fn_make_user
-		sudo -u "$v_USER" "$d_USER_STATWATCH"/stat_watch.pl --record "$d_USER_STATWATCH"/tests/working/testing --output "$d_USER_STATWATCH"/tests/working/testing2/report1.txt --md5
+		sudo -u "$v_USER" "$d_USER_STATWATCH"/stat_watch_wrap.sh --record "$d_USER_STATWATCH"/tests/working/testing --output "$d_USER_STATWATCH"/tests/working/testing2/report1.txt --md5
 		if [[ $( cat "$d_USER_STATWATCH"/tests/working/testing2/report1.txt | awk -F" -- " '{print $8}' | egrep -c "^[0-9a-f]{32}$" ) -ne 12 ]]; then
 			fn_fail "7.6"
 		fi

@@ -291,8 +291,8 @@ sub fn_diff {
 			$ref_diff->{$v_file}->{$v_first}->{'owner'} = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'perms'} = pop(@v_line);
 			if (! $b_partial_seconds) {
-				$v_ctime =~ s/([0-9]{2}:[0-9]{2}:[0-9]{2})\.[0-9]+/$1/;
-				$v_mtime =~ s/([0-9]{2}:[0-9]{2}:[0-9]{2})\.[0-9]+/$1/;
+				$v_ctime =~ s/\.[0-9]+/$1/;
+				$v_mtime =~ s/\.[0-9]+/$1/;
 			}
 			$ref_diff->{$v_file}->{$v_first}->{'ctime'} = $v_ctime;
 			$ref_diff->{$v_file}->{$v_first}->{'mtime'} = $v_mtime;
@@ -718,7 +718,7 @@ sub fn_check_retention {
 	### Sort the matching files in reverse
 	@v_files = sort {$b cmp $a} @v_files;
 	### skip over the most recent X files, where X is the retention count
-	my $v_count = $v_retention_max_copies + 1;
+	my $v_count = $v_retention_max_copies;
 	while ( defined $v_files[$v_count] ) {
 		my $v_file = $v_dir . "/" . $v_files[$v_count];
 		my $v_stamp = (split( m/_/, $v_files[$v_count] ))[-1];
@@ -1575,6 +1575,26 @@ while ( defined $ARGV[0] ) {
 			$b_verbose = 1;
 		} else {
 			$b_verbose = 0;
+		}
+	} elsif ( $v_arg eq "--no-partial-seconds" ) {
+		$b_partial_seconds = 0;
+	} elsif ( $v_arg eq "--backup-md" ) {
+		$v_retention_min_days = shift( @ARGV );
+		$v_retention_min_days =~ s/[^0-9]//;
+		if ( $v_retention_min_days eq '' ) {
+			$v_retention_min_days = 7;
+		}
+	} elsif ( $v_arg eq "--backup-mc" ) {
+		$v_retention_max_copies = shift( @ARGV );
+		$v_retention_max_copies =~ s/[^0-9]//;
+		if ( $v_retention_max_copies eq '' ) {
+			$v_retention_max_copies = 4;
+		}
+	} elsif ( $v_arg eq "--max-depth" ) {
+		$v_max_depth = shift( @ARGV );
+		$v_max_depth =~ s/[^0-9]//;
+		if ( $v_max_depth eq '' ) {
+			$v_max_depth = 20;
 		}
 	} else {
 		push( @args, $v_arg );

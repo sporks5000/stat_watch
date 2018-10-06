@@ -7,6 +7,9 @@ d_INST="/usr/local/stat_watch"
 if [[ -n "$1" && "${1:0:1}" == "/" ]]; then
 	### Make sure it's an absolute path
 	d_INST="$1"
+elif [[ -n "$1" ]]; then
+	echo "Must provide a full path to the installation directory"
+	exit 1
 fi
 if [[ "${d_INST: -1}" == "/" ]]; then
 	### Make sure it does not end in a slash
@@ -29,6 +32,7 @@ d_PROGRAM="$( cd -P "$( dirname "$f_PROGRAM" )" && pwd )"
 ### Other variables
 v_OUT="/dev/null"
 v_FAIL=false
+d_WORKING="stat_watch"
 
 ### Test that all of the variables are populated
 if [[ -z "$d_PROGRAM" || -z "$d_INST_R" || -z "$d_INST" || -z "$v_OUT" ]]; then
@@ -43,6 +47,9 @@ fi
 if [[ -d "$d_PROGRAM"/.git ]]; then
 	rm -rf "$d_PROGRAM"/.git
 fi
+if [[ -f "$d_PROGRAM"/."$d_WORKING"/conf ]]; then
+	rm -rf "$d_PROGRAM"/."$d_WORKING"/conf
+fi
 
 ### Make sure that we're not already in the installation directory
 if [[ "$d_INST" == "$d_PROGRAM" ]]; then
@@ -52,7 +59,7 @@ else
 	if [[ -d "$d_INST" ]]; then
 		### Copy over existing settings and details
 		if [[ -d "$d_INST"/.stat_watch ]]; then
-			cp -a "$d_INST"/.stat_watch "$d_PROGRAM"/ 2> "$v_OUT" || v_FAIL=true
+			cp -af "$d_INST"/.stat_watch "$d_PROGRAM"/ 2> "$v_OUT" || v_FAIL=true
 			if [[ "$v_FAIL" == true ]]; then
 				echo "Failed to copy working directory from previous install"
 				exit 1
@@ -62,9 +69,27 @@ else
 			fi
 		fi
 
+		### If there's a configuration file, port over those details
+		if [[ -f "$d_INST"/stat_watch.conf ]]; then
+			source "$d_PROGRAM"/includes/conf_version.shf
+			v_CONF_VERSION_NEW="$v_CONF_VERSION"
+			if [[ -f "$d_INST"/includes/conf_version.shf ]]; then
+				source "$d_INST"/includes/conf_version.shf
+				### We only need to overwrite the configuration if the versions don't match, otherwise the old one is fine
+				if [[ "$v_CONF_VERSION" != "$v_CONF_VERSION_NEW" ]]; then
+					source "$d_PROGRAM"/includes/variables.shf
+					fn_read_conf "$d_INST"/stat_watch.conf
+					fn_write_conf2
+					fn_make_conf
+				else
+					cp -af "$d_INST"/stat_watch.conf "$d_PROGRAM"/stat_watch.conf 2> "$v_OUT"
+				fi
+			fi
+		fi
+
 		### Move the previous install out of the way
 		if [[ -d "$d_INST"_old ]]; then
-			rm -rf "$d_INST"_old
+			rm -rf "$d_INST"_old 2> "$v_OUT"
 		fi
 		mv -f "$d_INST" "$d_INST"_old 2> "$v_OUT" || v_FAIL=true
 		if [[ "$v_FAIL" == true ]]; then
@@ -74,7 +99,7 @@ else
 	fi
 
 	### Move the directory we're installing into place
-	cp -a "$d_PROGRAM" "$d_INST_R" 2> "$v_OUT" || v_FAIL=true
+	cp -af "$d_PROGRAM" "$d_INST_R" 2> "$v_OUT" || v_FAIL=true
 	if [[ "$v_FAIL" == true ]]; then
 		echo "Failed to move Stat Watch to '$d_INST'"
 		if [[ -d "$d_INST"_old ]]; then
@@ -83,6 +108,11 @@ else
 		exit 1
 	fi
 fi
+
+### Set the appropriate perl and cpan binaries in the conf file
+sed -i "s@####PERL_BINARY####@$( which perl )@;s@####CPAN_BINARY####@$( which cpan )@" "$d_INST"/stat_watch.conf
+### set the installation directory in stat_watch_wrap.sh
+sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST@" "$d_INST"/stat_watch_wrap.sh
 
 ### Get all of the appropriate permissions in place
 chmod 700 "$d_INST"/stat_watch.pl "$d_INST"/stat_watch_wrap.sh "$d_INST"/scripts/fold_out.pl "$d_INST"/tests/test.sh 2> "$v_OUT" || v_FAIL=true

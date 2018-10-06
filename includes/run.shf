@@ -34,7 +34,7 @@ function fn_get_direc {
 
 function fn_run {
 	f_JOB="$1"
-	if [[ ! -f "$f_JOB" ]]; then
+	if [[ $( echo "$f_JOB" | grep -c "/" ) -lt 1 || ! -f "$f_JOB" ]]; then
 		if [[ -f "$f_JOBS" ]]; then
 			$f_JOB="$( egrep "^$f_JOB:" "$f_JOBS" | cut -d ":" -f2- | sed "s/ - Created .*$//" )"
 			if [[ -z "$f_JOB" || ! -f "$f_JOB" ]]; then
@@ -118,28 +118,28 @@ function fn_run {
 	fn_get_script "Run-post-e"; v_RUN_POST_E="$v_SCRIPT"
 	fn_get_script "Run-end"; v_RUN_END="$v_SCRIPT"
 	fn_get_direc "NICE"; v_NICE2="$v_DIREC"
-	if [[ -n $v_NICE2 && $( echo "$v_NICE2" | grep -E -c "^-?[0-9]+$" ) -gt 0 ]]; then
+	if [[ -n $v_NICE2 && $( echo "$v_NICE2" | grep -E -c "^-?[0-9]+$" ) -gt 0 && $v_NICE2 -ge -20 && $v_NICE2 -le 19 ]]; then
 		v_NICE="$v_NICE2"
 	fi
 	if [[ ! -f "$v_DIR"/"$v_NAME"_files.txt ]]; then
 	### If this is the first run, do an initial backup of files
 		eval "$v_RUN_START"
 		stat -c '%Y' "$f_JOB" > "$v_DIR"/"$v_NAME"_stamp
-		nice -n "$v_NICE" "$d_PROGRAM"/"$f_PERL_SCRIPT" --record -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files.txt -v 2> "$v_ERROR_OUT"
-		nice -n "$v_NICE" "$d_PROGRAM"/"$f_PERL_SCRIPT" --backup -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt 2> "$v_ERROR_OUT"
+		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --record -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files.txt -v 2> "$v_ERROR_OUT"
+		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --backup -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt 2> "$v_ERROR_OUT"
 		eval "$v_RUN_POST"
 	else
 	### If this is a later run, diff the reports, and if there were changes, email them out
 		eval "$v_RUN_START"
-		nice -n "$v_NICE" "$d_PROGRAM"/"$f_PERL_SCRIPT" --record -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
+		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --record -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
 		if [[ $( stat -c '%Y' "$f_JOB" ) -gt $( cat "$v_DIR"/"$v_NAME"_stamp 2> "$v_ERROR_OUT" ) ]]; then
 			### If the job file has been updated, there's a chance that we need to back up additional files
-			nice -n "$v_NICE" "$d_PROGRAM"/"$f_PERL_SCRIPT" --backup -i "$f_JOB" "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
+			nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --backup -i "$f_JOB" "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
 			### ypdate the stat file so that we know not to do that next time
 			stat -c '%Y' "$f_JOB" > "$v_DIR"/"$v_NAME"_stamp
 		fi
 		v_STAMP="$( date +%s )"
-		nice -n "$v_NICE" "$d_PROGRAM"/"$f_PERL_SCRIPT" --diff --no-check-retention -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> "$v_ERROR_OUT"
+		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --diff --no-check-retention -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> "$v_ERROR_OUT"
 		eval "$v_RUN_POST"
 		### this file should contain at least two lines
 		if [[ $( wc -l "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -gt 1 ]]; then
@@ -213,7 +213,7 @@ function fn_run {
 
 		### Determine whether or not we're purning old backups
 		if [[ $(( $v_PRUNE_CHANCE + RANDOM % $v_PRUNE_MAX )) -le $v_PRUNE_CHANCE ]]; then
-			nice -n "$v_NICE" "$d_PROGRAM"/"$f_PERL_SCRIPT" --prune -i "$f_JOB" 2> "$v_ERROR_OUT"
+			nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --prune -i "$f_JOB" 2> "$v_ERROR_OUT"
 		fi
 
 		### Remove old email messages

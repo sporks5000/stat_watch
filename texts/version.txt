@@ -1,7 +1,7 @@
 
 Current Version: 1.4.2
 
-Version 1.4.2 (2018-10-04) -
+Version 1.4.2 (2018-10-05) -
     - When files are backed up, they now capture ctime as well.
         - When comparing backups, if the md5sum was not checked, the ctime will be checked.
     - Removed the bits that assumed the possibility that md5.pm could be missing (except for with "--md5-test")
@@ -13,6 +13,9 @@ Version 1.4.2 (2018-10-04) -
         - If there is a file with a name matching a backed up file, plus the string "_hold", that file will be retained even if it would otherwise be pruned
     - Prune functionality will remove orphaned "_comment", "_ctime" and "_hold" files.
     - Added the "Nice" control string.
+    - Added a configuration file and (hopefully) all of the bits necessary to appropriately use and manipulate that configuration file
+    - Updated testing to run through stat_watch_wrap.sh instead of stat_watch.pl
+    - Fixed a bug where assumptions were incorrectly triggering
 
 Version 1.4.1 (2018-10-03) -
     - Added assumption functionality

@@ -1,0 +1,133 @@
+#! /bin/bash
+
+f_CONF="$d_PROGRAM"/stat_watch.conf
+f_CONF2="$d_PROGRAM"/."$d_WORKING"/conf
+
+function fn_read_conf {
+### Read from the conf file and get the values
+### $1 can be the location of an alternate conf to read from
+	### Source the variables from the conf file
+	local lf_CONF="$f_CONF"
+	if [[ -n "$1" ]]; then
+		lf_CONF="$1"
+	fi
+	if [[ -f "$lf_CONF" ]]; then
+		source <( cat "$f_CONF" | grep -Ev "^\s*#|^\s*$" | sed -E "s/^\s*/v_/;s/\s*=\s*/=\"/;s/\s*$/\"/" | grep -E "^v_(PERL|CPAN|PRUNE_(CHANCE|MAX)|NICE|LOG_MAX|EMAIL_RETAIN|BACKUP_(MIN_DAYS|MAX_COPIES)|PARTIAL_SECONDS|MAX_(DEPTH|RUN))=\".*\"$" ) 2> /dev/null
+	fi
+
+	### Check the variables to make sure that they're logical
+	if [[ -z "$v_PERL" || "${v_PERL:0:1}" = "/" || ! -x "$v_PERL" ]]; then
+		v_PERL="$( which perl )"
+	fi
+	if [[ -z "$v_CPAN" || "${v_CPAN:0:1}" = "/" || ! -x "$v_CPAN" ]]; then
+		v_CPAN="$( which cpan )"
+	fi
+
+	if [[ $( echo -n "$v_PRUNE_MAX" | grep -E "^[0-9]+$" ) -lt 1 || "$v_PRUNE_MAX" -lt 1 ]]; then
+		v_PRUNE_MAX=10
+	fi
+	if [[ $( echo -n "$v_PRUNE_CHANCE" | grep -E "^[0-9]+$" ) -lt 1 || "$v_PRUNE_CHANCE" -gt "$v_PRUNE_MAX" ]]; then
+		v_PRUNE_CHANCE=1
+	fi
+
+	if [[ $( echo -n "$v_NICE" | grep -E "^-?[0-9]+$" ) -lt 1 || "$v_NICE" -lt -20 || "$v_NICE" -gt 19 ]]; then
+		v_NICE=15
+	fi
+
+	if [[ $( echo -n "$v_MAX_RUN" | grep -E "^[0-9]+$" ) -lt 1 || "$v_MAX_RUN" -lt 1800 || "$v_MAX_RUN" -gt 86400 ]]; then
+		v_MAX_RUN=3600
+	fi
+	if [[ $( echo -n "$v_LOG_MAX" | grep -E "^[0-9]+$" ) -lt 1 || "$v_LOG_MAX" -lt 102400 ]]; then
+		v_LOG_MAX=10485760
+	fi
+	if [[ $( echo -n "$v_EMAIL_RETAIN" | grep -E "^[0-9]+$" ) -lt 1 || "$v_EMAIL_RETAIN" -lt 0 ]]; then
+		v_EMAIL_RETAIN=20
+	fi
+
+	### Variables related to the perl script
+
+	if [[ $( echo -n "$v_BACKUP_MIN_DAYS" | grep -E "^[0-9]+$" ) -lt 1 || "$v_BACKUP_MIN_DAYS" -lt 0 ]]; then
+		v_BACKUP_MIN_DAYS=7
+	fi
+	if [[ $( echo -n "$v_BACKUP_MAX_COPIES" | grep -E "^[0-9]+$" ) -lt 1 || "$v_BACKUP_MAX_COPIES" -lt 0 ]]; then
+		v_BACKUP_MAX_COPIES=4
+	fi
+	if [[ -z "$v_PARTIAL_SECONDS" ]]; then
+		v_PARTIAL_SECONDS=1
+	fi
+	if [[ $( echo -n "$v_MAX_DEPTH" | grep -E "^[0-9]+$" ) -lt 1 || "$v_MAX_DEPTH" -lt 0 ]]; then
+		v_MAX_DEPTH=20
+	fi
+
+	v_PERL_ARGS="--backup-md $v_BACKUP_MIN_DAYS --backup-mc $v_BACKUP_MAX_COPIES --max-depth $v_MAX_DEPTH"
+	if [[ "$v_PARTIAL_SECONDS" == "0" ]]; then
+		v_PERL_ARGS="$v_PERL_ARGS --no-partial-seconds"
+	fi
+}
+
+function fn_read_conf2 {
+### Read from the secondary conf
+	fn_read_conf "NOT A FILE"
+	source <( cat "$f_CONF2" | grep -E "^v_(PERL|CPAN|PRUNE_(CHANCE|MAX)|NICE|LOG_MAX|EMAIL_RETAIN|BACKUP_(MIN_DAYS|MAX_COPIES)|PARTIAL_SECONDS|MAX_(DEPTH|RUN))=\".*\"$" )
+}
+
+function fn_check_conf {
+### Compare the conf to the secondary conf. Get the variables
+	if [[ -f "$f_CONF" ]]; then
+		if [[ -f "$f_CONF2" ]]; then
+			if [[ $( stat -c %Z "$f_CONF" ) -gt $( stat -c %Z "$f_CONF2" ) ]]; then
+			### If the main configuration is newer, read from it
+				fn_read_conf
+				fn_write_conf2
+			else
+				fn_read_conf2
+			fi
+		else
+			### If the secondary configuration doesn't exist, create it
+			fn_read_conf
+			fn_write_conf2
+		fi
+	elif [[ -f "$f_CONF2" ]]; then
+		fn_read_conf2
+		fn_make_conf
+	else
+		fn_read_conf
+		fn_write_conf2
+		fn_make_conf
+	fi
+}
+
+function fn_write_conf2 {
+### Write to the secondary conf
+	mkdir -p "$d_PROGRAM"/."$d_WORKING"
+	echo "v_PERL=\"$v_PERL\"" > "$f_CONF2"
+	echo "v_CPAN=\"$v_CPAN\"" >> "$f_CONF2"
+	echo "v_PRUNE_CHANCE=\"$v_PRUNE_CHANCE\"" >> "$f_CONF2"
+	echo "v_PRUNE_MAX=\"$v_PRUNE_MAX\"" >> "$f_CONF2"
+	echo "v_NICE=\"$v_NICE\"" >> "$f_CONF2"
+	echo "v_MAX_RUN=\"$v_MAX_RUN\"" >> "$f_CONF2"
+	echo "v_LOG_MAX=\"$v_LOG_MAX\"" >> "$f_CONF2"
+	echo "v_EMAIL_RETAIN=\"$v_EMAIL_RETAIN\"" >> "$f_CONF2"
+	echo "v_BACKUP_MIN_DAYS=\"$v_BACKUP_MIN_DAYS\"" >> "$f_CONF2"
+	echo "v_BACKUP_MAX_COPIES=\"$v_BACKUP_MAX_COPIES\"" >> "$f_CONF2"
+	echo "v_PARTIAL_SECONDS=\"$v_PARTIAL_SECONDS\"" >> "$f_CONF2"
+	echo "v_MAX_DEPTH=\"$v_MAX_DEPTH\"" >> "$f_CONF2"
+	echo "v_PERL_ARGS=\"$v_PERL_ARGS\"" >> "$f_CONF2"
+}
+
+function fn_make_conf {
+### Use the conf template to create a configuration file
+	cp -af "$d_PROGRAM"/template_conf.txt "$f_CONF"
+	sed -i "s@####PERL_BINARY####@$v_PERL@" "$f_CONF"
+	sed -i "s@####CPAN_BINARY####@$v_CPAN@" "$f_CONF"
+	sed -i "s@####PRUNE_CHANCE####@$v_PRUNE_CHANCE@" "$f_CONF"
+	sed -i "s@####PRUNE_MAX####@$v_PRUNE_MAX@" "$f_CONF"
+	sed -i "s@####NICE####@$v_NICE@" "$f_CONF"
+	sed -i "s@####MAX_RUN####@$v_MAX_RUN@" "$f_CONF"
+	sed -i "s@####LOG_MAX####@$v_LOG_MAX@" "$f_CONF"
+	sed -i "s@####EMAIL_RETAIN####@$v_EMAIL_RETAIN@" "$f_CONF"
+	sed -i "s@####BACKUP_MIN_DAYS####@$v_BACKUP_MIN_DAYS@" "$f_CONF"
+	sed -i "s@####BACKUP_MAX_COPIES####@$v_BACKUP_MAX_COPIES@" "$f_CONF"
+	sed -i "s@####PARTIAL_SECONDS####@$v_PARTIAL_SECONDS@" "$f_CONF"
+	sed -i "s@####MAX_DEPTH####@$v_MAX_DEPTH@" "$f_CONF"
+}

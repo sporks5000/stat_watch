@@ -33,6 +33,9 @@ FILES
 /usr/local/stat_watch/README.md -
     - A markdown file providing a general overview of the project
 
+/usr/local/stat_watch/stat_watch.conf -
+    - Allows the user to set various default values for Stat Watch
+
 /usr/local/stat_watch/stat_watch.pl -
     - This script contains all of the core functionality of Stat Watch
 
@@ -48,6 +51,9 @@ FILES
 /usr/local/stat_watch/.stat_watch/backup_locations -
     - A file containing a list of all the directories that stat_watch.pl has seen designated as backup locations
 
+/usr/local/stat_watch/.stat_watch/conf -
+    - A file containing the configuration values in a format that's easier for the script to read
+
 /usr/local/stat_watch/.stat_watch/perl_modules -
     - The presence of this file indicates that we have tested for all of the necessary perl modules and do not need to test again
 
@@ -56,4 +62,7 @@ FILES
 
 /usr/local/stat_watch/info/expectations.md -
     - A markdown file with examples of verbiage to use when Stat Watch has been set up to send emails to customer-facing addresses
+
+/usr/local/stat_watch/texts/template.conf -
+    - A template file for the configuration, from which a new configuration file can be built if necesary
 

@@ -12,6 +12,7 @@ function fn_find_pwd {
 function fn_find_assume {
 ### Find if this directory is part of an assumption
 	local d_CUR="$1"
+	local d_SAN_CUR="$( fn_sanitize "$d_CUR" )"
 	local v_LINE="$( grep -Ea "^$d_SAN_CUR"$'\000' "$d_PROGRAM"/."$d_WORKING"/assumptions | tail -n1 )"
 	local v_RETURN=
 	if [[ -z "$v_LINE" ]]; then

@@ -87,20 +87,22 @@ function fn_create {
 	mkdir -p "$v_DIR"/backup_"$v_NAME"
 	touch $v_DIR/$v_NAME.log
 	f_JOB="$v_DIR/$v_NAME".job
-	cat << EOF > "$f_JOB"
-	### This file created by $f_PROGRAM
-	I $v_MONITOR
-	BackupD $v_DIR/backup_$v_NAME
-	### back up the following extensions: .php, .php4, .php5, .php7, .pl, .pm, .py, .js, .json, .css, .cgi .htm, .html, .htaccess, .htpasswd, .sh, .rb
-	BackupR \.(p(hp(4|5|7)?|[lym])|js(on)?|c(ss|gi)|ht(ml?|access|passwd)|sh|rb)$
-	BackupMD 7
-	BackupMC 4
-	Log $v_DIR/$v_NAME.log
+### Changing indentation for the heredoc
+cat << EOF > "$f_JOB"
+### This file created by Stat Watch
+I $v_MONITOR
+BackupD $v_DIR/backup_$v_NAME
+### back up the following extensions: .php, .php4, .php5, .php7, .pl, .pm, .py, .js, .json, .css, .cgi .htm, .html, .htaccess, .htpasswd, .sh, .rb
+BackupR \.(p(hp(4|5|7)?|[lym])|js(on)?|c(ss|gi)|ht(ml?|access|passwd)|sh|rb)$
+BackupMD $v_BACKUP_MIN_DAYS
+BackupMC $v_BACKUP_MAX_COPIES
+Log $v_DIR/$v_NAME.log
 
-	### These lines specific to the functionality of $f_PROGRAM
-	Name $v_NAME
-	Email-retain 20
-	EOF
+### These lines specific to Stat Watch job functionality
+Name $v_NAME
+Email-retain $v_EMAIL_RETAIN
+EOF
+### Returning to previous indentation
 	if [[ -n $v_EMAIL ]]; then
 		echo "Email $v_EMAIL" >> "$f_JOB"
 	fi

@@ -1,4 +1,4 @@
-f_STAT_WATCH="$d_STATWATCH"/stat_watch.pl
+f_STAT_WATCH="$d_STATWATCH"/stat_watch_wrap.sh
 if [[ ! -f "$f_STAT_WATCH" ]]; then
 	echo "stat_watch.pl must be present and executable one directory level up from the directory where this script exists"
 	exit 1;
@@ -54,7 +54,7 @@ function fn_fail {
 	echo -e "\e[91m""Test $1 FAILED""\e[00m"
 	echo
 	echo "To assist with troubleshooting, it might be helpful to run the following command:"
-	echo "     d_STATWATCH=\"$d_STATWATCH\"; d_STATWATCH_TESTS=\"$d_STATWATCH_TESTS\"; d_STATWATCH_TESTS_WORKING=\"$d_STATWATCH_TESTS_WORKING\"; f_STAT_WATCH=\"\$d_STATWATCH\"/stat_watch.pl"
+	echo "     d_STATWATCH=\"$d_STATWATCH\"; d_STATWATCH_TESTS=\"$d_STATWATCH_TESTS\"; d_STATWATCH_TESTS_WORKING=\"$d_STATWATCH_TESTS_WORKING\"; f_STAT_WATCH=\"$f_STAT_WATCH\""
 	echo
 	exit 1;
 }
