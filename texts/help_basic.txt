@@ -19,3 +19,6 @@ For information on the files that are present for a Stat Watch job:
 For information on files that are part of Stat Watch:
     stat_watch --help files
 
+For information on testing Stat Watch in order to verify it is functioning correctly:
+    stat_watch --help tests
+

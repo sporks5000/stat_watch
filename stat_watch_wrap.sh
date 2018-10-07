@@ -31,6 +31,7 @@ if [[ "$1" == "--config" ]]; then
 else
 	fn_check_conf	
 fi
+fn_perl_args
 
 ### If any of the arguments are asking for help, output help and exit
 a_CL_ARGUMENTS=( "$@" )
@@ -49,6 +50,8 @@ for (( c=0; c<=$(( ${#a_CL_ARGUMENTS[@]} - 1 )); c++ )); do
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_job_files.txt "$d_PROGRAM"/texts/help_feedback.txt
 		elif [[ "${a_CL_ARGUMENTS[$c + 1]}" == "files" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_files.txt "$d_PROGRAM"/texts/help_feedback.txt
+		elif [[ "${a_CL_ARGUMENTS[$c + 1]}" == "tests" ]]; then
+			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_tests.txt "$d_PROGRAM"/texts/help_feedback.txt
 		else
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_basic.txt "$d_PROGRAM"/texts/help_feedback.txt
 		fi

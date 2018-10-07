@@ -1,3 +1,5 @@
 
 Stat Watch - a script for finding and reporting changes in files and directories
 
+Note: The default installation location for Stat Watch is '/usr/local/stat_watch'. All help files refer to this location, even if you have installed Stat Watch outside of the default location.
+

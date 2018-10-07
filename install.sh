@@ -85,6 +85,12 @@ else
 					cp -af "$d_INST"/stat_watch.conf "$d_PROGRAM"/stat_watch.conf 2> "$v_OUT"
 				fi
 			fi
+		else
+		### If there isn't a configuration file, MAKE one
+			source "$d_PROGRAM"/includes/variables.shf
+			fn_conf_defaults
+			fn_write_conf2
+			fn_make_conf
 		fi
 
 		### Move the previous install out of the way
@@ -109,9 +115,7 @@ else
 	fi
 fi
 
-### Set the appropriate perl and cpan binaries in the conf file
-sed -i "s@####PERL_BINARY####@$( which perl )@;s@####CPAN_BINARY####@$( which cpan )@" "$d_INST"/stat_watch.conf
-### set the installation directory in stat_watch_wrap.sh
+### Set the installation directory in stat_watch_wrap.sh
 sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST@" "$d_INST"/stat_watch_wrap.sh
 
 ### Get all of the appropriate permissions in place

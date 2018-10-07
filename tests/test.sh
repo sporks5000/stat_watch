@@ -30,6 +30,16 @@ export d_STATWATCH_TESTS_WORKING="$d_STATWATCH_TESTS"/working
 
 b_SPECIFIC=false
 
+### If any of the arguments are asking for help, output help and exit
+a_CL_ARGUMENTS=( "$@" )
+for (( c=0; c<=$(( ${#a_CL_ARGUMENTS[@]} - 1 )); c++ )); do
+	v_ARG="${a_CL_ARGUMENTS[$c]}"
+	if [[ "$v_ARG" == "-h" || "$v_ARG" == "--help" ]]; then
+		"$d_STATWATCH"/scripts/fold_out.pl "$d_STATWATCH"/texts/help_header.txt "$d_STATWATCH"/texts/help_tests.txt "$d_STATWATCH"/texts/help_feedback.txt
+		exit
+	fi
+done
+
 #===============#
 #== Functions ==#
 #===============#

@@ -1,3 +1,5 @@
+#! /bin/bash
+
 f_STAT_WATCH="$d_STATWATCH"/stat_watch_wrap.sh
 if [[ ! -f "$f_STAT_WATCH" ]]; then
 	echo "stat_watch.pl must be present and executable one directory level up from the directory where this script exists"
@@ -64,7 +66,7 @@ function fn_pass {
 }
 
 function fn_sanitize {
-### Given a variable that we're gonig to run through an egrep, escape all special characters
+### Given a variable that we're going to run through an egrep, escape all special characters
 	v_OUTPUT="${1//\\/\\\\}"
 	v_OUTPUT="${v_OUTPUT//\*/\\*}"
 	v_OUTPUT="${v_OUTPUT//\./\\.}"
@@ -77,7 +79,7 @@ function fn_sanitize {
 	v_OUTPUT="${v_OUTPUT//+/\\+}"
 	v_OUTPUT="${v_OUTPUT//^/\\^}"
 	v_OUTPUT="${v_OUTPUT//{/\\{}"
-	echo "$v_OUTPUT"
+	echo -n "$v_OUTPUT"
 }
 
 function fn_username {

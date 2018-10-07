@@ -18,7 +18,7 @@ MAX_RUN = ####MAX_RUN####
 ### The maximum number of bytes that the log should contain before being trimmed
 LOG_MAX = ####LOG_MAX####
 
-### How many previous emails should be retained
+### How many previous emails should be retained ("0" means retain all of them forever)
 EMAIL_RETAIN = ####EMAIL_RETAIN####
 
 ### The minimum number of days that a backup should be kept before it's pruned out (as with the BackupMD control string)

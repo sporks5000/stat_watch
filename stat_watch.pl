@@ -853,7 +853,7 @@ sub fn_backup_file {
 				}
 				fn_log("Backed up file " . $v_file_escape . "\n");
 				if ($b_retention) {
-					fn_check_retention( $f_backup .= "/" . $v_name );
+					fn_check_retention( $d_backup . "/" . $v_name );
 				}
 				return $f_backup;
 			}
@@ -1596,6 +1596,15 @@ while ( defined $ARGV[0] ) {
 		if ( $v_max_depth eq '' ) {
 			$v_max_depth = 20;
 		}
+	} elsif ( $v_arg eq "--backupd" ) {
+		if ( defined $ARGV[0] ) {
+			my $v_file = fn_test_file( shift( @ARGV ), 1, 'd' );
+			if ( $v_file ) {
+				$d_backup = $v_file;
+			}
+		} else {
+			print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
+		}
 	} else {
 		push( @args, $v_arg );
 	}
@@ -1718,16 +1727,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	my $b_hold = 0;
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
-		if ( $v_arg eq "--backupd" ) {
-			if ( defined $args[0] ) {
-				my $v_file = fn_test_file( shift( @args ), 1, 'd' );
-				if ( $v_file ) {
-					$d_backup = $v_file;
-				}
-			} else {
-				print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
-			}
-		} elsif ( $v_arg eq "--backup+" ) {
+		if ( $v_arg eq "--backup+" ) {
 			if ( defined $args[0] ) {
 				my $v_file = fn_test_file( shift( @args ), 0, 'f' );
 				if ( $v_file ) {

@@ -1,0 +1,45 @@
+
+TESTING STAT WATCH FUNCTIONALITY
+
+Included with Stat Watch is a series of tests to verify that it is functioning as anticipated. These tests can be run with the executable '/usr/local/stat_watch/tests/test.sh'
+
+
+USAGE
+
+/usr/local/stat_watch/tests/test.sh -
+    - Iterate through all of the tests present
+    - If any of the tests fail, stop at that point and leave working files intact so that the user can examine them and assess what caused the test to fail
+
+/usr/local/stat_watch/tests/test.sh [TEST SCRIPT] -
+    - Run only the tests from specific test scripts
+    - Multiple file names can be given, but all must be scripts within the /usr/local/stat_watch/tests/ directory
+    - The files must be given as JUST the file name - no path
+
+/usr/local/stat_watch/tests/test.sh --skip [TEST SCRIPT] -
+    - Run all of the test scripts present, except for any specified
+    - Multiple file names can be given, but all must be scripts within the /usr/local/stat_watch/tests/ directory
+    - The files must be given as JUST the file name - no path
+
+
+FILES
+
+/usr/local/stat_watch/tests/test.sh -
+    - The script that iterates through and runs the test scripts
+
+/usr/local/stat_watch/tests/tests_include.shf -
+    - A file containing functions that are used across multiple tests
+
+/usr/local/stat_watch/tests/tests_001.sh - 
+    - One of the test scripts
+    - Test scripts must be named in the following format:
+        - "tests_", followed by a string composed only of numbers and/or underscores, followed by a period, followed by the appropriate file extension
+    - These files should be not be executable; test.sh will give them execute permissions one-by-one as it runs them, and remove them when they have finished
+
+/usr/local/stat_watch/tests/skipped_tests_001.sh -
+    - When ever any test is designated to be skipped, this is accomplished by renaming it such that its file name begins with "skipped_"
+    - When test.sh is run, before starting any of the tests, it renames any test files so that "skipped_" is removed from the beginning of their name
+
+/usr/local/stat_watch/tests/working -
+    - This directory contains working files for the current test script. When ever possible, tests should not alter files outside of this directory
+    - This directory is removed when test.sh successfully completes all tests; it should only be present if a test has failed
+

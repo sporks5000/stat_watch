@@ -2,18 +2,155 @@
 
 source "$d_STATWATCH_TESTS"/tests_include.shf
 
-function fn_test_12 {
-	echo -e "\n12. Is backup pruning working as anticipated (including \"_hold\" functionality)?"
-	### There are two ways that backups are pruned: when the "--prune" flag is used, and when a backup of a file is made during "--diff" (assuming "--no-check-retention" was not used)
-	### Backups are pruned within the "fn_check_retention" subroutine
-	### When backups are pruned is controled by the $v_retention_max_copies variable and the $v_retention_min_days variable
-	### $v_retention_max_copies defaults to 4 and is set by the "BackupMC" control string.
-	### $v_retention_min_days defaults to 7 and is set by the "BackupMD" control string
-	### The desired behavior is: If there are more than $v_retention_max_copies backups of a file, all of the copies older than $v_retention_min_days days will be removed
-		### Thus if $v_retention_max_copies is 4, and there are 12 backups present, but all of them are younger than $v_retention_min_days days, none of them are removed
-	### Backups should not be removed if they have a "_hold" file
-	### Whether or not backups are being taken was already tested in 006 and 009
+### There are two ways that backups are pruned: when the "--prune" flag is used, and when a backup of a file is made during "--diff" (assuming "--no-check-retention" was not used)
+### Backups are pruned within the "fn_check_retention" subroutine
+### When backups are pruned is controled by the $v_retention_max_copies variable and the $v_retention_min_days variable
+### $v_retention_max_copies defaults to 4 and is set by the "BackupMC" control string and the "--backup-mc" flag
+### $v_retention_min_days defaults to 7 and is set by the "BackupMD" control string and the "--backup-md" flag
+### The desired behavior is: If there are more than $v_retention_max_copies backups of a file, all of the copies older than $v_retention_min_days days will be removed
+	### Thus if $v_retention_max_copies is 4, and there are 12 backups present, but all of them are younger than $v_retention_min_days days, none of them are removed
+### Backups should not be removed if they have a "_hold" file
+### Whether or not backups are being taken was already tested in 006 and 009
+
+function fn_test_12_1 {
+	echo -e "\n12.1. Is backup pruning working as anticipated when using \"--prune\"?"
+
+	### Test that the correct number of backups are being retained
+	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
+	"$f_STAT_WATCH" --config "" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup+ "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123450
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123451
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123452
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123453
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123454
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123455
+	"$f_STAT_WATCH" --config "" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 3
+
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 3 ]]; then
+		fn_fail "12.1.1"
+	fi
+	fn_pass "12.1.1"
+
+	### Test the the minimum number of days is being held to
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_"$( date --date="-1 day" +%s )"
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_"$( date --date="-2 days" +%s )"
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_"$( date --date="-3 days" +%s )"
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_"$( date --date="-4 days" +%s )"
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_"$( date --date="-5 days" +%s )"
+	sleep 1.1
+	"$f_STAT_WATCH" --config "" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 6
+
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 6 ]]; then
+		fn_fail "12.1.2"
+	fi
+	fn_pass "12.1.2"
+
+	"$f_STAT_WATCH" --config "" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 4
+
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 4 ]]; then
+		fn_fail "12.1.3"
+	fi
+	fn_pass "12.1.3"
+
+	### Test that the minimum number is being retained even if they're too old
+	"$f_STAT_WATCH" --config "" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 2
+
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 4 ]]; then
+		fn_fail "12.1.4"
+	fi
+	fn_pass "12.1.4"
+
+	### Test that files marked as being held are not being removed
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123450
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123450_hold
+	"$f_STAT_WATCH" --config "" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 2
+
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 5 ]]; then
+		fn_fail "12.1.5"
+	fi
+	fn_pass "12.1.5"
+
+	### Test that when a orphaned "_hold" "_ctime" or "_comment" file is present, it is being appropriately removed
+	rm -f "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123450
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123450_ctime
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123450_comment
+	local v_NOW="$( date +%s )"
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_"$v_NOW"_hold
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_"$v_NOW"_ctime
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_"$v_NOW"_comment
+	"$f_STAT_WATCH" --config "" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 2
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_123450_" ) -ne 0 ]]; then
+		fn_fail "12.1.6.1"
+	elif [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_${v_NOW}_" ) -ne 0 ]]; then
+		fn_fail "12.1.6.2"
+	fi
+	fn_pass "12.1.6"
+}
+
+function fn_test_12_2 {
+	echo -e "\n12.2. Is backup pruning working as anticipated with \"--diff\"?"
+
+	### Create a backup and verify its presence
+	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
+	sleep 1.1
+	fn_change_files_1
+	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt
+	"$f_STAT_WATCH" --config "" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 1 ]]; then
+		fn_fail "12.2.1"
+	fi
+	fn_pass "12.2.1"
+
+	### If no changes have been made to the file, there's no reason to detect that we're out of bounds on the number of backups present
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123450
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123451
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123452
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123453
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123454
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123455
+	sleep 1.1
+	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
+	"$f_STAT_WATCH" --config "" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup-mc 3 --backup-md 3 --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
+
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456.php_[0-9]+$" ) -ne 7 ]]; then
+		fn_fail "12.2.2"
+	fi
+	fn_pass "12.2.2"
+
+	### When a change to the file is detected, that's when backups should be pruned - UNLESS the "--no-check-retention" flag is used
+	sleep 1.1
+	echo "11111" > "$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php
+	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt
+	"$f_STAT_WATCH" --config "" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt --no-check-retention --backup-mc 3 --backup-md 3 --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
+
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 8 ]]; then
+		fn_fail "12.2.3"
+	fi
+	fn_pass "12.2.3"
+
+	### Without that flag, however, the older ones should be pruned
+	sleep 1.1
+	echo "22222" > "$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php
+	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
+	"$f_STAT_WATCH" --config "" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup-mc 3 --backup-md 3 --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
+
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 3 ]]; then
+		fn_fail "12.2.4"
+	fi
+	fn_pass "12.2.4"
+
+	### No need to re-test other aspects, as it's the saem functions that they're being routed through
 }
 
 fn_make_files_1
-fn_test_12
+fn_test_12_1
+rm -rf "$d_STATWATCH_TESTS_WORKING"
+fn_make_files_1
+fn_test_12_2
+
+
+
+
+
+
+

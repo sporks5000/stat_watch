@@ -20,6 +20,7 @@ DIRECTORIES
 
 /usr/local/stat_watch/.stat_watch -
     - This is where Stat Watch stores its working files
+    - Note that the files within this directory are not designed to be edited by the user
 
 /usr/local/stat_watch/tests -
     - Tests to confirm the functionality of Stat Watch
@@ -64,5 +65,5 @@ FILES
     - A markdown file with examples of verbiage to use when Stat Watch has been set up to send emails to customer-facing addresses
 
 /usr/local/stat_watch/texts/template.conf -
-    - A template file for the configuration, from which a new configuration file can be built if necesary
+    - A template file for the configuration, from which a new configuration file can be built
 

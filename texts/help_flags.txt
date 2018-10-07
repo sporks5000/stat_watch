@@ -82,6 +82,7 @@ stat_watch --new-lines [DIRECTORY] ([DIRECTORY 2] ...)
 stat_watch --prune
     - Go through the backup directory and remove files older files
     - The "-i" or "--include" flag must be used to specify a job file and that file must have "BackupD" string present
+        - Alternately, the "--backupd" flag can be used to specify a backup directory
     - Any files outside of the range specified by the "BackupMD" and "BackupMC" control strings will be removed
         - The "--backup-md" and "--backup-mc" flags can be used to set the vaules typically set by the "BackupMD" and "BackupMC" control strings
 
@@ -118,6 +119,7 @@ stat_watch --help job
 stat_watch --help backups
 stat_watch --help job-files
 stat_watch --help files
+stat_watch --help tests
     - Outputs information regarding the specific aspect of Stat Watch requested
 
 stat_watch --version
