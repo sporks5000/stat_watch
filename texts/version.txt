@@ -1,5 +1,14 @@
 
-Current Version: 1.4.2
+Current Version: 1.4.3
+
+Version 1.4.3 (2018-10-08) -
+    - Implimented the "--hold", "--unhold", "--comment", and "--restore" flags
+    - Added "-a" as an alias for "--backup-file"
+    - The installation process writes the installation path to all of the executable files
+        - Added the "--locate" flag to reproduce historical finctionality
+    - Continued to add to functionality tests
+    - Fixed assumptions even more. Added testing for them to verify that they work as intended now
+    - Added the ability to use a different working directory (no use case outside of testing purposes)
 
 Version 1.4.2 (2018-10-05) -
     - When files are backed up, they now capture ctime as well.

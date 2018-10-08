@@ -170,13 +170,19 @@ sub fn_fold_print {
 }
 
 sub fn_print_files {
+### Given a list of files, frint the contents of those files
+### If the first argument starts with a space, a dash, or an asterisk, assume that it's not a file, and print that before the start of each line
 	if (@_) {
+		my $v_pre = '';
+		if ( substr( $_[0], 0, 1 ) =~ m/[-* ]/ ) {
+			$v_pre = shift(@_)
+		}
 		while (@_) {
 			my $arg = shift(@_);
 			if ( -f $arg && -r $arg && open( my $fh_read, "<", $arg ) ) {
 				my $v_message = '';
 				while (<$fh_read>) {
-					$v_message .= $_;
+					$v_message .= $v_pre . $_;
 				}
 				print fn_fold_print($v_message);
 			}

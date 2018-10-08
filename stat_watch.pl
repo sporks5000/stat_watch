@@ -10,8 +10,8 @@ use Cwd qw(abs_path getcwd);
 use POSIX 'strftime';
 
 my $v_program = __FILE__;
-my $d_program;
-my $d_working;
+my $d_program = '####INSTALLATION_DIRECTORY####';
+my $d_working = $d_program . "/.stat_watch";
 
 ### Arrays to hold files and directories to check against and ignore strings
 my @v_dirs;
@@ -756,7 +756,7 @@ sub fn_prune_backups {
 			my @dirs;
 			my @files2;
 			for my $_file (@files) {
-				if ( $_file eq "." || $_file eq ".." ) {
+				if ( $_file eq "." || $_file eq ".." || $_file eq "__origin_path" ) {
 					next;
 				} elsif ( -d ($v_dir . "/" . $_file) && ! -l ($v_dir . "/" . $_file) ) {
 					push( @dirs, ($v_dir . "/" . $_file) );
@@ -817,6 +817,7 @@ sub fn_backup_file {
 		my @v_dirs = split( m/\//, $v_file );
 		shift(@v_dirs); ### this will have been empty
 		my $v_name = pop(@v_dirs);
+		my $v_origin_dir = '/' . join( '/', @v_dirs );
 		for my $_dir (@v_dirs) {
 			$d_backup .= "/" . $_dir;
 			if ( ! -d $d_backup ) {
@@ -845,6 +846,11 @@ sub fn_backup_file {
 						$v_stat = (stat( $v_file ))[10];
 					}
 					print $fh_write $v_stat;
+					close( $fh_write );
+				}
+				### Save the path to the original directory
+				if ( ! -f $d_backup . "/__origin_path" && open( my $fh_write, ">", $d_backup . "/__origin_path" ) ) {
+					print $fh_write $v_origin_dir;
 					close( $fh_write );
 				}
 				if ($b_verbose) {
@@ -958,13 +964,12 @@ sub fn_list_file {
 	}
 	{
 	### Find all of the backup directories that have been used
-		my $v_dir = $d_working;
-		if ( ! -d $v_dir ) {
-			mkdir( $v_dir );
+		if ( ! -d $d_working ) {
+			mkdir( $d_working );
 		}
 		### Open the list and read from it
-		if ( -f $v_dir . "/backup_locations" ) {
-			if ( open( my $fh_read, "<", $v_dir . "/backup_locations" ) ) {
+		if ( -f $d_working . "/backup_locations" ) {
+			if ( open( my $fh_read, "<", $d_working . "/backup_locations" ) ) {
 				while (<$fh_read>) {
 					my $_line = $_;
 					chomp($_line);
@@ -1010,13 +1015,19 @@ sub fn_list_file {
 			}
 			my $_file_escape = fn_escape_filename($_file);
 			print "  " . $_file_escape . " -- Timestamp: " . $v_stamp . " -- " . $v_size . " bytes";
+			no warnings; ### Apparently earlier versions of perl error if you ask about a file that has a new line character and turns out to be not present.
 			if ( -f $_file . "_hold" ) {
+				use warnings;
 				print " -- HELD"
 			}
+			use warnings;
 			print "\n";
+			no warnings;
 			if ( -f $_file . "_comment" ) {
-				fn_print_files( $_file . "_comment" );
+				use warnings;
+				fn_print_files( "    - ", $_file . "_comment" );
 			}
+			use warnings;
 		}
 	} else {
 		print "There are no backups of this file\n"
@@ -1131,8 +1142,9 @@ sub fn_document_backup {
 	### If the job file listed a backup directory, add that to the list of backup directories
 		my @v_backup_dirs;
 		### Open the list and read from it
-		if ( -f $d_working . "/backup_locations" ) {
-			if ( open( my $fh_read, "<", $d_working . "/backup_locations" ) ) {
+		my $f_bl = $d_working . "/backup_locations";
+		if ( -f $f_bl ) {
+			if ( open( my $fh_read, "<", $f_bl ) ) {
 				while (<$fh_read>) {
 					my $_line = $_;
 					chomp($_line);
@@ -1147,7 +1159,7 @@ sub fn_document_backup {
 		}
 		### If we've gotten this far, it wasn't in the list. Add it
 		push( @v_backup_dirs, $d_backup );
-		if ( open( my $fh_write, ">", $d_working . "/backup_locations" ) ) {
+		if ( open( my $fh_write, ">", $f_bl ) ) {
 			for my $_line (@v_backup_dirs) {
 				print $fh_write $_line . "\n";
 			}
@@ -1432,9 +1444,6 @@ sub fn_get_working {
 	$v_name =~ s/\.pl$//;
 	my $d_program = join( '/', @v_working );
 	my $d_working = $d_program . "/." . $v_name;
-	if ( ! -d $d_working ) {
-		mkdir( $d_working, 0755 );
-	}
 	return( $d_working, $d_program );
 }
 
@@ -1518,9 +1527,12 @@ sub fn_bin_check {
 #==================================#
 
 ### Find the working directory, in case it's needed
-($d_working,$d_program) = fn_get_working($v_program);
+if ( substr( $d_program, 0, 1 ) ne "/" ) {
+	($d_working,$d_program) = fn_get_working($v_program);
+}
 
 ### Process all of the universal arguments first
+my $d_working2;
 my @args;
 while ( defined $ARGV[0] ) {
 	my $v_arg = shift( @ARGV );
@@ -1542,6 +1554,12 @@ while ( defined $ARGV[0] ) {
 		my @v_args = split( m/=/, $v_arg, 2 );
 		for my $a (@v_args) {
 			unshift( @ARGV, $a );
+		}
+	} elsif ( $v_arg eq "--locate" ) {
+		($d_working,$d_program) = fn_get_working($v_program);
+	} elsif ( $v_arg eq "--working" ) {
+		if ( defined $ARGV[0] ) {
+			$d_working2 = shift( @ARGV );
 		}
 	} elsif ( $v_arg eq "--ignore" ) {
 		if ( defined $ARGV[0] ) {
@@ -1579,22 +1597,22 @@ while ( defined $ARGV[0] ) {
 	} elsif ( $v_arg eq "--no-partial-seconds" ) {
 		$b_partial_seconds = 0;
 	} elsif ( $v_arg eq "--backup-md" ) {
-		$v_retention_min_days = shift( @ARGV );
-		$v_retention_min_days =~ s/[^0-9]//;
-		if ( $v_retention_min_days eq '' ) {
-			$v_retention_min_days = 7;
+		if ( defined $ARGV[0] && $ARGV[0] =~ m/^[0-9]+$/ ) {
+			$v_retention_min_days = shift( @ARGV );
+		} else {
+			print STDERR "Argument '" . $v_arg . "' must be followed by a number\n";
 		}
 	} elsif ( $v_arg eq "--backup-mc" ) {
-		$v_retention_max_copies = shift( @ARGV );
-		$v_retention_max_copies =~ s/[^0-9]//;
-		if ( $v_retention_max_copies eq '' ) {
-			$v_retention_max_copies = 4;
+		if ( defined $ARGV[0] && $ARGV[0] =~ m/^[0-9]+$/ ) {
+			$v_retention_max_copies = shift( @ARGV );
+		} else {
+			print STDERR "Argument '" . $v_arg . "' must be followed by a number\n";
 		}
 	} elsif ( $v_arg eq "--max-depth" ) {
-		$v_max_depth = shift( @ARGV );
-		$v_max_depth =~ s/[^0-9]//;
-		if ( $v_max_depth eq '' ) {
-			$v_max_depth = 20;
+		if ( defined $ARGV[0] && $ARGV[0] =~ m/^[0-9]+$/ ) {
+			$v_max_depth = shift( @ARGV );
+		} else {
+			print STDERR "Argument '" . $v_arg . "' must be followed by a number\n";
 		}
 	} elsif ( $v_arg eq "--backupd" ) {
 		if ( defined $ARGV[0] ) {
@@ -1608,6 +1626,13 @@ while ( defined $ARGV[0] ) {
 	} else {
 		push( @args, $v_arg );
 	}
+}
+
+if ($d_working2) {
+	$d_working = $d_working2;
+}
+if ( ! -d $d_working ) {
+	mkdir( $d_working, 0755 );
 }
 
 ### Process the commandline arguments
@@ -1718,9 +1743,12 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		fn_list_file($_file);
 	}
 	print "\n";
-} elsif ( defined $args[0] && ( $args[0] eq "--backup" || $args[0] eq "--backup-file" ) ) {
+} elsif ( defined $args[0] && ( $args[0] eq "--backup" || $args[0] eq "--backup-file" || $args[0] eq "-a" ) ) {
 ### Backup files from "--report" output. or backup a single file
 	my $v_type = shift( @args );
+	if ( $v_type eq "-a" ) {
+		$v_type = "--backup-file";
+	}
 	my $v_file;
 	my @v_files;
 	my $v_comment;
@@ -1765,6 +1793,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 	if (@v_unknown) {
 		fn_report_unknown(@v_unknown);
 	}
+	### We don't want to check retention and do pruning for this
 	$b_retention = 0;
 	if ( ! $d_backup || (! @v_backupr && ! @v_backup_plus) ) {
 		if ( $v_type eq "--backup" ) {
@@ -1796,10 +1825,11 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		fn_document_backup();
 		fn_backup_initial($v_file);
 	} else {
+		fn_document_backup();
+		if ( $b_use_md5 ) {
+			$b_md5_all = 1;
+		}
 		for my $_file ( @v_files ) {
-			if ( $b_use_md5 ) {
-				$b_md5_all = 1;
-			}
 			@v_backup_plus = ($_file);
 			my $f_backup = fn_backup_file( $_file, $d_backup );
 			if ( $b_hold && ! -f $f_backup . "_hold" ) {
@@ -1813,7 +1843,7 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			}
 			if ($v_comment) {
 				if ( open( my $fh_write, ">>", $f_backup . "_comment" ) ) {
-					print $fh_write "    - " . $v_comment . "\n";
+					print $fh_write $v_comment . "\n";
 					close( $fh_write );
 				}
 			}
@@ -1914,6 +1944,9 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 		close $fh_output;
 	}
 } else {
+	if ( defined $args[0] ) {
+		print STDERR "Unrecognized argument \"" . $args[0] . "\"\n";
+	}
 	print STDERR "See \"--help\" for usage\n";
 	exit 1;
 }

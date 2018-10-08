@@ -6,8 +6,8 @@ function fn_test_6 {
 	echo -e "\n6.  Does the \"--backup\" flag work as expected"
 
 	### Create a situation where one file should be backed up - is it?
-	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
-	"$f_STAT_WATCH" --config "" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup+ "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
+	"$f_STAT_WATCH" --config "$f_CONF" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup+ "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 1 ]]; then
 		fn_fail "6.1.1"
 	fi
@@ -26,7 +26,7 @@ function fn_test_6 {
 	fn_pass "6.2"
 	
 	### Test to see if a second backup will be made in spite of there having been no changes to the file
-	"$f_STAT_WATCH" --config "" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup+ "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+	"$f_STAT_WATCH" --config "$f_CONF" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup+ "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456.php_[0-9]+$" ) -ne 1 ]]; then
 		fn_fail "6.3"
 	fi
@@ -35,7 +35,7 @@ function fn_test_6 {
 	### Change the file; make sure that a second backup is made
 	sleep 1.1
 	fn_change_files_1
-	"$f_STAT_WATCH" --config "" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup+ "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+	"$f_STAT_WATCH" --config "$f_CONF" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup+ "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 2 ]]; then
 		fn_fail "6.4"
 	fi
@@ -44,8 +44,8 @@ function fn_test_6 {
 	### Test regular expression matching
 	fn_remove_files
 	fn_make_files_1
-	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
-	"$f_STAT_WATCH" --config "" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backupr '\.php$' --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
+	"$f_STAT_WATCH" --config "$f_CONF" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backupr '\.php$' --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "\.php_[0-9]+$" ) -ne 8 ]]; then
 		fn_fail "6.5.1"
 	fi
@@ -60,7 +60,7 @@ function fn_test_6 {
 	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123?456.php"
 	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123!456.php"
 	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php"
-	"$f_STAT_WATCH" --config "" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backupr '\.php$' --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+	"$f_STAT_WATCH" --config "$f_CONF" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backupr '\.php$' --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "\.php_[0-9]+$" ) -ne 11 ]]; then
 		fn_fail "6.6"
 	fi

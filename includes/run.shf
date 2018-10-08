@@ -1,14 +1,5 @@
 #! /bin/bash
 
-### Set a one in 10 chance of us pruning old backups
-v_PRUNE_MAX=10
-v_PRUNE_CHANCE=1
-### Other default variables for the run
-v_NICE=15
-v_MAX_RUN=3600
-v_LOG_MAX=10485760
-v_EMAIL_RETAIN=20
-
 function fn_get_script {
 ### Given an identifier from the job file, find the script and all command line arguments that follow
 	local a_SCRIPT=()
@@ -55,7 +46,7 @@ function fn_run {
 		echo "Cannot find name in Job file. Exiting"
 		exit
 	fi
-	v_DIR="$( echo "$f_JOB" | rev | cut -d "/" -f2- | rev )"
+	fn_file_path "$f_JOB"; local v_DIR="$s_DIR"
 	fn_get_direc "Expire"; v_EXPIRE="$v_DIREC"
 	### Create a directory to stand as an indicator that a job is running
 	v_EXIT=false

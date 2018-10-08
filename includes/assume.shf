@@ -2,7 +2,7 @@
 
 function fn_find_pwd {
 ### Find the current directory and see if it's part of an assumption
-	if [[ ! -f "$d_PROGRAM"/."$d_WORKING"/assumptions ]]; then
+	if [[ ! -f "$d_WORKING"/assumptions ]]; then
 		return
 	fi
 	local v_PWD="$( pwd -P )"
@@ -11,17 +11,17 @@ function fn_find_pwd {
 
 function fn_find_assume {
 ### Find if this directory is part of an assumption
-	local d_CUR="$1"
+	local d_CUR="$( cd "$1" && pwd -P )"
 	local d_SAN_CUR="$( fn_sanitize "$d_CUR" )"
-	local v_LINE="$( grep -Ea "^$d_SAN_CUR"$'\000' "$d_PROGRAM"/."$d_WORKING"/assumptions | tail -n1 )"
+	local v_LINE="$( grep -nEao "^$d_SAN_CUR." "$d_WORKING"/assumptions | grep -Pa "\x0" | tail -n1 | cut -d ":" -f1 )"
 	local v_RETURN=
 	if [[ -z "$v_LINE" ]]; then
-		local d_PARENT="$( echo "$d_CUR" | rev | cut -d "/" -f2- | rev )"
+		fn_file_path "$d_CUR"; local d_PARENT="$s_DIR"
 		if [[ -n "$d_PARENT" ]]; then
 			v_RETURN="$( fn_find_assume "$d_PARENT" )"
 		fi
 	else
-		v_RETURN="$( grep -Ea "^$d_SAN_CUR"$'\000' "$d_PROGRAM"/."$d_WORKING"/assumptions | tail -n1 | cut -d $'\000' -f2 )"
+		v_RETURN="$( tail -n +"$v_LINE" "$d_WORKING"/assumptions | head -n1 | cut -d $'\000' -f2 )"
 	fi
 	echo -n "$v_RETURN"
 }
@@ -39,15 +39,20 @@ function fn_assume_include {
 }
 
 function fn_create_assumption {
-	if [[ -z "$1" || -z "$2" ]]; then
+	if [[ -z "$1" ]]; then
 		return
-	elif [[ ! -f "$1" || ! -d "$2" ]]; then
+	elif [[ ! -f "$1" || ( -n "$2" && ! -d "$2" ) ]]; then
 		return
 	fi
 	### Create a working directory and a file to document assumptions
-	mkdir -p $d_PROGRAM/."$d_WORKING"
+	mkdir -p "$d_WORKING"
 	local f_TEMP=$( mktemp )
-	local d_ASSUME="$2"
+	local d_ASSUME
+	if [[ -n "$2" ]]; then
+		d_ASSUME="$2"
+	else
+		d_ASSUME="$( pwd )"
+	fi
 	d_ASSUME="$( cd "$d_ASSUME" && pwd -P )"
 	if [[ "${d_ASSUME: -1}" == "/" ]]; then
 		### Remove a trailing slash
@@ -55,30 +60,14 @@ function fn_create_assumption {
 	fi
 	local d_ASSUME_SAN="$( fn_sanitize "$d_ASSUME" )"
 	### Put all other assumptions into a temp file
-	grep -Ea -v "^$d_ASSUME_SAN"$'\000' "$d_PROGRAM"/."$d_WORKING"/assumptions > "$f_TEMP" 2> /dev/null
+	grep -Ea -v "^$d_ASSUME_SAN"$'\000' "$d_WORKING"/assumptions > "$f_TEMP" 2> /dev/null
 	### Add this assumption to the temp file
 	printf '%b' "$d_ASSUME"'\0' >> "$f_TEMP"
-	echo "$1" >> "$f_TEMP"
+	fn_file_path "$1"
+	echo "$( cd -P "$s_DIR" && pwd )"/"$s_FILE" >> "$f_TEMP"
 	### Replace the assumptions file with the temp file
-	mv -f "$f_TEMP" "$d_PROGRAM"/."$d_WORKING"/assumptions
+	mv -f "$f_TEMP" "$d_WORKING"/assumptions
 	echo "Assumption created"
-}
-
-function fn_sanitize {
-### Given a variable that we're gonig to run through an egrep, escape all special characters
-	v_OUTPUT="${1//\\/\\\\}"
-	v_OUTPUT="${v_OUTPUT//\*/\\*}"
-	v_OUTPUT="${v_OUTPUT//\./\\.}"
-	v_OUTPUT="${v_OUTPUT//[/\\[}"
-	v_OUTPUT="${v_OUTPUT//|/\\|}"
-	v_OUTPUT="${v_OUTPUT//\?/\\?}"
-	v_OUTPUT="${v_OUTPUT//\(/\\(}"
-	v_OUTPUT="${v_OUTPUT//)/\\)}"
-	v_OUTPUT="${v_OUTPUT//$/\\$}"
-	v_OUTPUT="${v_OUTPUT//+/\\+}"
-	v_OUTPUT="${v_OUTPUT//^/\\^}"
-	v_OUTPUT="${v_OUTPUT//{/\\{}"
-	echo -n "$v_OUTPUT"
 }
 
 

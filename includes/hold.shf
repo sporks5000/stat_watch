@@ -1,0 +1,67 @@
+#! /bin/bash
+
+function fn_hold {
+	local v_FILE="$1"
+	##### This really should be more clever and check against the list of backup locations to make sure that the file it's been given is actually a backup
+	##### But I'm lazy
+	if [[ -f "$v_FILE" ]]; then
+		touch "$v_FILE"_hold
+	fi
+}
+
+function fn_unhold {
+	local v_FILE="$1"
+	if [[ -f "$v_FILE"_hold ]]; then
+		rm -f "$v_FILE"_hold
+	fi
+}
+
+function fn_comment {
+	local v_FILE="$1"
+	local v_COMMENT="$2"
+	##### As with fn_hold above, this should be made more robust
+	echo "$v_COMMENT" >> "$v_FILE"_comment
+}
+
+function fn_restore {
+	### Figure out what we're restoring and where we're restoring it to
+	local v_FILE="$1"
+	if [[ ! -f "$v_FILE" ]]; then
+		echo "Backup specified does not exist"
+		exit
+	fi
+
+	### Find the original file name, the epoch timestamp, and the full path of the backup directory
+	fn_file_path "$v_FILE"; local v_NAME="$s_FILE"; local v_DIR="$s_DIR"
+	local v_STAMP="$( echo "$v_NAME" | tail -n1 | sed -E "s/^.*_([0-9]+)$/\1/" )"
+	local v_NAME_LEN=$(( ${#v_NAME} - ${#v_STAMP} - 1 ))
+	v_NAME="${v_NAME:0:$v_NAME_LEN}"
+
+	### Find the original file path
+	local d_ORIGIN="$( cat "$v_DIR"/__origin_path 2> /dev/null )"
+	if [[ -z "$d_ORIGIN" ]]; then
+		echo "Cannot find original path to this file"
+		exit
+	fi
+
+	### Find the root of the backup directory
+	local d_BACKUP="${v_DIR:0:$(( ${#v_DIR} - ${#d_ORIGIN} ))}"
+
+	### Make sure that there's a backup of the file that's currently present
+	if [[ -f "$d_ORIGIN"/"$v_NAME" ]]; then
+		"$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --backup-file "$d_ORIGIN"/"$v_NAME" --backupd "$d_BACKUP"
+	fi
+	local v_FAIL=false
+	cp -af "$v_FILE" "$d_ORIGIN"/"$v_NAME" 2> /dev/null || v_FAIL=true
+	if [[ "$v_FAIL" == true ]]; then
+		echo "Failed to restore file"
+		exit
+	fi
+
+	### Now that we've restored, backup the file as it is currently
+	sleep 1.1
+	"$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --backup-file "$d_ORIGIN"/"$v_NAME" --backupd "$d_BACKUP" --comment "Restored from backup taken at $( date --date=@"$v_STAMP" +%F" "%T" "%z )"
+
+	### And tell the user that it has been done
+	echo "Restored"
+}

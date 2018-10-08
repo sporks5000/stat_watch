@@ -33,3 +33,7 @@ PARTIAL_SECONDS = ####PARTIAL_SECONDS####
 
 ### What is the maximum directory depth that "--record" should descend to
 MAX_DEPTH = ####MAX_DEPTH####
+
+### Typically the working directory is '/ust/local/stat_watch/.stat_watch'. You can set an alternate working directory.
+### There is very little reason to do this outside of testing purposes
+# WORKING = 

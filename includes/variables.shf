@@ -1,7 +1,7 @@
 #! /bin/bash
 
 f_CONF="$d_PROGRAM"/stat_watch.conf
-f_CONF2="$d_PROGRAM"/."$d_WORKING"/conf
+f_CONF2="$d_WORKING"/conf
 
 function fn_conf_defaults {
 ### Default configuration values
@@ -49,49 +49,55 @@ function fn_read_conf {
 	local DEFv_MAX_DEPTH="$v_MAX_DEPTH"
 
 	### Read from the configuration file
-	source <( cat "$f_CONF" | grep -Ev "^\s*#|^\s*$" | sed -E "s/^\s*/v_/;s/\s*=\s*/=\"/;s/\s*$/\"/" | grep -E "^v_(PERL|CPAN|PRUNE_(CHANCE|MAX)|NICE|LOG_MAX|EMAIL_RETAIN|BACKUP_(MIN_DAYS|MAX_COPIES)|PARTIAL_SECONDS|MAX_(DEPTH|RUN))=\".*\"$" ) 2> /dev/null
+	source <( cat "$lf_CONF" | grep -Ev "^\s*#|^\s*$" | sed -E "s/^\s*/v_/;s/\s*=\s*/=\"/;s/\s*$/\"/" | grep -E "^v_(PERL|CPAN|PRUNE_(CHANCE|MAX)|NICE|LOG_MAX|EMAIL_RETAIN|BACKUP_(MIN_DAYS|MAX_COPIES)|PARTIAL_SECONDS|MAX_(DEPTH|RUN)|WORKING)=\".*\"$" ) 2> /dev/null
 
 	### Check the variables to make sure that they're logical
-	if [[ -z "$v_PERL" || "${v_PERL:0:1}" = "/" || ! -x "$v_PERL" ]]; then
+	if [[ -z "$v_PERL" || "${v_PERL:0:1}" == "/" || ! -x "$v_PERL" ]]; then
 		v_PERL="$DEFv_PERL"
 	fi
-	if [[ -z "$v_CPAN" || "${v_CPAN:0:1}" = "/" || ! -x "$v_CPAN" ]]; then
+	if [[ -z "$v_CPAN" || "${v_CPAN:0:1}" == "/" || ! -x "$v_CPAN" ]]; then
 		v_CPAN="$DEFv_CPAN"
 	fi
 
-	if [[ $( echo -n "$v_PRUNE_MAX" | grep -E "^[0-9]+$" ) -lt 1 || "$v_PRUNE_MAX" -lt 1 ]]; then
+	if [[  -z "$v_PRUNE_MAX" || $( echo -n "$v_PRUNE_MAX" | grep -E "^[0-9]+$" ) -lt 1 || "$v_PRUNE_MAX" -lt 1 ]]; then
 		v_PRUNE_MAX="$DEFv_PRUNE_MAX"
 	fi
-	if [[ $( echo -n "$v_PRUNE_CHANCE" | grep -E "^[0-9]+$" ) -lt 1 || "$v_PRUNE_CHANCE" -gt "$v_PRUNE_MAX" ]]; then
+	if [[ -z "$v_PRUNE_CHANCE" || $( echo -n "$v_PRUNE_CHANCE" | grep -E "^[0-9]+$" ) -lt 1 || "$v_PRUNE_CHANCE" -gt "$v_PRUNE_MAX" ]]; then
 		v_PRUNE_CHANCE="$DEFv_PRUNE_CHANCE"
 	fi
 
-	if [[ $( echo -n "$v_NICE" | grep -E "^-?[0-9]+$" ) -lt 1 || "$v_NICE" -lt -20 || "$v_NICE" -gt 19 ]]; then
+	if [[ -z "$v_NICE" || $( echo -n "$v_NICE" | grep -E "^-?[0-9]+$" ) -lt 1 || "$v_NICE" -lt -20 || "$v_NICE" -gt 19 ]]; then
 		v_NICE="$DEFv_NICE"
 	fi
 
-	if [[ $( echo -n "$v_MAX_RUN" | grep -E "^[0-9]+$" ) -lt 1 || "$v_MAX_RUN" -lt 1800 || "$v_MAX_RUN" -gt 86400 ]]; then
+	if [[ -z "$v_MAX_RUN" || $( echo -n "$v_MAX_RUN" | grep -E "^[0-9]+$" ) -lt 1 || "$v_MAX_RUN" -lt 1800 || "$v_MAX_RUN" -gt 86400 ]]; then
 		v_MAX_RUN="$DEFv_MAX_RUN"
 	fi
-	if [[ $( echo -n "$v_LOG_MAX" | grep -E "^[0-9]+$" ) -lt 1 || "$v_LOG_MAX" -lt 102400 ]]; then
+	if [[ -z "$v_LOG_MAX" || $( echo -n "$v_LOG_MAX" | grep -E "^[0-9]+$" ) -lt 1 || "$v_LOG_MAX" -lt 102400 ]]; then
 		v_LOG_MAX="$DEFv_LOG_MAX"
 	fi
-	if [[ $( echo -n "$v_EMAIL_RETAIN" | grep -E "^[0-9]+$" ) -lt 1 || "$v_EMAIL_RETAIN" -lt 0 ]]; then
+	if [[ -z "$v_EMAIL_RETAIN" || $( echo -n "$v_EMAIL_RETAIN" | grep -E "^[0-9]+$" ) -lt 1 || "$v_EMAIL_RETAIN" -lt 0 ]]; then
 		v_EMAIL_RETAIN="$DEFv_EMAIL_RETAIN"
 	fi
 
 	### Variables related to the perl script
-	if [[ $( echo -n "$v_BACKUP_MIN_DAYS" | grep -E "^[0-9]+$" ) -lt 1 || "$v_BACKUP_MIN_DAYS" -lt 0 ]]; then
+	if [[ -z "$v_BACKUP_MIN_DAYS" || $( echo -n "$v_BACKUP_MIN_DAYS" | grep -E "^[0-9]+$" ) -lt 1 || "$v_BACKUP_MIN_DAYS" -lt 0 ]]; then
 		v_BACKUP_MIN_DAYS="$DEFv_BACKUP_MIN_DAYS"
 	fi
-	if [[ $( echo -n "$v_BACKUP_MAX_COPIES" | grep -E "^[0-9]+$" ) -lt 1 || "$v_BACKUP_MAX_COPIES" -lt 0 ]]; then
+	if [[ -z "$v_BACKUP_MAX_COPIES" || $( echo -n "$v_BACKUP_MAX_COPIES" | grep -E "^[0-9]+$" ) -lt 1 || "$v_BACKUP_MAX_COPIES" -lt 0 ]]; then
 		v_BACKUP_MAX_COPIES="$DEFv_BACKUP_MAX_COPIES"
 	fi
 	if [[ -z "$v_PARTIAL_SECONDS" ]]; then
 		v_PARTIAL_SECONDS="$DEFv_PARTIAL_SECONDS"
 	fi
-	if [[ $( echo -n "$v_MAX_DEPTH" | grep -E "^[0-9]+$" ) -lt 1 || "$v_MAX_DEPTH" -lt 0 ]]; then
+	if [[ -z "$v_MAX_DEPTH" || $( echo -n "$v_MAX_DEPTH" | grep -E "^[0-9]+$" ) -lt 1 || "$v_MAX_DEPTH" -lt 0 ]]; then
 		v_MAX_DEPTH="$DEFv_MAX_DEPTH"
+	fi
+
+	if [[ -n "$v_WORKING" && "${v_WORKING:0:1}" == "/" && -d "$v_WORKING" ]]; then
+		d_WORKING="$v_WORKING"
+	else
+		unset v_WORKING
 	fi
 }
 
@@ -100,6 +106,9 @@ function fn_perl_args {
 	v_PERL_ARGS="--backup-md $v_BACKUP_MIN_DAYS --backup-mc $v_BACKUP_MAX_COPIES --max-depth $v_MAX_DEPTH"
 	if [[ "$v_PARTIAL_SECONDS" == "0" ]]; then
 		v_PERL_ARGS="$v_PERL_ARGS --no-partial-seconds"
+	fi
+	if [[ -n "$v_WORKING" ]]; then
+		v_PERL_ARGS="$v_PERL_ARGS --working $d_WORKING"
 	fi
 }
 
@@ -137,7 +146,7 @@ function fn_check_conf {
 
 function fn_write_conf2 {
 ### Write to the secondary conf
-	mkdir -p "$d_PROGRAM"/."$d_WORKING"
+	mkdir -p "$d_WORKING"
 	echo "v_PERL=\"$v_PERL\"" > "$f_CONF2"
 	echo "v_CPAN=\"$v_CPAN\"" >> "$f_CONF2"
 	echo "v_PRUNE_CHANCE=\"$v_PRUNE_CHANCE\"" >> "$f_CONF2"

@@ -9,8 +9,8 @@ set -e
 export PATH=$PATH:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
 
 ### Find where statwatch is
-export d_STATWATCH="/usr/local/stat_watch"
-if [[ ! -d "$d_STATWATCH" ]]; then
+export d_STATWATCH='####INSTALLATION_DIRECTORY####'
+if [[ "${d_STATWATCH:0:1}" != "/" ]]; then
 	f_PROGRAM="$( readlink "${BASH_SOURCE[0]}" || true )"
 	if [[ -z "$f_PROGRAM" ]]; then
 		f_PROGRAM="${BASH_SOURCE[0]}"
@@ -19,7 +19,7 @@ if [[ ! -d "$d_STATWATCH" ]]; then
 	if [[ -f "$d_PROGRAM"/stat_watch.pl && -f "$d_PROGRAM"/stat_watch_wrap.sh ]]; then
 		export d_STATWATCH="$d_PROGRAM"
 	else
-		echo "Cannot find the working directory. Exiting"
+		echo "Cannot find the installation directory. Exiting"
 		exit 1
 	fi
 fi
@@ -99,23 +99,36 @@ function fn_unskip {
 #== Parse Arguments ==#
 #=====================#
 
+source "$d_STATWATCH"/includes/util.shf
+
 fn_unskip
-if [[ -n "$1" && "$1" != "--skip" ]]; then
+if [[ -n "$1" && "$1" != "--skip" && "$1" != "--start" ]]; then
 ### Run a single test script
 	b_SPECIFIC=true
 	while [[ -n "$1" ]]; do
-		if [[ -f "$d_STATWATCH_TESTS"/"$1" ]]; then
-			fn_run_test "$1"
+		fn_file_path "$1"
+		if [[ -f "$d_STATWATCH_TESTS"/"$s_FILE" ]]; then
+			fn_run_test "$s_FILE"
 		fi
 		shift
 	done
 else
 	### Skip any tests that were specified to be skipped
+	v_START=
+	if [[ "$1" == "--start" ]]; then
+		shift
+		fn_file_path "$1"
+		if [[ -f "$d_STATWATCH_TESTS"/"$s_FILE" ]]; then
+			v_START="$s_FILE"
+		fi
+		shift
+	fi
 	if [[ "$1" == "--skip" ]]; then
 		shift
 		while [[ -n "$1" ]]; do
-			if [[ -f "$d_STATWATCH_TESTS"/"$1" && $( echo "$1" | grep -Ec "^tests_[0-9_]+\.[^.]+$" ) -gt 0 ]]; then
-				mv -f "$d_STATWATCH_TESTS"/"$1" "$d_STATWATCH_TESTS"/skipped_"$1"
+			fn_file_path "$1"
+			if [[ -f "$d_STATWATCH_TESTS"/"$s_FILE" && $( echo "$s_FILE" | grep -Ec "^tests_[0-9_]+\.[^.]+$" ) -gt 0 ]]; then
+				mv -f "$d_STATWATCH_TESTS"/"$s_FILE" "$d_STATWATCH_TESTS"/skipped_"$s_FILE"
 			fi
 			shift
 		done
@@ -124,8 +137,10 @@ else
 	### Iterate through all of the test scripts
 	if [[ $( ls -1 "$d_STATWATCH_TESTS" | sort -n | grep -Ec "^tests_[0-9_]+\.[^.]+$" ) -gt 0 ]]; then
 		for i in $( ls -1 "$d_STATWATCH_TESTS" | sort -n | grep -E "^tests_[0-9_]+\.[^.]+$" ); do
-			### Announce the set of tests that we're running
-			fn_run_test "$i"
+			if [[ -z "$v_START" || "$v_START" == "$i" ]]; then
+				fn_run_test "$i"
+				v_START=
+			fi
 		done
 	else
 		echo "No tests found"

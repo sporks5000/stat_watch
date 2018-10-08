@@ -16,15 +16,15 @@ function fn_test_12_1 {
 	echo -e "\n12.1. Is backup pruning working as anticipated when using \"--prune\"?"
 
 	### Test that the correct number of backups are being retained
-	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
-	"$f_STAT_WATCH" --config "" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup+ "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
+	"$f_STAT_WATCH" --config "$f_CONF" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup+ "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123450
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123451
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123452
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123453
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123454
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123455
-	"$f_STAT_WATCH" --config "" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 3
+	"$f_STAT_WATCH" --config "$f_CONF" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 3
 
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 3 ]]; then
 		fn_fail "12.1.1"
@@ -38,14 +38,14 @@ function fn_test_12_1 {
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_"$( date --date="-4 days" +%s )"
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_"$( date --date="-5 days" +%s )"
 	sleep 1.1
-	"$f_STAT_WATCH" --config "" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 6
+	"$f_STAT_WATCH" --config "$f_CONF" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 6
 
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 6 ]]; then
 		fn_fail "12.1.2"
 	fi
 	fn_pass "12.1.2"
 
-	"$f_STAT_WATCH" --config "" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 4
+	"$f_STAT_WATCH" --config "$f_CONF" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 4
 
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 4 ]]; then
 		fn_fail "12.1.3"
@@ -53,7 +53,7 @@ function fn_test_12_1 {
 	fn_pass "12.1.3"
 
 	### Test that the minimum number is being retained even if they're too old
-	"$f_STAT_WATCH" --config "" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 2
+	"$f_STAT_WATCH" --config "$f_CONF" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 2
 
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 4 ]]; then
 		fn_fail "12.1.4"
@@ -63,7 +63,7 @@ function fn_test_12_1 {
 	### Test that files marked as being held are not being removed
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123450
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123450_hold
-	"$f_STAT_WATCH" --config "" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 2
+	"$f_STAT_WATCH" --config "$f_CONF" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 2
 
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 5 ]]; then
 		fn_fail "12.1.5"
@@ -78,24 +78,38 @@ function fn_test_12_1 {
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_"$v_NOW"_hold
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_"$v_NOW"_ctime
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_"$v_NOW"_comment
-	"$f_STAT_WATCH" --config "" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 2
+	"$f_STAT_WATCH" --config "$f_CONF" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 2
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_123450_" ) -ne 0 ]]; then
 		fn_fail "12.1.6.1"
 	elif [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_${v_NOW}_" ) -ne 0 ]]; then
 		fn_fail "12.1.6.2"
 	fi
 	fn_pass "12.1.6"
+
+	### Verify that pruning is correctly recursing
+	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/subdir/
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/subdir/123.php_123450
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/subdir/123.php_123451
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/subdir/123.php_123452
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/subdir/123.php_123453
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/subdir/123.php_123454
+	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/subdir/123.php_123455
+	"$f_STAT_WATCH" --config "$f_CONF" --prune --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup --backup-mc 4 --backup-md 2
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/subdir | egrep -c "123.php_[0-9]+$" ) -ne 4 ]]; then
+		fn_fail "12.1.7"
+	fi
+	fn_pass "12.1.7"
 }
 
 function fn_test_12_2 {
 	echo -e "\n12.2. Is backup pruning working as anticipated with \"--diff\"?"
 
 	### Create a backup and verify its presence
-	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
 	sleep 1.1
 	fn_change_files_1
-	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt
-	"$f_STAT_WATCH" --config "" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt
+	"$f_STAT_WATCH" --config "$f_CONF" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 1 ]]; then
 		fn_fail "12.2.1"
 	fi
@@ -109,8 +123,8 @@ function fn_test_12_2 {
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123454
 	touch "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_123455
 	sleep 1.1
-	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
-	"$f_STAT_WATCH" --config "" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup-mc 3 --backup-md 3 --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
+	"$f_STAT_WATCH" --config "$f_CONF" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup-mc 3 --backup-md 3 --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
 
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456.php_[0-9]+$" ) -ne 7 ]]; then
 		fn_fail "12.2.2"
@@ -120,8 +134,8 @@ function fn_test_12_2 {
 	### When a change to the file is detected, that's when backups should be pruned - UNLESS the "--no-check-retention" flag is used
 	sleep 1.1
 	echo "11111" > "$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php
-	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt
-	"$f_STAT_WATCH" --config "" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt --no-check-retention --backup-mc 3 --backup-md 3 --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt
+	"$f_STAT_WATCH" --config "$f_CONF" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt --no-check-retention --backup-mc 3 --backup-md 3 --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
 
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 8 ]]; then
 		fn_fail "12.2.3"
@@ -131,8 +145,8 @@ function fn_test_12_2 {
 	### Without that flag, however, the older ones should be pruned
 	sleep 1.1
 	echo "22222" > "$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php
-	"$f_STAT_WATCH" --config "" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
-	"$f_STAT_WATCH" --config "" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup-mc 3 --backup-md 3 --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
+	"$f_STAT_WATCH" --config "$f_CONF" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup-mc 3 --backup-md 3 --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
 
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 3 ]]; then
 		fn_fail "12.2.4"

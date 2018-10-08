@@ -6,10 +6,15 @@ if [[ ! -f "$f_STAT_WATCH" ]]; then
 	exit 1;
 fi
 
+source "$d_STATWATCH"/includes/util.shf
+
 function fn_make_files_1 {
 	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing
 	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing2
 	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing2/working
+	f_CONF="$d_STATWATCH_TESTS_WORKING"/testing2/stat_watch.conf
+	echo "WORKING = $d_STATWATCH_TESTS_WORKING/testing2/working" > "$f_CONF"
 	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing/subdir
 	echo "1234" > "$d_STATWATCH_TESTS_WORKING"/testing/123.php
 	echo "1234" > "$d_STATWATCH_TESTS_WORKING"/testing/123.php"' -- d"
@@ -25,6 +30,7 @@ function fn_make_files_1 {
 	echo "1234" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/abc.txt
 	echo "1234" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0010456.html" )"
 	echo "1234" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0033456.html" )"
+	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/subdir/123💩456.php"
 	rm -f "$d_STATWATCH_TESTS_WORKING"/testing/subdir/456.php
 }
 
@@ -43,6 +49,7 @@ function fn_change_files_1 {
 	echo "1235" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/abc.txt
 	echo "1235" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0010456.html" )"
 	echo "1235" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0033456.html" )"
+	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/subdir/123💩456.php"
 	echo "1235" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/456.php
 }
 
@@ -56,30 +63,13 @@ function fn_fail {
 	echo -e "\e[91m""Test $1 FAILED""\e[00m"
 	echo
 	echo "To assist with troubleshooting, it might be helpful to run the following command:"
-	echo "     d_STATWATCH=\"$d_STATWATCH\"; d_STATWATCH_TESTS=\"$d_STATWATCH_TESTS\"; d_STATWATCH_TESTS_WORKING=\"$d_STATWATCH_TESTS_WORKING\"; f_STAT_WATCH=\"$f_STAT_WATCH\""
+	echo "     d_STATWATCH=\"$d_STATWATCH\"; d_STATWATCH_TESTS=\"$d_STATWATCH_TESTS\"; d_STATWATCH_TESTS_WORKING=\"$d_STATWATCH_TESTS_WORKING\"; f_STAT_WATCH=\"$f_STAT_WATCH\"; f_CONF=\"$f_CONF\""
 	echo
 	exit 1;
 }
 
 function fn_pass {
 	echo -e "\e[32m""Test $1 SUCCESS""\e[00m"
-}
-
-function fn_sanitize {
-### Given a variable that we're going to run through an egrep, escape all special characters
-	v_OUTPUT="${1//\\/\\\\}"
-	v_OUTPUT="${v_OUTPUT//\*/\\*}"
-	v_OUTPUT="${v_OUTPUT//\./\\.}"
-	v_OUTPUT="${v_OUTPUT//[/\\[}"
-	v_OUTPUT="${v_OUTPUT//|/\\|}"
-	v_OUTPUT="${v_OUTPUT//\?/\\?}"
-	v_OUTPUT="${v_OUTPUT//\(/\\(}"
-	v_OUTPUT="${v_OUTPUT//)/\\)}"
-	v_OUTPUT="${v_OUTPUT//$/\\$}"
-	v_OUTPUT="${v_OUTPUT//+/\\+}"
-	v_OUTPUT="${v_OUTPUT//^/\\^}"
-	v_OUTPUT="${v_OUTPUT//{/\\{}"
-	echo -n "$v_OUTPUT"
 }
 
 function fn_username {

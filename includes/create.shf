@@ -44,9 +44,9 @@ function fn_create {
 	fn_name
 
 	### And figure out where we're going to store this job
-	if [[ $( stat -c %n /*/"$d_WORKING"/ 2> /dev/null | wc -l ) -gt 0 ]]; then
+	if [[ $( stat -c %n /*/stat_watch/ 2> /dev/null | wc -l ) -gt 0 ]]; then
 		echo "There are currently stat_watch working directories in the following root-level directories:"
-		stat -c %n /*/"$d_WORKING"/ 2> /dev/null | sed "s/^/   /;s/\/$d_WORKING\/$//"
+		stat -c %n /*/stat_watch/ 2> /dev/null | sed "s/^/   /;s/\/stat_watch\/$//"
 		echo
 	fi
 	read -ep "What root-level directory do you want backups to be placed on? " v_PART
@@ -58,7 +58,7 @@ function fn_create {
 			exit
 		fi
 	fi
-	v_DIR="$v_PART"/"$d_WORKING"/"$v_ACCOUNT"
+	v_DIR="$v_PART"/stat_watch/"$v_ACCOUNT"
 	if [[ -f "$v_DIR"/"$v_NAME".job ]]; then
 		echo "There already appears to be a stat_watch job at \""$v_DIR"/"$v_NAME".job\". You can delete or modify that."
 		exit
@@ -114,7 +114,7 @@ EOF
 	echo "$( date +%Y-%m-%d" "%T" "%z ) - Job \"$f_JOB\" created by $f_PROGRAM" >> "$v_DIR"/"$v_NAME".log
 
 	### Create a working directory and a file to document jobs created
-	mkdir -p $d_PROGRAM/."$d_WORKING"
+	mkdir -p "$d_WORKING"
 	f_TEMP=$( mktemp )
 	### Copy all of the other jobs into a temp file
 	grep -E -v "^$f_JOB - Created " "$f_JOBS" > "$f_TEMP" 2> /dev/null

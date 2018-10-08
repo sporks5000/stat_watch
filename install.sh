@@ -1,6 +1,18 @@
 #! /bin/bash
 
-export PATH=$PATH:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
+export PATH="$PATH:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+
+### Initial variables
+v_OUT="/dev/null"
+v_FAIL=false
+
+### Find out where we are
+f_PROGRAM="$( readlink "${BASH_SOURCE[0]}" || true )"
+if [[ -z $f_PROGRAM ]]; then
+	f_PROGRAM="${BASH_SOURCE[0]}"
+fi
+d_PROGRAM="$( cd -P "$( dirname "$f_PROGRAM" )" && pwd )"
+d_WORKING="$d_PROGRAM"/.stat_watch
 
 ### An optional command line argument can be given to install this elsewhere
 d_INST="/usr/local/stat_watch"
@@ -15,28 +27,20 @@ if [[ "${d_INST: -1}" == "/" ]]; then
 	### Make sure it does not end in a slash
 	d_INST="${d_INST:0:${#d_INST}-1}"
 fi
-### Make sure that the parent directory exists
-d_INST_R="$( echo "$d_INST" | rev | cut -d "/" -f2- | rev )"
-if [[ ! -d "$d_INST_R" ]]; then
-	echo "'$d_INST_R' does not exist. Please create it first"
+
+### Test that all of the variables are populated
+if [[ -z "$d_PROGRAM" || -z "$d_INST" || -z "$v_OUT" ]]; then
+	echo "There appear to have been issues with setting variables correctly. Exiting."
 	exit 1
 fi
 
-### Find out where we are
-f_PROGRAM="$( readlink "${BASH_SOURCE[0]}" || true )"
-if [[ -z $f_PROGRAM ]]; then
-	f_PROGRAM="${BASH_SOURCE[0]}"
-fi
-d_PROGRAM="$( cd -P "$( dirname "$f_PROGRAM" )" && pwd )"
+### Pull in utility functions
+source "$d_PROGRAM"/includes/util.shf
 
-### Other variables
-v_OUT="/dev/null"
-v_FAIL=false
-d_WORKING="stat_watch"
-
-### Test that all of the variables are populated
-if [[ -z "$d_PROGRAM" || -z "$d_INST_R" || -z "$d_INST" || -z "$v_OUT" ]]; then
-	echo "There appear to have been issues with setting variables correctly. Exiting."
+### Make sure that the parent directory exists
+fn_file_path "$d_INST"; d_INST_R="$s_DIR"
+if [[ ! -d "$d_INST_R" ]]; then
+	echo "Directory '$d_INST_R' does not exist. Please create it first"
 	exit 1
 fi
 
@@ -46,9 +50,6 @@ if [[ -f "$d_PROGRAM"/../stat_watch.tar.gz ]]; then
 fi
 if [[ -d "$d_PROGRAM"/.git ]]; then
 	rm -rf "$d_PROGRAM"/.git
-fi
-if [[ -f "$d_PROGRAM"/."$d_WORKING"/conf ]]; then
-	rm -rf "$d_PROGRAM"/."$d_WORKING"/conf
 fi
 
 ### Make sure that we're not already in the installation directory
@@ -115,8 +116,15 @@ else
 	fi
 fi
 
-### Set the installation directory in stat_watch_wrap.sh
-sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST@" "$d_INST"/stat_watch_wrap.sh
+### Set the installation directory in the executable files
+sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST@" "$d_INST"/stat_watch_wrap.sh 2> "$v_OUT" || v_FAIL=true
+sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST@" "$d_INST"/stat_watch.pl 2> "$v_OUT" || v_FAIL=true
+sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST@" "$d_INST"/scripts/fold_out.pl 2> "$v_OUT" || v_FAIL=true
+sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST@" "$d_INST"/tests/test.sh 2> "$v_OUT" || v_FAIL=true
+if [[ "$v_FAIL" == true ]]; then
+	echo "Failed correctly set the installation directory for executable files"
+	exit 1
+fi
 
 ### Get all of the appropriate permissions in place
 chmod 700 "$d_INST"/stat_watch.pl "$d_INST"/stat_watch_wrap.sh "$d_INST"/scripts/fold_out.pl "$d_INST"/tests/test.sh 2> "$v_OUT" || v_FAIL=true

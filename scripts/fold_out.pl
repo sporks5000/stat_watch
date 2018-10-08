@@ -4,11 +4,14 @@
 use strict;
 use warnings;
 
-my $d_progdir = __FILE__;
-$d_progdir = ( readlink($d_progdir) || $d_progdir );
-my @progdir = split( m/\//, $d_progdir );
-pop( @progdir );
-$d_progdir = join( "/", @progdir );
+my $d_progdir = '####INSTALLATION_DIRECTORY####/scripts';
+if ( substr($d_progdir, 0, 1) ne "/" ) {
+	$d_progdir = __FILE__;
+	$d_progdir = ( readlink($d_progdir) || $d_progdir );
+	my @progdir = split( m/\//, $d_progdir );
+	pop( @progdir );
+	$d_progdir = join( "/", @progdir );
+}
 
 require( $d_progdir . '/fold_print.pm' );
 

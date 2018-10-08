@@ -6,6 +6,7 @@ stat_watch --assume [JOB_FILE] [DIRECTORY]
     - If Stat Watch is run within the directory specified with the "-i" or "--include" flags or with the "--no-assume" flag, these assumptions will be ignored
     - Only one job file can be specified as being assumed for each directory - running "--assume" again and specifying the same directory will overwrite the job file to use
     - The PWD will be chedked first, followed by its parent directory and so on - thus if both '/var' and '/var/log' are specified, and a Stat Watch command is run within the directory '/var/log/tmp', the assumptions for '/var/log' will be used and the assumptions for '/var' will be ignored
+    - If this argument is only given the job file and no directory, the PWD is assumed
 
 stat_watch --backup [REPORT FILE]
     - Create backups of files specified using a Stat Watch report file and the settings within a job file
@@ -21,6 +22,7 @@ stat_watch --backup [REPORT FILE]
         - However, files that are no longer matched will not be removed
 
 stat-watch --backup-file [FULL PATH TO FILE]
+stat-watch -a [FULL PATH TO FILE]
     - Create a backup of the specified file
     - If multiple files are specified, they will all be backed up
     - The "-i" or "--include" flag can be used to specify a job file and that file must have the "BackupD" control string present
@@ -30,9 +32,8 @@ stat-watch --backup-file [FULL PATH TO FILE]
         - If multiple files are specified for backup, the comment will be applied to all of those files
     - The "--hold" flag can be used to prevent Stat Watch from removing this file as part of file pruning
 
-stat_watch --config [CONFIGURATION FILE]
-    - Allows the user to specify an alternate configuration file
-    - The "--config" flag and alternate configuration file MUST come before any other flags or arguments
+stat_watch --comment [BACKED UP FILE] [COMMENT]
+    - Add a comment to an existing backed up file
 
 stat_watch --create
     - Asks the user key questions in order to create a Stat Watch job file with the information necessary to watch and backup key user files
@@ -61,6 +62,9 @@ stat_watch --diff [REPORT FILE 1] [REPORT FILE 2]
 
 stat_watch --email-test [EMAIL ADDRESS]
     - Sends a test message to the email address specified so that the end recipient can see an example
+
+stat_watch --hold [BACKED UP FILE]
+    - Flags a backed up file such that it will not be pruned
 
 stat_watch --links [DIRECTORY] ([DIRECTORY 2] ...)
     - Outputs the number of symlinks in each directory
@@ -104,10 +108,16 @@ stat_watch --record [DIRECTORY] ([DIRECTORY 2] ...)
         - For example, running "./stat_watch.pl --record /home/account --as-dir "/home/different/path" will result in the file "/home/account/file.txt" to be listed as "/home/different/path/file.txt"
         - This is useful for situations where you want to capture information for backed-up files and compare them to files in place.
 
+stat_watch --restore [BACKED UP FILE]
+    - Given the full path to a backed up file, restore it to its original location
+
 stat_watch --run [JOB FILE]
     - Runs the necessary commands to complete a Stat Watch job, including checking the stats of files, determining th edifferences, and backing up files when necessary
     - [JOB FILE] is the .job file created when running Stat Watch with the "--create" flag
     - Adding the "--errors" flag after the file will prevent any errors from being routed to /dev/null
+
+stat_watch --unhold [BACKED UP FILE]
+    - Removes the hold from a backed up gile, meaning that it is once again elidgable to be pruned per the rules specified by the "BackupMD" and "BackupMC" control strings
 
 stat_watch --help
 stat_watch -h
@@ -124,4 +134,16 @@ stat_watch --help tests
 
 stat_watch --version
     - Outputs version and changelog information
+
+
+OTHER FLAGS
+
+--config [CONFIGURATION FILE]
+    - Allows the user to specify an alternate configuration file
+    - The "--config" flag and alternate configuration file MUST come before any other flags or arguments
+
+--locate
+    - Tells Stat Watch to determine its own location programatically rather than trust the hard coded location
+    - This flag must come immediately after the primary flag
+    - This was only added for testing purposes; it is unlikely that there will be a use case for it outside of that
 
