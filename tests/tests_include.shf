@@ -34,6 +34,21 @@ function fn_make_files_1 {
 	rm -f "$d_STATWATCH_TESTS_WORKING"/testing/subdir/456.php
 }
 
+function fn_make_files_2 {
+	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing/subdir2
+	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing/subdir/subdir3
+	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/subdir4
+	### Note that this variable was not made local so that it can be used externally
+	v_ANGRY="123""$( echo -e "\n__\0033__\0010" )""__💩__ᡘ__'__"'"__'
+	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing/"$v_ANGRY"
+	touch "$d_STATWATCH_TESTS_WORKING"/testing/"$v_ANGRY".png
+	touch "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/123.png
+	touch "$d_STATWATCH_TESTS_WORKING"/testing/sub
+	touch "$d_STATWATCH_TESTS_WORKING"/testing/subdir/subdir3/123.png
+	touch "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/subdir4/123.png
+	touch "$d_STATWATCH_TESTS_WORKING"/testing/"$v_ANGRY"/123.png
+}
+
 function fn_change_files_1 {
 	rm -f "$d_STATWATCH_TESTS_WORKING"/testing/123.php
 	echo "1235" > "$d_STATWATCH_TESTS_WORKING"/testing/123.php"' -- d"
@@ -51,6 +66,16 @@ function fn_change_files_1 {
 	echo "1235" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0033456.html" )"
 	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/subdir/123💩456.php"
 	echo "1235" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/456.php
+}
+
+function fn_change_files_2 {
+	echo "123" > "$d_STATWATCH_TESTS_WORKING"/testing/"$v_ANGRY".png
+	echo "123" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/123.png
+	echo "123" > "$d_STATWATCH_TESTS_WORKING"/testing/sub
+	echo "123" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/subdir3/123.png
+	echo "123" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/subdir4/123.png
+	rm -f "$d_STATWATCH_TESTS_WORKING"/testing/"$v_ANGRY"/123.png
+	echo "123" > "$d_STATWATCH_TESTS_WORKING"/testing/"$v_ANGRY"/456.png
 }
 
 function fn_remove_files {

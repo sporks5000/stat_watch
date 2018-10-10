@@ -1,9 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_8 {
-	echo -e "\n8.  Is max-depth working as expected?"
+	echo "8.  Is max-depth working as expected?"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 
 	### hen given a max depth, make sure that it ends up in the report
 	"$f_STAT_WATCH" --config "$f_CONF" "$d_STATWATCH_TESTS_WORKING"/testing -i <( echo "Max-depth 0" ) --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
@@ -34,5 +37,4 @@ function fn_test_8 {
 	fn_pass "8.3"
 }
 
-fn_make_files_1
-fn_test_8
+fn_test_8 "$@"

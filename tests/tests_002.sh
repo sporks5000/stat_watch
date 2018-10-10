@@ -1,9 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_2 {
-	echo -e "\n2.  Will stat_watch.pl recognize file names with special characters, quotes, or new lines"
+	echo "2.  Will stat_watch.pl recognize file names with special characters, quotes, or new lines"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "testing/123('|\"|\?|!)456\.php' -- " ) -ne 4 ]]; then
 		fn_fail "2.1"
 	fi
@@ -30,5 +33,4 @@ function fn_test_2 {
 	fn_pass "2.6"
 }
 
-fn_make_files_1
-fn_test_2
+fn_test_2 "$@"

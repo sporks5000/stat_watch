@@ -1,7 +1,5 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_9 {
 ### Sections from test 9 that were used to prep for test 10
 	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
@@ -20,7 +18,12 @@ function fn_test_9 {
 }
 
 function fn_test_10 {
-	echo -e "\n10. If there are backed-up files, does \"--list\" work as anticipated?"
+	echo "10. If there are backed-up files, does \"--list\" work as anticipated?"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 
 	### Test a file where there should be backups
 	fn_test_9
@@ -49,5 +52,4 @@ function fn_test_10 {
 	fn_pass "10.4"
 }
 
-fn_make_files_1
-fn_test_10
+fn_test_10 "$@"

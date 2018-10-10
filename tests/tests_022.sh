@@ -1,9 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_22 {
-	echo -e "\n22. test to ensure that --backup-file is working as anticipated (including \"--hold\" and \"--comment\" functionality)"
+	echo "22. Test to ensure that --backup-file is working as anticipated (including \"--hold\" and \"--comment\" functionality)"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 
 	### Make sure that a file that was not explicitly requested to be backed up was backed up
 	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
@@ -113,5 +116,4 @@ function fn_test_22 {
 	fn_pass "22.9"
 }
 
-fn_make_files_1
-fn_test_22
+fn_test_22 "$@"

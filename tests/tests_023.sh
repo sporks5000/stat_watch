@@ -1,9 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_23 {
-	echo -e "\n23. test assumptions to ensure that they are working as expected"
+	echo "23. Test assumptions to ensure that they are working as expected"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 
 	### Given a job file and a directory, is the assumption created as expected
 	f_JOB="$d_STATWATCH_TESTS_WORKING"/testing2/test.job
@@ -47,8 +50,49 @@ function fn_test_23 {
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123.php_* | egrep -cv "ctime$" ) -ne 2 ]]; then
 		fn_fail "23.5"
 	fi
-	fn_pass "23.5"	
+	fn_pass "23.5"
+
+	### Test to ensure that creating a new assumption one directory up from an existing assumption does not remove the existing assumption
+	if [[ $( cat "$d_STATWATCH_TESTS_WORKING"/testing2/working/assumptions | wc -l ) -ne 1 ]]; then
+		fn_fail "23.6.1"
+	fi
+	cp -a "$f_JOB" "$f_JOB"2
+	"$f_STAT_WATCH" --config "$f_CONF" --assume "$f_JOB"2 "$d_STATWATCH_TESTS_WORKING" > /dev/null
+	### Verify a new line has been added
+	if [[ $( cat "$d_STATWATCH_TESTS_WORKING"/testing2/working/assumptions | wc -l ) -ne 2 ]]; then
+		fn_fail "23.6.2"
+	fi
+	### Verify that we're given the right directory as output
+	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --assume "$d_STATWATCH_TESTS_WORKING" | egrep -c "$( fn_sanitize "$f_JOB"2 )" ) -ne 1 ]]; then
+		fn_fail "23.6.3"
+	fi
+	fn_pass "23.6"
+
+	### Test "--remove" functionality
+	"$f_STAT_WATCH" --config "$f_CONF" --assume --remove "$d_STATWATCH_TESTS_WORKING" > /dev/null
+	if [[ $( cat "$d_STATWATCH_TESTS_WORKING"/testing2/working/assumptions | wc -l ) -ne 1 ]]; then
+		fn_fail "23.7.1"
+	fi	
+	### Verify that we're told no directories match
+	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --assume "$d_STATWATCH_TESTS_WORKING" | egrep -c "No assumed job for directory" ) -ne 1 ]]; then
+		fn_fail "23.7.2"
+	fi
+	### Verify that assumptions in deeper directories remain intact
+	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --assume "$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "$( fn_sanitize "$f_JOB" )" ) -ne 1 ]]; then
+		fn_fail "23.7.3"
+	fi
+	fn_pass "23.7"
+	
+	### Test to ensure that creating a new assumption for a directory with an existing assumption successfully overwrites the existing assumption
+	"$f_STAT_WATCH" --config "$f_CONF" --assume "$f_JOB"2 "$d_STATWATCH_TESTS_WORKING"/testing > /dev/null
+	if [[ $( cat "$d_STATWATCH_TESTS_WORKING"/testing2/working/assumptions | wc -l ) -ne 1 ]]; then
+		fn_fail "23.8.1"
+	fi
+	### Verify that we're given the right directory as output
+	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --assume "$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "$( fn_sanitize "$f_JOB"2 )" ) -ne 1 ]]; then
+		fn_fail "23.8.2"
+	fi
+	fn_pass "23.8"
 }
 
-fn_make_files_1
-fn_test_23
+fn_test_23 "$@"

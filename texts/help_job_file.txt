@@ -9,7 +9,8 @@ Default Usage:
     - All other lines that don't match this or the control strings described below will be ignored.
 
 Control Strings:
-    - Lines beginning with the following control strings have special meanings and can be declared multiple times: 
+    - Lines beginning with the following control strings have special meanings and can be declared multiple times:
+        - If a line begins with the full path ot a file or directory (starting with "/") that file or directory will be passed over (as if declared with the "--ignore" flag)
         - "*" - Pass over all files and directories whose full path begins with the string that follows
         - "R" - Pass over all files and directories that match the following Perl interpreted regex
         - "I" - Add the following file or directory to the list of files and directories to be checked (as if it was listed at the command line). Has no effect with "--diff"

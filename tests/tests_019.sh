@@ -1,10 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_19 {
-	echo -e "\n19. Do the \"Time-\" and \"MD5R\" control strings work as expected?"
+	echo "19. Do the \"Time-\" and \"MD5R\" control strings work as expected?"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 }
 
-fn_make_files_1
-fn_test_19
+fn_test_19 "$@"

@@ -1,10 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_25 {
-	echo -e "\n25. test to verify that \"--run\" is running jobs correctly, with or without an assumption, either with the job name or the file"
+	echo "25. Test to verify that \"--run\" is running jobs correctly, with or without an assumption, either with the job name or the file"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 }
 
-fn_make_files_1
-fn_test_25
+fn_test_25 "$@"

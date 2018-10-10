@@ -6,14 +6,21 @@ function fn_find_pwd {
 		return
 	fi
 	local v_PWD="$( pwd -P )"
-	echo -n "$( fn_find_assume $v_PWD )"
+	echo -n "$( fn_find_assume "$v_PWD" )"
 }
 
 function fn_find_assume {
 ### Find if this directory is part of an assumption
 	local d_CUR="$( cd "$1" && pwd -P )"
+	if [[ "${d_CUR: -1}" == "/" ]]; then
+		### Remove a trailing slash
+		d_CUR="${d_CUR:0:${#d_CUR}-1}"
+	fi
 	local d_SAN_CUR="$( fn_sanitize "$d_CUR" )"
-	local v_LINE="$( grep -nEao "^$d_SAN_CUR." "$d_WORKING"/assumptions | grep -Pa "\x0" | tail -n1 | cut -d ":" -f1 )"
+	### First, get  only the section of lines that begin with the directory, plus the next character
+	### Next, select only lines where that next character was zero
+	### Finally, grab the line number
+	local v_LINE="$( grep -nEao "^$d_SAN_CUR." "$d_WORKING"/assumptions 2> /dev/null | grep -Pa "\x0$" | tail -n1 | cut -d ":" -f1 )"
 	local v_RETURN=
 	if [[ -z "$v_LINE" ]]; then
 		fn_file_path "$d_CUR"; local d_PARENT="$s_DIR"
@@ -21,7 +28,7 @@ function fn_find_assume {
 			v_RETURN="$( fn_find_assume "$d_PARENT" )"
 		fi
 	else
-		v_RETURN="$( tail -n +"$v_LINE" "$d_WORKING"/assumptions | head -n1 | cut -d $'\000' -f2 )"
+		v_RETURN="$( tail -n +"$v_LINE" "$d_WORKING"/assumptions 2> /dev/null | head -n1 | cut -d $'\000' -f2 )"
 	fi
 	echo -n "$v_RETURN"
 }
@@ -39,15 +46,31 @@ function fn_assume_include {
 }
 
 function fn_create_assumption {
+	local d_ASSUME
 	if [[ -z "$1" ]]; then
-		return
-	elif [[ ! -f "$1" || ( -n "$2" && ! -d "$2" ) ]]; then
-		return
+	### No arguments - give addumptions for the PWD
+		local f_JOB="$( fn_find_pwd )"
+		if [[ -n "$f_JOB" ]]; then
+			echo "Job file: '$f_JOB'"
+		else
+			echo "No assumed job"
+		fi
+		exit
+	elif [[ ( ! -f "$1" && "$1" != "--remove" ) || ( -n "$2" && ! -d "$2" ) ]]; then
+		if [[ -d "$1" ]]; then
+		### The first argument was a directory - give assumptions for that directory
+			local f_JOB="$( fn_find_assume "$1" )"
+			if [[ -n "$f_JOB" ]]; then
+				echo "Job file for directory '$1': '$f_JOB'"
+			else
+				echo "No assumed job for directory '$1'"
+			fi
+		fi
+		exit
 	fi
 	### Create a working directory and a file to document assumptions
 	mkdir -p "$d_WORKING"
 	local f_TEMP=$( mktemp )
-	local d_ASSUME
 	if [[ -n "$2" ]]; then
 		d_ASSUME="$2"
 	else
@@ -60,14 +83,26 @@ function fn_create_assumption {
 	fi
 	local d_ASSUME_SAN="$( fn_sanitize "$d_ASSUME" )"
 	### Put all other assumptions into a temp file
-	grep -Ea -v "^$d_ASSUME_SAN"$'\000' "$d_WORKING"/assumptions > "$f_TEMP" 2> /dev/null
-	### Add this assumption to the temp file
-	printf '%b' "$d_ASSUME"'\0' >> "$f_TEMP"
-	fn_file_path "$1"
-	echo "$( cd -P "$s_DIR" && pwd )"/"$s_FILE" >> "$f_TEMP"
-	### Replace the assumptions file with the temp file
-	mv -f "$f_TEMP" "$d_WORKING"/assumptions
-	echo "Assumption created"
+	local v_LINES="$( grep -nEao "^$d_ASSUME_SAN." "$d_WORKING"/assumptions 2> /dev/null | grep -Pa "\x0$" | cut -d ":" -f1 | tr "\n" ";" | sed "s/;/d;/g" )"
+	if [[ -n "$v_LINES" ]]; then
+		sed -e "$v_LINES" "$d_WORKING"/assumptions > "$f_TEMP" 2> /dev/null
+	else
+		cat "$d_WORKING"/assumptions > "$f_TEMP" 2> /dev/null
+	fi
+	if [[ "$1" == "--remove" ]]; then
+	### we've been asked to remove an assumption
+		mv -f "$f_TEMP" "$d_WORKING"/assumptions
+		echo "Assumptions for directory '$d_ASSUME' have been removed"
+	else
+	### Add the assumption to the list
+		### Add this assumption to the temp file
+		printf '%b' "$d_ASSUME"'\0' >> "$f_TEMP"
+		fn_file_path "$1"
+		echo "$( cd -P "$s_DIR" && pwd )"/"$s_FILE" >> "$f_TEMP"
+		### Replace the assumptions file with the temp file
+		mv -f "$f_TEMP" "$d_WORKING"/assumptions
+		echo "Assumption created for directory '$d_ASSUME'"
+	fi
 }
 
 

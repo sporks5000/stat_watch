@@ -3,11 +3,15 @@
 function fn_file_path {
 ### Given the full path to a file, populate the variables "$s_FILE" and "$s_DIR" with the file and the directory
 	local v_FILE="$1"
+	### If the file name ends in a slash, remove that slash
 	if [[ "${v_FILE: -1}" == "/" ]]; then
 		v_FILE="${v_FILE:0:${#v_FILE}-1}"
 	fi
+	### Separate out the file name from the path
 	s_FILE="${v_FILE##*/}"
+	### Find the length of the path
 	local v_DIR_LEN=$(( ${#v_FILE} - ${#s_FILE} - 1 ))
+	### Separate out the path
 	s_DIR=
 	if [[ "$v_DIR_LEN" -gt 0 ]]; then
 		s_DIR="${v_FILE:0:$v_DIR_LEN}"

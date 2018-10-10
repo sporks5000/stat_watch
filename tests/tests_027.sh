@@ -1,9 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_27 {
-	echo -e "\n27. Verify functionality of \"--restore\""
+	echo "27. Verify functionality of \"--restore\""
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 
 	### Make backups of filenames with special characters
 	"$f_STAT_WATCH" --config "$f_CONF" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup -a "$d_STATWATCH_TESTS_WORKING"/testing/123.php"' -- d" "$d_STATWATCH_TESTS_WORKING/testing/123'456.php" "$d_STATWATCH_TESTS_WORKING/testing/123\"456.php" "$d_STATWATCH_TESTS_WORKING/testing/123?456.php" "$d_STATWATCH_TESTS_WORKING"'/testing/123!456.php' "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/123\n456.php" )" "$d_STATWATCH_TESTS_WORKING/testing/123ᡘ456.php" "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0010456.html" )" "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0033456.html" )" "$d_STATWATCH_TESTS_WORKING/testing/subdir/123💩456.php"
@@ -13,8 +16,8 @@ function fn_test_27 {
 	fn_pass "27.1"
 
 	### Create a file with all of the special characters
-	local v_FILE="$d_STATWATCH_TESTS_WORKING"/testing/123"$( echo -e "\n__\0033__\0010" )""__💩__ᡘ__'__"'"__'".png"
-	touch "$v_FILE"
+	fn_make_files_2
+	local v_FILE="$d_STATWATCH_TESTS_WORKING"/testing/"$v_ANGRY".png
 	echo "1234" > "$v_FILE"
 	"$f_STAT_WATCH" --config "$f_CONF" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup -a "$v_FILE"
 	### Make sure that it lists
@@ -46,5 +49,4 @@ function fn_test_27 {
 	fn_pass "27.3"
 }
 
-fn_make_files_1
-fn_test_27
+fn_test_27 "$@"

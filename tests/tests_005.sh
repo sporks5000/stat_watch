@@ -1,9 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_5 {
-	echo -e "\n5.  Will stat_watch.pl accurately replace paths using the \"--as-dir\" flag?"
+	echo "5.  Will stat_watch.pl accurately replace paths using the \"--as-dir\" flag?"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 
 	### Make sure that it is accurately labeling the report as saying that it's looking in the changed directory
 	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --as-dir /home | egrep -c "Processing: '/home'" ) -ne 1 ]]; then
@@ -24,5 +27,4 @@ function fn_test_5 {
 	fn_pass "5.3"
 }
 
-fn_make_files_1
-fn_test_5
+fn_test_5 "$@"

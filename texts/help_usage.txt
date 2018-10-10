@@ -84,9 +84,9 @@ Typically it is not recommended that this feature be used as it results in addit
 To capture any MD5 sums, whether using the "--md5" flag or settings within an include/ignore file, the perl modules 'Digest::MD5' and 'Digest::MD5::File' will need to be present. You can verify that everything you need for this is in place by running stat_watch with the "--md5-test" flag:
 ```    /root/bin/stat_watch --md5-test```
 
-#======================#
-#== Backing Up Files ==#
-#======================#
+#====================================#
+#== Backing Up Files from a Report ==#
+#====================================#
 
 Using a Stat Watch report generated with the "--record" functionality, you can create backups of certain files in order to ensure that you have copies available for later.
 
@@ -97,7 +97,21 @@ Then backup the files that you're interested in using the "--backup" flag in con
 ```    mkdir -p /home/stat_watch/temp_backup
     /root/bin/stat_watch --backup /root/stat_watch1.txt --backupr '\.(p(hp(4|5|7)?|[lym])|js|css|ht(ml?|access|passwd)|sh|rb)$' --backupd /home/stat_watch/temp_backup```
 
-The files will be stored with the backup directory specified with the "--backupd" functioning as the equivalent of "/", and with a unix timestamp appended to the end of their file name. Thus with the above command, the file '/home/account/public_html/directory/script.php' would have a backup located at '/home/stat_watch/temp_backup/home/account/public_html/directory/script.php_1533578720'. "cp -a" is used to make the copy, so all stat data except ctime should be retained.
+The files will be stored with the backup directory specified with the "--backupd" functioning as the equivalent of "/", and with a unix timestamp appended to the end of their file name. Thus with the above command, the file '/home/account/public_html/directory/script.php' would have a backup located at '/home/stat_watch/temp_backup/home/account/public_html/directory/script.php_1533578720' (or some other epoch timestamp). "cp -a" is used to make the copy, so all stat data should be retained. The ctime of the file is documented by writing it to a file with a name ending in "_ctime", so for the above example, it would be '/home/stat_watch/temp_backup/home/account/public_html/directory/script.php_1533578720_ctime'
+
+#=================================#
+#== Backing Up Individual Files ==#
+#=================================#
+
+You can have Stat Watch create a backup of a single file using the "--backup-file" flag or the "-a" flag. Note that a backup directory must be specified.
+
+```    /root/bin/stat_watch -a /home/account/public_html/directory/script.php --backupd /home/stat_watch/temp_backup```
+
+As above, the backup created would end up located at '/home/stat_watch/temp_backup/home/account/public_html/directory/script.php_1533578720' (or some other epoch timestamp).
+
+You can also leave a comment when backing up a file. Such comments can be viewed when listing backed-up copies for files (see "Listing Backed-up Files" below):
+
+```    /root/bin/stat_watch -a /home/account/public_html/directory/script.php --comment "Prior to changes for ticket 12345" --backupd /home/stat_watch/temp_backup```
 
 #=============================#
 #== Listing Backed-up Files ==#
@@ -112,7 +126,23 @@ And the output you receive would look something like the following:
 ```    Available Backups for '/home/account/public_html/directory/script.php':
       '/home/stat_watch/sporks50/backup_sporks50/home/account/public_html/directory/script.php_1533578720' -- Timestamp: 2018-08-06 14:05:20 -0400```
 
-With this output, you have the full path to both the current file and all backups, making it easy to compare them with "diff" or to use "cp -a" to overwrite the current file with one of the backups.
+If there is a comment associated with one of the backups, the output would look something like this:
+```    Available Backups for '/home/account/public_html/directory/script.php':
+      '/home/stat_watch/sporks50/backup_sporks50/home/account/public_html/directory/script.php_1533532189' -- Timestamp: 2018-08-06 01:09:41 -0400
+        - Prior to changes for ticket 12345
+      '/home/stat_watch/sporks50/backup_sporks50/home/account/public_html/directory/script.php_1533578720' -- Timestamp: 2018-08-06 14:05:20 -0400```
+
+With this output, you have the full path to both the current file and all backups, making it easy to compare them with "diff"
+
+#===============================#
+#== Restoring Backed-up Files ==#
+#===============================#
+
+After getting a list of backed-up files, you can choose to restore one of them using the "--restore" flag:
+
+```    /root/bin/stat_watch --restore '/home/stat_watch/sporks50/backup_sporks50/home/account/public_html/directory/script.php_1533532189'```
+
+This would return the version of the file from 2018-08-06 01:09:41 -0400 to its previous location at '/home/account/public_html/directory/script.php' with the same permissions and ownerships that it had had at that time.
 
 #==========================#
 #== Watching a Directory ==#

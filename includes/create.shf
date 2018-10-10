@@ -1,10 +1,21 @@
 #! /bin/bash
 ### Create a Stat Watch job
 
+v_ACCOUNT=
+v_NAME=
+
 function fn_name {
-	read -ep "Is there a specific name you want to use for this job (leave blank for \"$v_ACCOUNT\")? " v_NAME
-	if [[ -z $v_NAME ]]; then
+	echo -n "What name do you want to use for this job"
+	if [[ -n "$v_ACCOUNT" ]]; then
+		echo -n "(leave blank for \"$v_ACCOUNT\")"
+	fi
+	read -ep "? " v_NAME
+	echo
+	if [[ -z "$v_NAME" && -n "$v_ACCOUNT" ]]; then
 		v_NAME="$v_ACCOUNT"
+	elif [[ -z "$v_NAME" ]]; then
+		echo "A name must be provided"
+		fn_name
 	fi
 	if [[ $( echo "$v_NAME" | egrep -c "^[0-9a-zA-Z]+$" ) -lt 1 ]]; then
 		echo "The name should only contain letters and numbers"
@@ -19,8 +30,12 @@ function fn_name {
 }
 
 function fn_create {
+	local v_HOMEDIR
+	local v_MONITOR
+	local v_YN
 	### Prompt for basic details about the job that we're going to create
 	read -ep "What is the name of the account that you're creating a stat_watch job for? " v_ACCOUNT
+	echo
 	if [[ $( grep -E "^""$v_ACCOUNT"":" -c /etc/passwd ) -lt 1 ]]; then
 		echo "Account \"$v_ACCOUNT\" Does not exist"
 		exit
@@ -34,50 +49,64 @@ function fn_create {
 		fi
 	fi
 	if [[ -z $v_MONITOR ]]; then
-		read -ep "Name one directory we should monitor: " v_MONITOR
+		read -ep "Name one directory we should monitor (you can add more later): " v_MONITOR
 		if [[ ! -e $v_MONITOR ]]; then
 			echo "\"$v_MONITOR\" is not a directory"
 			exit
 		fi
 	fi
 
+	### Get a name for the job
 	fn_name
 
 	### And figure out where we're going to store this job
-	if [[ $( stat -c %n /*/stat_watch/ 2> /dev/null | wc -l ) -gt 0 ]]; then
-		echo "There are currently stat_watch working directories in the following root-level directories:"
-		stat -c %n /*/stat_watch/ 2> /dev/null | sed "s/^/   /;s/\/stat_watch\/$//"
-		echo
-	fi
-	read -ep "What root-level directory do you want backups to be placed on? " v_PART
-	if [[ ! -d "$v_PART" ]]; then
-		if [[ -d "/""$v_PART" ]]; then
-			v_PART="/""$v_PART"
-		else
-			echo "\"$v_PART\" Is not a root-level directory"
-			exit
+	local v_DIR
+	echo "Next we need a directory to designate as the working directory for this job. It's recommended that this directory not contain any other files and directories so that its contents can be completely dedicated to this job. Be sure that the directory exists on a partition with enough extra space to store the files that we will be backing up. Also, if this Stat Watch job is being created out of concern that malicious users might have access to the files that are being monitored, it is best to select a directory outside of that threat." | "$d_PROGRAM"/scripts/fold_out.pl
+	echo
+	read -ep "What directory do you want to use as the working directory for this job (Default: /home/stat_watch/$v_NAME)? " v_DIR
+	echo
+	if [[ -z "$v_DIR" ]]; then
+		v_DIR="/home/stat_watch/$v_NAME"
+		if [[ ! -d "/home/stat_watch" ]]; then
+			mkdir -p "/home/stat_watch"
 		fi
 	fi
-	v_DIR="$v_PART"/stat_watch/"$v_ACCOUNT"
+	fn_file_path "$v_DIR"
+	if [[ -n "$s_DIR" && ! -d "$s_DIR"  ]]; then
+		echo "Directory '$s_DIR' does not exist"
+		exit
+	elif [[ ! -d "$v_DIR" ]]; then
+		read -ep "Directory '$v_DIR' does not exist. Do you want me to create it for you (Y/n)? " v_YN
+		echo
+		if [[ $( echo "$v_YN" | grep -E -c "^[nN]" ) -gt 0 ]]; then
+			echo "exiting"
+			exit
+		fi
+		mkdir -p "$v_DIR"
+	fi
 	if [[ -f "$v_DIR"/"$v_NAME".job ]]; then
-		echo "There already appears to be a stat_watch job at \""$v_DIR"/"$v_NAME".job\". You can delete or modify that."
+		echo "There already appears to be a stat_watch job at \""$v_DIR"/"$v_NAME".job\". You should probably delete or modify that rather than create a new job." | "$d_PROGRAM"/scripts/fold_out.pl
 		exit
 	fi
 
 	### Prompt if the job should stop running after 45 days
+	local b_EXPIRE=false
 	read -ep "Do you want this job to stop running after 45 days, and for all backed up files to be removed after 60 days (Y/n)? " v_YN
+	echo
 	if [[ $( echo "$v_YN" | grep -E -c "^[nN]" ) -eq 0 ]]; then
-		v_EXPIRE=true
+		b_EXPIRE=true
 	fi
 
 	### Prompt for an email address to send reports to
+	local v_EMAIL
 	read -ep "What email address should reports be sent to (leave blank for none)? " v_EMAIL
+	echo
 	if [[ -n $v_EMAIL ]]; then
 		echo -e "\e[91m"
-		echo "If $v_EMAIL is a customer-facing address, MAKE SURE that appropriate expectations have been set for how these emails will be followed up on."
-		echo "Here is an example of setting such expectations: https://raw.githubusercontent.com/sporks5000/stat_watch/master/texts/expectations.txt"
+		echo "If $v_EMAIL is a customer-facing address, MAKE SURE that appropriate expectations have been set for how these emails will be followed up on." | "$d_PROGRAM"/scripts/fold_out.pl
+		echo "Here is an example of setting such expectations: https://raw.githubusercontent.com/sporks5000/stat_watch/master/texts/expectations.txt" | "$d_PROGRAM"/scripts/fold_out.pl
 		echo
-		echo "Note: If you create a file at \"$v_DIR/$v_NAME""_message_head.txt\" or \"$v_DIR/$v_NAME""_message_foot.txt\", the contents of that file will be sent at the top or bottom, respectively, of each email message. It might be wise to set expectations there as well"
+		echo "Note: If you create a file at \"$v_DIR/$v_NAME""_message_head.txt\" or \"$v_DIR/$v_NAME""_message_foot.txt\", the contents of that file will be sent at the top or bottom, respectively, of each email message. It might be wise to set expectations there as well" | "$d_PROGRAM"/scripts/fold_out.pl
 		echo -e "\e[0m"
 		### Pause here, because I SUPER want people to read this
 		sleep 10
@@ -86,7 +115,8 @@ function fn_create {
 	### Create the relevant files
 	mkdir -p "$v_DIR"/backup_"$v_NAME"
 	touch $v_DIR/$v_NAME.log
-	f_JOB="$v_DIR/$v_NAME".job
+	local f_JOB="$v_DIR/$v_NAME".job
+
 ### Changing indentation for the heredoc
 cat << EOF > "$f_JOB"
 ### This file created by Stat Watch
@@ -102,11 +132,12 @@ Log $v_DIR/$v_NAME.log
 Name $v_NAME
 Email-retain $v_EMAIL_RETAIN
 EOF
-### Returning to previous indentation
+
+	### Returning to previous indentation
 	if [[ -n $v_EMAIL ]]; then
 		echo "Email $v_EMAIL" >> "$f_JOB"
 	fi
-	if [[ $v_EXPIRE == true ]]; then
+	if [[ $b_EXPIRE == true ]]; then
 		echo "Expire $( date --date="now + 45 days" +%s )" >> "$f_JOB"
 	fi
 
@@ -115,7 +146,7 @@ EOF
 
 	### Create a working directory and a file to document jobs created
 	mkdir -p "$d_WORKING"
-	f_TEMP=$( mktemp )
+	local f_TEMP=$( mktemp )
 	### Copy all of the other jobs into a temp file
 	grep -E -v "^$f_JOB - Created " "$f_JOBS" > "$f_TEMP" 2> /dev/null
 	### Add this job to the temp file
@@ -126,12 +157,12 @@ EOF
 	### Output text telling the user what next steps they need to take
 	echo
 	echo -e "A job file has been created at \"\e[92m$f_JOB\e[0m\""
-	echo "Run \"$d_PROGRAM/$f_PERL_SCRIPT --help\" for further information on how it can be edited to suit your needs"
+	echo "Run \"stat_watch --help job\" for further information on how it can be edited to suit your needs"
 	echo "Once you have that file organized as you need it, run the following command:"
 	echo
 	echo "$d_PROGRAM/$f_PROGRAM --run \"$f_JOB\""
 	echo
-	echo "Then add the following line to root's crontab (adjusting times if necessary):"
+	echo "Then add the following line to root's crontab (adjusting times as desired):"
 	echo
 	### set a random minute from 1 to 59 for the cron job to run
 	echo "$(( 1 + RANDOM % 58 )) */2 * * * $d_PROGRAM/$f_PROGRAM --run "$f_JOB" > /dev/null 2>&1"

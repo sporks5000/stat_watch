@@ -1,10 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_15 {
-	echo -e "\n15. Does ignoring work as anticipated (\"--ignore\" flag, bare string in the job file, \"*\" and \"R\" control strings)"
+	echo -e "\e[35mThere is no test 15\e[00m"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 }
 
-fn_make_files_1
-fn_test_15
+fn_test_15 "$@"

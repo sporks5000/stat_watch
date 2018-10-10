@@ -7,6 +7,7 @@
 set -e
 
 export PATH=$PATH:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
+b_LIST=false
 
 ### Find where statwatch is
 export d_STATWATCH='####INSTALLATION_DIRECTORY####'
@@ -67,24 +68,32 @@ function fn_run_test {
 	fi
 
 	### Run the test script
-	v_SUCCESS=true
-	echo -e "\e[34mRunning tests from file '$f_TEST'\e[00m"
-	"$d_STATWATCH_TESTS"/"$f_TEST" || v_SUCCESS=false
+	if [[ "$b_LIST" == false ]]; then
+		v_SUCCESS=true
+		echo -e "\e[34mRunning tests from file '$f_TEST'\e[00m"
+		"$d_STATWATCH_TESTS"/"$f_TEST" || v_SUCCESS=false
+	else
+		echo -e "\e[34mListing tests from file '$f_TEST'\e[00m"
+		"$d_STATWATCH_TESTS"/"$f_TEST" --list
+	fi
 
 	### Make the test no longer executable
 	chmod -x "$d_STATWATCH_TESTS"/"$f_TEST"
 
 	### Exit if the test failed
-	if [[ "$v_SUCCESS" == false ]]; then
-		### If the script failed, exit
-		echo -e "\e[31mTests from file '$f_TEST': Failed\e[00m" > /dev/stderr
-		if [[ "$b_SPECIFIC" == false ]]; then
-			echo "To skip these tests, add the flags '--skip $f_TEST'"
+	if [[ "$b_LIST" == false ]]; then
+		if [[ "$v_SUCCESS" == false ]]; then
+			### If the script failed, exit
+			echo -e "\e[31mTests from file '$f_TEST': Failed\e[00m" > /dev/stderr
+			if [[ "$b_SPECIFIC" == false ]]; then
+				echo -e "To skip these tests, add the flags '--skip $f_TEST'"
+			fi
+			echo
+			fn_unskip 
+			exit 1
 		fi
-		fn_unskip 
-		exit 1
+		echo -e '\e[32mTests from file '$f_TEST': Success!\e[00m\n'
 	fi
-	echo -e '\e[32mTests from file '$f_TEST': Success!\e[00m'
 }
 
 function fn_unskip {
@@ -102,6 +111,10 @@ function fn_unskip {
 source "$d_STATWATCH"/includes/util.shf
 
 fn_unskip
+if [[ "$1" == "--list" ]]; then
+	b_LIST=true
+	shift
+fi
 if [[ -n "$1" && "$1" != "--skip" && "$1" != "--start" ]]; then
 ### Run a single test script
 	b_SPECIFIC=true

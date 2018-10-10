@@ -6,19 +6,23 @@ Included with Stat Watch is a series of tests to verify that it is functioning a
 
 USAGE
 
-/usr/local/stat_watch/tests/test.sh -
+/usr/local/stat_watch/tests/test.sh
     - Iterate through all of the tests present
     - If any of the tests fail, stop at that point and leave working files intact so that the user can examine them and assess what caused the test to fail
 
-/usr/local/stat_watch/tests/test.sh [TEST SCRIPT] -
+/usr/local/stat_watch/tests/test.sh [TEST SCRIPT]
     - Run only the tests from specific test scripts
     - Multiple file names can be given, but all must be scripts within the /usr/local/stat_watch/tests/ directory
 
-/usr/local/stat_watch/tests/test.sh --skip [TEST SCRIPT] -
+/usr/local/stat_watch/tests/test.sh --list
+    - Just lists what each of the tests does
+    - When used with any other arguments, "--list" must come first
+
+/usr/local/stat_watch/tests/test.sh --skip [TEST SCRIPT]
     - Run all of the test scripts present, except for any specified
     - Multiple file names can be given, but all must be scripts within the /usr/local/stat_watch/tests/ directory
 
-/usr/local/stat_watch/tests/test.sh --start [TEST SCRIPT] -
+/usr/local/stat_watch/tests/test.sh --start [TEST SCRIPT]
     - Process the tests scripts that are present in order, starting with the test script specified
     - When using "--start" and "--skip", "--start" must be declared first
 

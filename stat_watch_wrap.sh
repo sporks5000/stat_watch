@@ -86,7 +86,7 @@ done
 ### Test to ensure that the necessary perl modules are present
 if [[ ! -f "$d_WORKING"/perl_modules ]]; then
 	v_MODULES=''
-	for i in "Digest::MD5" "Digest::MD5::File" "Cwd" "POSIX"; do
+	for i in "Digest::MD5" "Digest::MD5::File" "Cwd" "POSIX" "Fcntl"; do
 		if [[ $( "$v_PERL" -e "use $i;" 2>&1 | head -n1 | grep -E -c "^Can't locate" ) -gt 0 ]]; then
 			v_MODULES="$v_MODULES $i"
 		fi
@@ -181,7 +181,7 @@ elif [[ -n "$1" && "$1" != "--create" ]]; then
 	else
 		"$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS "$@"
 	fi
-elif [[ -z "$1" || "$1" == "--create" ]]; then
+elif [[ "$1" == "--create" ]]; then
 	if [[ "$1" == "--create" ]]; then
 		shift
 	fi
@@ -190,8 +190,8 @@ elif [[ -z "$1" || "$1" == "--create" ]]; then
 	fi
 	source "$d_PROGRAM"/includes/create.shf
 	fn_create
-elif [[ -n "$1" ]]; then
-	echo "Unrecognized argument \"$1\""
+else
+	"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_basic.txt "$d_PROGRAM"/texts/help_feedback.txt
 fi
 
 

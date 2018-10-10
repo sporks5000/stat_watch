@@ -1,9 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_9 {
-	echo -e "\n9.  Do the backups work as expected with \"--diff\""
+	echo "9.  Do the backups work as expected with \"--diff\""
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 
 	### Create a situation where one file should be backed up. Is it?
 	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
@@ -68,5 +71,4 @@ function fn_test_9 {
 	fn_pass "9.5"
 }
 
-fn_make_files_1
-fn_test_9
+fn_test_9 "$@"

@@ -1,7 +1,5 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 ### There are two ways that backups are pruned: when the "--prune" flag is used, and when a backup of a file is made during "--diff" (assuming "--no-check-retention" was not used)
 ### Backups are pruned within the "fn_check_retention" subroutine
 ### When backups are pruned is controled by the $v_retention_max_copies variable and the $v_retention_min_days variable
@@ -13,7 +11,12 @@ source "$d_STATWATCH_TESTS"/tests_include.shf
 ### Whether or not backups are being taken was already tested in 006 and 009
 
 function fn_test_12_1 {
-	echo -e "\n12.1. Is backup pruning working as anticipated when using \"--prune\"?"
+	echo "12.1. Is backup pruning working as anticipated when using \"--prune\"?"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 
 	### Test that the correct number of backups are being retained
 	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
@@ -102,7 +105,12 @@ function fn_test_12_1 {
 }
 
 function fn_test_12_2 {
-	echo -e "\n12.2. Is backup pruning working as anticipated with \"--diff\"?"
+	echo "12.2. Is backup pruning working as anticipated with \"--diff\"?"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 
 	### Create a backup and verify its presence
 	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
@@ -156,11 +164,9 @@ function fn_test_12_2 {
 	### No need to re-test other aspects, as it's the saem functions that they're being routed through
 }
 
-fn_make_files_1
-fn_test_12_1
+fn_test_12_1 "$@"
 rm -rf "$d_STATWATCH_TESTS_WORKING"
-fn_make_files_1
-fn_test_12_2
+fn_test_12_2 "$@"
 
 
 

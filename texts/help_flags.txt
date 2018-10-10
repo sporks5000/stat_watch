@@ -5,8 +5,12 @@ stat_watch --assume [JOB_FILE] [DIRECTORY]
     - From this point forward, when ever Stat Watch is run within a directory or one of its subdirectories, assume that a specific job file should be included (as if with the "-i" or "--include" flag)
     - If Stat Watch is run within the directory specified with the "-i" or "--include" flags or with the "--no-assume" flag, these assumptions will be ignored
     - Only one job file can be specified as being assumed for each directory - running "--assume" again and specifying the same directory will overwrite the job file to use
-    - The PWD will be chedked first, followed by its parent directory and so on - thus if both '/var' and '/var/log' are specified, and a Stat Watch command is run within the directory '/var/log/tmp', the assumptions for '/var/log' will be used and the assumptions for '/var' will be ignored
-    - If this argument is only given the job file and no directory, the PWD is assumed
+    - The PWD will be checked first, followed by its parent directory and so on - thus if both '/var' and '/var/log' have been given assumptions, and a Stat Watch command is run within the directory '/var/log/tmp', the assumptions for '/var/log' will be used and the assumptions for '/var' will not be used
+    - If this flag given only the job file and no directory, an assumption is created for the PWD
+    - If this flag given only a directory, the script will report assumptions for the directory given (if any)
+    - If this flag given no arguments, It will return whether or not these is an assumption for the PWD
+    - If instead of a job file, the flag "--remove" is given, remove any flags for the directory given
+        - Or the PWD, if no directory is given
 
 stat_watch --backup [REPORT FILE]
     - Create backups of files specified using a Stat Watch report file and the settings within a job file
@@ -56,6 +60,7 @@ stat_watch --diff [REPORT FILE 1] [REPORT FILE 2]
         - This is optimal if you're regularly running Stat Watch with the "--prune" flag (as is done automatically with the "--run" flag)
     - The "--no-ctime" flag tells the script to ignore differences in ctime. This is useful if you're comparing against a restored backup.
     - The "--no-partial-seconds" limits the comparison of timestamps to full seconds
+        - This functionality will become the default in future versions
     - The "--before" and "--after" flags can be used to specify which is the earlier Stat Watch report file and which is the later
         - Without these flags, the mtimes of the files are used to determine which is which
     - The "--backup-md" and "--backup-mc" flags can be used to set the vaules typically set by the "BackupMD" and "BackupMC" control strings
@@ -107,6 +112,8 @@ stat_watch --record [DIRECTORY] ([DIRECTORY 2] ...)
     - The "--as-dir" flag can be followed by a string of text that will be used to replace the directory name when recording the full file path
         - For example, running "./stat_watch.pl --record /home/account --as-dir "/home/different/path" will result in the file "/home/account/file.txt" to be listed as "/home/different/path/file.txt"
         - This is useful for situations where you want to capture information for backed-up files and compare them to files in place.
+    - The "--ext-stat" flag can be used to use the stat binary rather than perl's internal stat
+        - This functionality is deprecated (as it is significantly less performant) and will be removed in future versions
 
 stat_watch --restore [BACKED UP FILE]
     - Given the full path to a backed up file, restore it to its original location

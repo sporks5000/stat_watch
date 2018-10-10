@@ -1,9 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_26 {
-	echo -e "\n26. Verify functionality of \"--hold\", \"--unhold\", and \"--comment\""
+	echo "26. Verify functionality of \"--hold\", \"--unhold\", and \"--comment\""
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 
 	### Backup a file
 	"$f_STAT_WATCH" --config "$f_CONF" --backup-file "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
@@ -56,5 +59,4 @@ function fn_test_26 {
 	fn_pass "26.4"
 }
 
-fn_make_files_1
-fn_test_26
+fn_test_26 "$@"

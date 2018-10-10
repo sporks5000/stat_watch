@@ -1,9 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_7 {
-	echo -e "\n7.  Does gathering md5 sums work?"
+	echo "7.  Does gathering md5 sums work?"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 
 	### Test recording with md5's
 	fn_md5_modules
@@ -61,5 +64,4 @@ function fn_test_7 {
 	fi
 }
 
-fn_make_files_1
-fn_test_7
+fn_test_7 "$@"

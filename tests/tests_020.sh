@@ -1,10 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_20 {
-	echo -e "\n20. If a directory is not readable or is not executable (or both) how does this impact Stat Watch?"
+	echo "20. If a directory is not readable or is not executable (or both) how does this impact Stat Watch?"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 }
 
-fn_make_files_1
-fn_test_20
+fn_test_20 "$@"

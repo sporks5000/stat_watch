@@ -8,6 +8,7 @@ use warnings;
 
 use Cwd qw(abs_path getcwd);
 use POSIX 'strftime';
+use Fcntl ':mode';
 
 my $v_program = __FILE__;
 my $d_program = '####INSTALLATION_DIRECTORY####';
@@ -55,6 +56,7 @@ my $v_as_dir;
 my $v_current_dir;
 my $b_links;
 my $b_new_lines;
+my $b_ext_stat;
 
 #===================#
 #== Report Output ==#
@@ -145,9 +147,16 @@ sub fn_report_line {
 ### Given a file name, output the necessary data for a "--record" style report
 	my $v_file = $_[0];
 	my $v_timestamp = $_[1];
-	my $v_file_escape = fn_shell_escape_filename($v_file);
-	my $v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z $v_file_escape 2> /dev/null`;
-	chomp( $v_line );
+	my $v_line;
+	if ($b_ext_stat) {
+		my $v_file_escape = fn_shell_escape_filename($v_file);
+		$v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z $v_file_escape 2> /dev/null`;
+		chomp( $v_line );
+	} elsif ( -l $v_file ) {
+		$v_line = join( ' -- ', (lstat($v_file))[2,4,5,7,9,10] );
+	} else {
+		$v_line = join( ' -- ', (stat($v_file))[2,4,5,7,9,10] );
+	}
 	$v_line .= fn_check_md5($v_file);
 	$v_file = fn_get_file_name($v_file, $v_timestamp);
 	print $fh_output "'" . $v_file . "' -- " . $v_line . "\n";
@@ -289,11 +298,30 @@ sub fn_diff {
 			$ref_diff->{$v_file}->{$v_first}->{'size'} = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'group'} = pop(@v_line);
 			$ref_diff->{$v_file}->{$v_first}->{'owner'} = pop(@v_line);
-			$ref_diff->{$v_file}->{$v_first}->{'perms'} = pop(@v_line);
-			if (! $b_partial_seconds) {
+			my $v_perms = pop(@v_line);
+			if ( $v_perms =~ m/^[0-9]+$/ ) {
+			### This indicates that the report file was done with internal stat rather than external stat
+				$v_ctime = strftime( '%Y-%m-%d %T %z', localtime($v_ctime) );
+				$v_mtime = strftime( '%Y-%m-%d %T %z', localtime($v_mtime) );
+				### - for normal file, d for a directory, l for symbolic link, c for a character device, p for a pseudo-terminal and b for a block device
+				if ( S_ISREG($v_perms) ) {
+					$v_perms = "f-" . sprintf "%04o", $v_perms & 07777;
+				} elsif ( S_ISDIR($v_perms) ) {
+					$v_perms = "d-" . sprintf "%04o", $v_perms & 07777;
+				} elsif ( S_ISLNK($v_perms) ) {
+					$v_perms = "l-" . sprintf "%04o", $v_perms & 07777;
+				} elsif ( S_ISBLK($v_perms) ) {
+					$v_perms = "b-" . sprintf "%04o", $v_perms & 07777;
+				} elsif ( S_ISCHR($v_perms) ) {
+					$v_perms = "c-" . sprintf "%04o", $v_perms & 07777;
+				} elsif ( S_ISFIFO($v_perms) ) {
+					$v_perms = "p-" . sprintf "%04o", $v_perms & 07777;
+				}
+			} elsif (! $b_partial_seconds) {
 				$v_ctime =~ s/\.[0-9]+/$1/;
 				$v_mtime =~ s/\.[0-9]+/$1/;
 			}
+			$ref_diff->{$v_file}->{$v_first}->{'perms'} = $v_perms;
 			$ref_diff->{$v_file}->{$v_first}->{'ctime'} = $v_ctime;
 			$ref_diff->{$v_file}->{$v_first}->{'mtime'} = $v_mtime;
 		}
@@ -1377,6 +1405,7 @@ sub fn_escape_filename {
 }
 
 sub fn_shell_escape_filename {
+### Escape the file name such that it can be used in a command run with backticks
 	my $v_file = $_[0];
 	$v_file =~ s/'/'\\''/g;
 	$v_file = "'" . $v_file . "'";
@@ -1384,6 +1413,8 @@ sub fn_shell_escape_filename {
 }
 
 sub fn_unescape_filename {
+### Experimental - has not be thoroughly tested
+### Take the results of fn_escape_filename and return them to their original form
 	my $v_file = $_[0];
 	while ( $v_file =~ m/'\$'[\\0-7abtnvfr]+''/ ) {
 	### for each block of escaped hex characters
@@ -1563,7 +1594,7 @@ while ( defined $ARGV[0] ) {
 		}
 	} elsif ( $v_arg eq "--ignore" ) {
 		if ( defined $ARGV[0] ) {
-			$v_file = fn_test_file(shift( @ARGV ), 1);
+			$v_file = fn_test_file(shift( @ARGV ));
 		}
 		if ( $v_file ) {
 			push( @v_ignore, $v_file );
@@ -1596,6 +1627,8 @@ while ( defined $ARGV[0] ) {
 		}
 	} elsif ( $v_arg eq "--no-partial-seconds" ) {
 		$b_partial_seconds = 0;
+	} elsif ( $v_arg eq "--ext-stat" ) {
+		$b_ext_stat = 1;
 	} elsif ( $v_arg eq "--backup-md" ) {
 		if ( defined $ARGV[0] && $ARGV[0] =~ m/^[0-9]+$/ ) {
 			$v_retention_min_days = shift( @ARGV );
@@ -1653,8 +1686,6 @@ if ( defined $args[0] && $args[0] eq "--diff" ) {
 			}
 		} elsif ( $v_arg eq "--no-check-retention" ) {
 			$b_retention = 0;
-		} elsif ( $v_arg eq "--no-partial-seconds" ) {
-			$b_partial_seconds = 0;
 		} elsif ( $v_arg eq "--no-ctime" ) {
 			$b_diff_ctime = 0;
 		} elsif ( $v_arg eq "--backup" ) {

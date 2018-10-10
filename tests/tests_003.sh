@@ -1,9 +1,12 @@
 #! /bin/bash
 
-source "$d_STATWATCH_TESTS"/tests_include.shf
-
 function fn_test_3 {
-	echo -e "\n3.  Will stat_watch.pl recognize changes to files in \"--diff\" mode"
+	echo "3.  Will stat_watch.pl recognize changes to files in \"--diff\" mode"
+	if [[ "$1" == "--list" ]]; then
+		return
+	fi
+	source "$d_STATWATCH_TESTS"/tests_include.shf
+	fn_make_files_1
 	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
 	sleep 1.1
 	fn_change_files_1
@@ -28,5 +31,4 @@ function fn_test_3 {
 	fn_pass "3.3"
 }
 
-fn_make_files_1
-fn_test_3
+fn_test_3 "$@"
