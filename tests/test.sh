@@ -122,6 +122,11 @@ if [[ -n "$1" && "$1" != "--skip" && "$1" != "--start" ]]; then
 		fn_file_path "$1"
 		if [[ -f "$d_STATWATCH_TESTS"/"$s_FILE" ]]; then
 			fn_run_test "$s_FILE"
+		else
+			v_FILE="$( \ls -1 "$d_STATWATCH_TESTS" | grep -E -m1 "^tests_$s_FILE" )"
+			if [[ -n "$v_FILE" ]]; then
+				fn_run_test "$v_FILE"
+			fi
 		fi
 		shift
 	done
@@ -133,6 +138,11 @@ else
 		fn_file_path "$1"
 		if [[ -f "$d_STATWATCH_TESTS"/"$s_FILE" ]]; then
 			v_START="$s_FILE"
+		else
+			v_FILE="$( \ls -1 "$d_STATWATCH_TESTS" | grep -E -m1 "^tests_$s_FILE" )"
+			if [[ -n "$v_FILE" ]]; then
+				fn_run_test "$v_FILE"
+			fi
 		fi
 		shift
 	fi
@@ -142,6 +152,11 @@ else
 			fn_file_path "$1"
 			if [[ -f "$d_STATWATCH_TESTS"/"$s_FILE" && $( echo "$s_FILE" | grep -Ec "^tests_[0-9_]+\.[^.]+$" ) -gt 0 ]]; then
 				mv -f "$d_STATWATCH_TESTS"/"$s_FILE" "$d_STATWATCH_TESTS"/skipped_"$s_FILE"
+			else
+				v_FILE="$( \ls -1 "$d_STATWATCH_TESTS" | egrep -m1 "^tests_$s_FILE" )"
+				if [[ -n "$v_FILE" && $( echo "$v_FILE" | grep -Ec "^tests_[0-9_]+\.[^.]+$" ) -gt 0 ]]; then
+					fn_run_test "$v_FILE"
+				fi
 			fi
 			shift
 		done

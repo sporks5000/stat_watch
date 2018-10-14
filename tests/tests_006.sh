@@ -14,16 +14,15 @@ function fn_test_6 {
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 1 ]]; then
 		fn_fail "6.1.1"
 	fi
-	### Make sure that the ctime file is there as well
-	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+_ctime$" ) -ne 1 ]]; then
+	### Make sure that the stat file is there as well
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+_stat$" ) -ne 1 ]]; then
 		fn_fail "6.1.2"
 	fi
 	fn_pass "6.1"
 
-	### Verify that the information stored in the ctime file is correct
+	### Verify that the information stored in the stat file is correct
 	local v_CTIME1="$( stat -c %Z "$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php )"
-	local v_CTIME2="$( cat "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_*_ctime )"
-	if [[ "$v_CTIME1" -ne "$v_CTIME2" ]]; then
+	if [[ $( cat "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456.php_*_stat | egrep -c " -- $v_CTIME1 -- [^ ]+$" ) -ne 1 ]]; then
 		fn_fail "6.2"
 	fi
 	fn_pass "6.2"
@@ -38,6 +37,7 @@ function fn_test_6 {
 	### Change the file; make sure that a second backup is made
 	sleep 1.1
 	fn_change_files_1
+	echo -n "12" > "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php"
 	"$f_STAT_WATCH" --config "$f_CONF" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backup+ "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 2 ]]; then
 		fn_fail "6.4"
@@ -60,9 +60,9 @@ function fn_test_6 {
 
 	### Make changes to some of the files; verify that they are backed up again
 	sleep 1.1
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123?456.php"
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123!456.php"
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php"
+	echo "12356" > "$d_STATWATCH_TESTS_WORKING/testing/123?456.php"
+	echo "12356" > "$d_STATWATCH_TESTS_WORKING/testing/123!456.php"
+	echo "12356" > "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php"
 	"$f_STAT_WATCH" --config "$f_CONF" --backup "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --backupr '\.php$' --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "\.php_[0-9]+$" ) -ne 11 ]]; then
 		fn_fail "6.6"

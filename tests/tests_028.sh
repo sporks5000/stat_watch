@@ -71,7 +71,7 @@ function fn_test_28 {
 	### Go to the directory by the correct name and test if backing up a file works
 	cd "$d_STATWATCH_TESTS_WORKING"/testing/
 	"$f_STAT_WATCH" --config "$f_CONF" -a 123.php >/dev/null
-	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123.php_* | egrep -cv "ctime$" ) -ne 1 ]]; then
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123.php_* | egrep -cv "stat$" ) -ne 1 ]]; then
 		fn_fail "28.6"
 	fi
 	fn_pass "28.6"
@@ -80,7 +80,7 @@ function fn_test_28 {
 	rm -rf "$d_STATWATCH_TESTS_WORKING"/testing2/backup/*
 	cd "$d_STATWATCH_TESTS"/symlink/testing/
 	"$f_STAT_WATCH" --config "$f_CONF" -a 123.php >/dev/null
-	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123.php_* | egrep -cv "ctime$" ) -ne 1 ]]; then
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123.php_* | egrep -cv "stat$" ) -ne 1 ]]; then
 		fn_fail "28.7"
 	fi
 	fn_pass "28.7"
@@ -90,7 +90,7 @@ function fn_test_28 {
 	"$f_STAT_WATCH" --config "$f_CONF" --assume "$f_JOB" > /dev/null
 	cd "$d_STATWATCH_TESTS_WORKING"/testing/
 	"$f_STAT_WATCH" --config "$f_CONF" -a 123.php >/dev/null
-	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123.php_* | egrep -cv "ctime$" ) -ne 1 ]]; then
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123.php_* | egrep -cv "stat$" ) -ne 1 ]]; then
 		fn_fail "28.8"
 	fi
 	fn_pass "28.8"

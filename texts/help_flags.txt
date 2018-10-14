@@ -36,8 +36,12 @@ stat-watch -a [FULL PATH TO FILE]
         - If multiple files are specified for backup, the comment will be applied to all of those files
     - The "--hold" flag can be used to prevent Stat Watch from removing this file as part of file pruning
 
-stat_watch --comment [BACKED UP FILE] [COMMENT]
+stat_watch --comment [BACKED-UP FILE] [COMMENT]
     - Add a comment to an existing backed up file
+
+stat_watch --compare [FILE 1] [FILE 2]
+    - Compares stats of two files and outputs a diff of their content
+    - The files presented can be actual filenames, or backup display names as output by "--list"
 
 stat_watch --create
     - Asks the user key questions in order to create a Stat Watch job file with the information necessary to watch and backup key user files
@@ -78,7 +82,9 @@ stat_watch --links [DIRECTORY] ([DIRECTORY 2] ...)
 
 stat_watch --list [FILE]
     - This will list the available backups that Stat Watch has taken of a specific file
-    - It is not necessary to specify an includde file, Stat Watch will check all directories that it has ever backed up to in hopes of giving the most comprehensive answer possible.
+        - The output shows the file's display name, the time the backup was taken, the file's size in bytes, and any comments that might have been made for the backup
+    - It is not necessary to specify an include file or backup directory
+        - Stat Watch will check all directories that it has ever backed up to in hopes of giving the most comprehensive answer possible.
 
 stat_watch --md5-test
     - Test to see if everything necessary is in place for checking the md5sum of files

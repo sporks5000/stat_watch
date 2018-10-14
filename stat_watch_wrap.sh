@@ -138,34 +138,6 @@ elif [[ "$1" == "--assume" ]]; then
 		shift
 	fi
 	fn_create_assumption "$@"
-elif [[ "$1" == "--hold" ]]; then
-	source "$d_PROGRAM"/includes/hold.shf
-	shift
-	if [[ "$1" == "--locate" ]]; then
-		shift
-	fi
-	fn_hold "$@"
-elif [[ "$1" == "--unhold" ]]; then
-	source "$d_PROGRAM"/includes/hold.shf
-	shift
-	if [[ "$1" == "--locate" ]]; then
-		shift
-	fi
-	fn_unhold "$@"
-elif [[ "$1" == "--restore" ]]; then
-	source "$d_PROGRAM"/includes/hold.shf
-	shift
-	if [[ "$1" == "--locate" ]]; then
-		shift
-	fi
-	fn_restore "$@"
-elif [[ "$1" == "--comment" ]]; then
-	source "$d_PROGRAM"/includes/hold.shf
-	shift
-	if [[ "$1" == "--locate" ]]; then
-		shift
-	fi
-	fn_comment "$@"
 elif [[ -n "$1" && "$1" != "--create" ]]; then
 ### This covers all of the flags that need to be ran by the perl script
 	source "$d_PROGRAM"/includes/assume.shf
@@ -177,9 +149,9 @@ elif [[ -n "$1" && "$1" != "--create" ]]; then
 	fi
 
 	if [[ "$b_ADD_INCLUDE" == true ]]; then
-		"$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS "$@" --include "$f_ASSUME"
+		"$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" "$@" --include "$f_ASSUME"
 	else
-		"$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS "$@"
+		"$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" "$@"
 	fi
 elif [[ "$1" == "--create" ]]; then
 	if [[ "$1" == "--create" ]]; then

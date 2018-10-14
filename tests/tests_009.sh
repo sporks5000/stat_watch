@@ -12,13 +12,14 @@ function fn_test_9 {
 	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
 	sleep 1.1
 	fn_change_files_1
+	echo -n "12" > "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php"
 	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt
 	"$f_STAT_WATCH" --config "$f_CONF" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+$" ) -ne 1 ]]; then
 		fn_fail "9.1.1"
 	fi
 	### Make sure that the ctime file is there as well
-	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+_ctime$" ) -ne 1 ]]; then
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456\.php_[0-9]+_stat$" ) -ne 1 ]]; then
 		fn_fail "9.1.2"
 	fi
 	fn_pass "9.1"
@@ -32,7 +33,7 @@ function fn_test_9 {
 
 	### If we change the ctime, however, it should result in a second backup being made
 	sleep 1.1
-	local f_CTIME="$( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456\.php_*_ctime )"
+	local f_CTIME="$( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/123Ͼ456\.php_*_stat )"
 	date +%s > "$f_CTIME"
 	"$f_STAT_WATCH" --config "$f_CONF" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackup+ $d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" ) > /dev/null
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123Ͼ456.php_[0-9]+$" ) -ne 2 ]]; then
@@ -59,9 +60,9 @@ function fn_test_9 {
 
 	### Given changes to some of those files, make sure that they are backed up again
 	sleep 1.1
-	echo "1236" > "$d_STATWATCH_TESTS_WORKING/testing/123?456.php"
-	echo "1236" > "$d_STATWATCH_TESTS_WORKING/testing/123!456.php"
-	echo "1236" > "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php"
+	echo "12356" > "$d_STATWATCH_TESTS_WORKING/testing/123?456.php"
+	echo "12356" > "$d_STATWATCH_TESTS_WORKING/testing/123!456.php"
+	echo "12356" > "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php"
 	mv -f "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
 	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt
 	"$f_STAT_WATCH" --config "$f_CONF" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackupR \.php$" ) > /dev/null

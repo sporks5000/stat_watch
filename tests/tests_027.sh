@@ -25,7 +25,7 @@ function fn_test_27 {
 		fn_fail "27.2.1"
 	fi
 	### Make sure that we've actually captured the name of the backup
-	local v_BACKUP="$d_STATWATCH_TESTS_WORKING"/testing2/backup"$v_FILE"_"$( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep "png" | egrep -v "ctime" | egrep -o "[0-9]+$" )"
+	local v_BACKUP="$d_STATWATCH_TESTS_WORKING"/testing2/backup"$v_FILE"_"$( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep "png" | egrep -v "stat" | egrep -o "[0-9]+$" )"
 	if [[ ! -f "$v_BACKUP" ]]; then
 		fn_fail "27.2.2"
 	fi
@@ -33,7 +33,7 @@ function fn_test_27 {
 
 	### Modify the file, then restore the earlier version
 	sleep 1.1
-	echo "5678" > "$v_FILE"
+	echo "56789" > "$v_FILE"
 	"$f_STAT_WATCH" --config "$f_CONF" --restore "$v_BACKUP" > /dev/null
 	if [[ "$( cat "$v_FILE" )" != "1234" ]]; then
 		fn_fail "27.3.1"

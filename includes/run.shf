@@ -116,21 +116,21 @@ function fn_run {
 	### If this is the first run, do an initial backup of files
 		eval "$v_RUN_START"
 		stat -c '%Y' "$f_JOB" > "$v_DIR"/"$v_NAME"_stamp
-		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --record -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files.txt -v 2> "$v_ERROR_OUT"
-		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --backup -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt 2> "$v_ERROR_OUT"
+		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" --record -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files.txt -v 2> "$v_ERROR_OUT"
+		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" --backup -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt 2> "$v_ERROR_OUT"
 		eval "$v_RUN_POST"
 	else
 	### If this is a later run, diff the reports, and if there were changes, email them out
 		eval "$v_RUN_START"
-		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --record -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
+		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" --record -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
 		if [[ $( stat -c '%Y' "$f_JOB" ) -gt $( cat "$v_DIR"/"$v_NAME"_stamp 2> "$v_ERROR_OUT" ) ]]; then
 			### If the job file has been updated, there's a chance that we need to back up additional files
-			nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --backup -i "$f_JOB" "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
+			nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" --backup -i "$f_JOB" "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
 			### ypdate the stat file so that we know not to do that next time
 			stat -c '%Y' "$f_JOB" > "$v_DIR"/"$v_NAME"_stamp
 		fi
 		v_STAMP="$( date +%s )"
-		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --diff --no-check-retention -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> "$v_ERROR_OUT"
+		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" --diff --no-check-retention -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> "$v_ERROR_OUT"
 		eval "$v_RUN_POST"
 		### this file should contain at least two lines
 		if [[ $( wc -l "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -gt 1 ]]; then
@@ -203,8 +203,18 @@ function fn_run {
 		fi
 
 		### Determine whether or not we're purning old backups
-		if [[ $(( $v_PRUNE_CHANCE + RANDOM % $v_PRUNE_MAX )) -le $v_PRUNE_CHANCE ]]; then
-			nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" $v_PERL_ARGS --prune -i "$f_JOB" 2> "$v_ERROR_OUT"
+		if [[ $(( $v_PRUNE_CHANCE + RANDOM % $v_PRUNE_MAX )) -le "$v_PRUNE_CHANCE" ]]; then
+			fn_get_direc "BackupD"; d_BACKUP="$v_DIREC"
+			v_LAST_PRUNE=0;
+			### If there's a default backup directory, prevent multiple jobs from pruning it all the time
+			if [[ "$v_BACKUP_DIRECTORY" == "$d_BACKUP" && -d "$d_BACKUP" && -f "$d_BACKUP"/__last_prune ]]; then
+				v_LAST_PRUNE="$( cat "$d_BACKUP"/__last_prune )"
+			fi
+			if [[ (( v_LAST_PRUNE + 10800 )) -le "$( date +%s )" ]]; then
+				echo -n "$( date +%s )" > "$d_BACKUP"/__last_prune 2> /dev/null
+				nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" --prune -i "$f_JOB" 2> "$v_ERROR_OUT"
+				echo -n "$( date +%s )" > "$d_BACKUP"/__last_prune 2> /dev/null
+			fi
 		fi
 
 		### Remove old email messages

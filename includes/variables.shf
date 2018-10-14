@@ -15,6 +15,7 @@ function fn_conf_defaults {
 	v_EMAIL_RETAIN=20
 	v_BACKUP_MIN_DAYS=7
 	v_BACKUP_MAX_COPIES=4
+	v_BACKUP_DIRECTORY=
 	v_PARTIAL_SECONDS=1
 	v_MAX_DEPTH=20
 }
@@ -45,11 +46,12 @@ function fn_read_conf {
 	local DEFv_EMAIL_RETAIN="$v_EMAIL_RETAIN"
 	local DEFv_BACKUP_MIN_DAYS="$v_BACKUP_MIN_DAYS"
 	local DEFv_BACKUP_MAX_COPIES="$v_BACKUP_MAX_COPIES"
+	local DEFv_BACKUP_DIRECTORY="$v_BACKUP_DIRECTORY"
 	local DEFv_PARTIAL_SECONDS="$v_PARTIAL_SECONDS"
 	local DEFv_MAX_DEPTH="$v_MAX_DEPTH"
 
 	### Read from the configuration file
-	source <( cat "$lf_CONF" | grep -Ev "^\s*#|^\s*$" | sed -E "s/^\s*/v_/;s/\s*=\s*/=\"/;s/\s*$/\"/" | grep -E "^v_(PERL|CPAN|PRUNE_(CHANCE|MAX)|NICE|LOG_MAX|EMAIL_RETAIN|BACKUP_(MIN_DAYS|MAX_COPIES)|PARTIAL_SECONDS|MAX_(DEPTH|RUN)|WORKING)=\".*\"$" ) 2> /dev/null
+	source <( cat "$lf_CONF" | grep -Ev "^\s*#|^\s*$" | sed -E "s/^\s*/v_/;s/\s*=\s*/=\"/;s/\s*$/\"/" | grep -E "^v_(PERL|CPAN|PRUNE_(CHANCE|MAX)|NICE|LOG_MAX|EMAIL_RETAIN|BACKUP_(MIN_DAYS|MAX_COPIES|DIRECTORY)|PARTIAL_SECONDS|MAX_(DEPTH|RUN)|WORKING)=\".*\"$" ) 2> /dev/null
 
 	### Check the variables to make sure that they're logical
 	if [[ -z "$v_PERL" || "${v_PERL:0:1}" == "/" || ! -x "$v_PERL" ]]; then
@@ -87,6 +89,9 @@ function fn_read_conf {
 	if [[ -z "$v_BACKUP_MAX_COPIES" || $( echo -n "$v_BACKUP_MAX_COPIES" | grep -E "^[0-9]+$" ) -lt 1 || "$v_BACKUP_MAX_COPIES" -lt 0 ]]; then
 		v_BACKUP_MAX_COPIES="$DEFv_BACKUP_MAX_COPIES"
 	fi
+	if [[ -z "$v_BACKUP_DIRECTORY" || ! -d "$v_BACKUP_DIRECTORY" ]]; then
+		v_BACKUP_DIRECTORY="$DEFv_BACKUP_DIRECTORY"
+	fi
 	if [[ -z "$v_PARTIAL_SECONDS" ]]; then
 		v_PARTIAL_SECONDS="$DEFv_PARTIAL_SECONDS"
 	fi
@@ -103,12 +108,17 @@ function fn_read_conf {
 
 function fn_perl_args {
 ### Take the variables that relate to the perl script and make them into a string of arguments for calling the perl script
-	v_PERL_ARGS="--backup-md $v_BACKUP_MIN_DAYS --backup-mc $v_BACKUP_MAX_COPIES --max-depth $v_MAX_DEPTH"
+	a_PERL_ARGS=( "--backup-md" "$v_BACKUP_MIN_DAYS" "--backup-mc" "$v_BACKUP_MAX_COPIES" "--max-depth" "$v_MAX_DEPTH" )
 	if [[ "$v_PARTIAL_SECONDS" == "0" ]]; then
-		v_PERL_ARGS="$v_PERL_ARGS --no-partial-seconds"
+		a_PERL_ARGS[${#a_PERL_ARGS[@]}]="--no-partial-seconds"
 	fi
 	if [[ -n "$v_WORKING" ]]; then
-		v_PERL_ARGS="$v_PERL_ARGS --working $d_WORKING"
+		a_PERL_ARGS[${#a_PERL_ARGS[@]}]="--working"
+		a_PERL_ARGS[${#a_PERL_ARGS[@]}]="$d_WORKING"
+	fi
+	if [[ -n "$v_BACKUP_DIRECTORY" ]]; then
+		a_PERL_ARGS[${#a_PERL_ARGS[@]}]="--backupd"
+		a_PERL_ARGS[${#a_PERL_ARGS[@]}]="$v_BACKUP_DIRECTORY"
 	fi
 }
 
@@ -157,6 +167,7 @@ function fn_write_conf2 {
 	echo "v_EMAIL_RETAIN=\"$v_EMAIL_RETAIN\"" >> "$f_CONF2"
 	echo "v_BACKUP_MIN_DAYS=\"$v_BACKUP_MIN_DAYS\"" >> "$f_CONF2"
 	echo "v_BACKUP_MAX_COPIES=\"$v_BACKUP_MAX_COPIES\"" >> "$f_CONF2"
+	echo "v_BACKUP_DIRECTORY=\"$v_BACKUP_DIRECTORY\"" >> "$f_CONF2"
 	echo "v_PARTIAL_SECONDS=\"$v_PARTIAL_SECONDS\"" >> "$f_CONF2"
 	echo "v_MAX_DEPTH=\"$v_MAX_DEPTH\"" >> "$f_CONF2"
 }
@@ -174,6 +185,7 @@ function fn_make_conf {
 	sed -i "s@####EMAIL_RETAIN####@$v_EMAIL_RETAIN@" "$f_CONF"
 	sed -i "s@####BACKUP_MIN_DAYS####@$v_BACKUP_MIN_DAYS@" "$f_CONF"
 	sed -i "s@####BACKUP_MAX_COPIES####@$v_BACKUP_MAX_COPIES@" "$f_CONF"
+	sed -i "s@####BACKUP_DIRECTORY####@$v_BACKUP_DIRECTORY@" "$f_CONF"
 	sed -i "s@####PARTIAL_SECONDS####@$v_PARTIAL_SECONDS@" "$f_CONF"
 	sed -i "s@####MAX_DEPTH####@$v_MAX_DEPTH@" "$f_CONF"
 }

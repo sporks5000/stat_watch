@@ -27,6 +27,9 @@ BACKUP_MIN_DAYS = ####BACKUP_MIN_DAYS####
 ### The maximum number of backed up copies of a file that should be kept before they're elidgible to be pruned out (as with the BackupMC control string)
 BACKUP_MAX_COPIES = ####BACKUP_MAX_COPIES####
 
+### It can be useful to be able to set a default backup directory that is used server-wide. This is not the default, however.
+BACKUP_DIRECTORY = ####BACKUP_DIRECTORY####
+
 ### When comparing the stats of files, should fractions of seconds for m-time and c-time be taken into consideration?
 ### "0" will disable checking partial seconds, anything else will enable it
 PARTIAL_SECONDS = ####PARTIAL_SECONDS####
@@ -36,4 +39,4 @@ MAX_DEPTH = ####MAX_DEPTH####
 
 ### Typically the working directory is '/ust/local/stat_watch/.stat_watch'. You can set an alternate working directory.
 ### There is very little reason to do this outside of testing purposes
-# WORKING = 
+WORKING = 

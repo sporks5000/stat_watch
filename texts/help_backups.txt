@@ -1,18 +1,72 @@
 
 REGARDING BACKUPS
 
+What is necessary for backups to occur?
+    - There must be a backup directory declared, either with the "--backupd" flag or the "BackupD" control string in a job file (potentially referenced via an assumtion)
+    - For backups to be created while using the "--backup" flag" or the "--diff" flag, there also needs to be defined criteria to match files against to determine if a backup is desired
+        - The "--backup+" flag and "Backup+" control string can be used to specify indifidual files that that you want to have backed up
+        - The "--backupr" flag and "BackupR" control string can be used to specify regular expressions to match files against
+        - Both of the above can be used multiple times for a single command or job
+
 When do backups occur?
-    - For backups to occur, you must have a job file that contains lines with the control characters "BackupD" and "BackupR" or "Backup+"
-    - When Stat Watch is run in "--backup" mode, all files matching the "BackupR" or "Backup+" lines will have their file type, permissions, user, group, size, and mtime checked against the most recent backup (if any). If any of these are different, the file will be backed up
-    - When Stat Watch is run in "--diff" mode, any files with changes to their file type, permissions, user, group, size, mtime, or ctime will be backed up
-    - Changing the "BackupR" or "Backup+" lines and then running "--diff" without running "--backup" WILL NOT cause matching files to be backed up (until "--diff" recognizes that a change has happened)
+    - When Stat Watch is run with the "--backup-file" or "-a" flags, a backup of the file specified will be created
+    - When Stat Watch is run in "--backup" mode, all files from the report that match the "BackupR" or "Backup+" items specified will have their file type, permissions, user, group, size, mtime, and ctime checked against the most recent backup (if any). If any of these are different, or if a previous backup does not exist, the file will be backed up
+    - When Stat Watch is run in "--diff" mode, ONLY files showing as having their file type, permissions, user, group, size, mtime, or ctime (or any combimation thereof) changed will be checked to see if they match the "BackupR" or "Backup+" items that were specified. If they do, a backup will be created
+    - The Stat Watch "--run" mode is actually a wrapper for a number of different Stat Watch processes. Backups occur during this as well.
 
 When are backups pruned?
     - Every time a file is backed up, the directory is checked afterward for other backups of the same file
-    - Of those other backups, the newest X are ignored, where X is the number set by the "BackupMC" control string
-    - Any of the remaining backups that are older then Y days are removed, where Y is the number set by the BackupMD control string
-    - Because old backups will not typically be removed unles a new backup of the file is made, there is also the option to run stat_watch.pl with the "--prune" flag
+        - This check can be disabled with the "--no-check-retention" retention flag
+    - Stat Watch also has the "--prune" mode to remove old backups
 
-Automating backups
-    - Creating Stat Watch jobs wit hthe "--create" flag, and then setting up a cron job to run them wit the "--run" flag is the easiest way to automate creating backups with Stat Watch
+Which of the backups will be pruned?
+    - First the script will check to ensure that we keep the maximum number of copies specified
+        - The "--backup-mc" flag or "BackupMC" control string can be used to specify this number
+        - For example: if "BackupMC" is set to 4, the 4 newest backups will be held in reserve, and only backups older than them will be considered for deletion
+        - If "BackupMC" is set to "-1", all backups will be kept
+    - For those backups beyond the maximum number, the script checks if they are older than the minimum number of days
+        - The "--backup-md" flag of "BackupMD" control string can be used to specify this number
+        - For example: if "BackupMD" is set to 7, only the backups that are more than seven days old will be considered for deletion
+    - For any backups that remain, Stat Watch checks to see if the user has specified for them to be held
+        - This can be accomplished with the "--hold" flag, either when taking the backup initialy with "--backup-file" or "-a", or by using "--hold" on its own
+    - All of the backups that don't fall within any of the above criteria will be removed
+
+How do I view the backups that have been taken of a file?
+    - When you run Stat Watch with "--list" and the name of a file, it will present you with a list of the backups that exist for a file at that path (if any)
+    - This output will include the display name of the backup, the time at which the backup was taken, the size of the backup (in bytes), and if the backup has been held
+
+How can I compare a backup to the current file or restore a backup
+    - By running Stat Watch with the "--compare" flag and giving it the display name shown with "--list", Stat Watch will output differences in file stats and a diff of the file contents
+    - By running Stat Watch with the "--Restore" flag and giving it the display name shown with "--list", Stat Watch will replace the current file with the backup specified, ensuring that the permissions, ownership, and mtime are the same as they were previously
+
+How would one go about automating backups
+    - Creating Stat Watch jobs with the "--create" flag, and then setting up a cron job to run them with the "--run" flag is the easiest way to automate creating backups with Stat Watch
+
+
+REGARDING BACKUP STORAGE
+
+Stat Watch creates backups by emulating the file system's directory tree in the backup directory specified. For example, if Stat Watch were told to backup the file '/usr/local/src/stat_watch.tar.gz' with a backup directory of '/home/stat_watch/backups', it would first create the directory '/home/stat_watch/backups/usr', then '/home/stat_watch/backups/usr/local', then '/home/stat_watch/backups/usr/local/src', and finally it would make a copy of the file stat_watch.tar.gz.
+
+With this organization, Stat Watch backups should always have a full path that looks like the following:
+    [PATH TO THE BACKUP DIRECTORY][ORIGINAL PATH TO THE FILE][ORIGINAL FILE NAME]_[EPOCH TIMESTAMP OF WHEN THE BACKUP WAS CREATED][INCRIMENTAL DIGIT]
+
+So the backup of '/usr/local/src/stat_watch.tar.gz' Might have a file name such as '/home/stat_watch/backups/usr/local/src/stat_watch.tar.gz_15394781730'
+
+Along with the backed up contents, Stat Watch backups may also include files that match the start of the backup file name, but end in one of the following: '_hold', '_comment', '_stat', '_md5', '_pointer'. These files perfrm the following functions: 
+
+'_hold' -
+    - Tells Stat Watch to not prune that specific backup file regardless of what BackupMC and BackupMD are set to
+
+'_comment' -
+    - Contains any comments that have been created for the backed up file
+
+'_stat' -
+    - The permissions, user, group, size, ctime, and mtime of the file
+
+'_md5' -
+    - If Stat Watch has taken an md5sum so that backup file, it will be stored here so that processor time doesn't need to be spent on gathering the data a second time
+
+'_pointer' - 
+    - The presence of this file indicates that the file contents of a later backup were the same as this backup (in otherwords, only permissions or timestamps had changed), and thus rather than wasting space storing the same backup content twice, it's just referencing the other file.
+    - Think of this as being similar to a symlink
 

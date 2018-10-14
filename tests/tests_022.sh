@@ -21,7 +21,7 @@ function fn_test_22 {
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123\?456\.php_[0-9]+$" ) -ne 1 ]]; then
 		fn_fail "22.2.1"
 	fi
-	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123\?456\.php_[0-9]+_ctime$" ) -ne 1 ]]; then
+	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123\?456\.php_[0-9]+_stat$" ) -ne 1 ]]; then
 		fn_fail "22.2.2"
 	fi
 	if [[ $( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "123\?456\.php_[0-9]+_comment$" ) -ne 0 ]]; then
@@ -104,13 +104,13 @@ function fn_test_22 {
 	fn_pass "22.7"
 
 	### "--list" should show that the file is held
-	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --list "$d_STATWATCH_TESTS_WORKING/testing/123?456.php" | egrep -c "$( fn_sanitize "$f_BACKUP3" ).* -- HELD" ) -ne 1 ]]; then
+	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --list "$d_STATWATCH_TESTS_WORKING/testing/123?456.php" | egrep -c "$( fn_sanitize "$d_STATWATCH_TESTS_WORKING/testing/123?456.php" ).* -- HELD" ) -ne 1 ]]; then
 		fn_fail "22.8"
 	fi
 	fn_pass "22.8"
 
 	### "--list" should also show the comment
-	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --list "$d_STATWATCH_TESTS_WORKING/testing/123?456.php" | egrep -A1 "$( fn_sanitize "$f_BACKUP3" ).* -- HELD" | egrep -c "very nice" ) -ne 1 ]]; then
+	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --list "$d_STATWATCH_TESTS_WORKING/testing/123?456.php" | egrep -A1 "$( fn_sanitize "$d_STATWATCH_TESTS_WORKING/testing/123?456.php" ).* -- HELD" | egrep -c "very nice" ) -ne 1 ]]; then
 		fn_fail "22.9"
 	fi
 	fn_pass "22.9"

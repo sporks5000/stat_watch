@@ -10,7 +10,11 @@ function fn_test_26 {
 
 	### Backup a file
 	"$f_STAT_WATCH" --config "$f_CONF" --backup-file "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+
+	### Both of these names should be able to be used to reference the backup equally well
 	f_BACKUP="$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing/"$( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep "123Ͼ456\.php_[0-9]+$" )"
+	f_BACKUP2="$d_STATWATCH_TESTS_WORKING"/testing/"$( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep "123Ͼ456\.php_[0-9]+$" )"
+
 	### Verify that the backup exists
 	if [[ ! -n "$f_BACKUP" || ! -f "$f_BACKUP" ]]; then
 		fn_fail "26.1.1"
@@ -26,7 +30,7 @@ function fn_test_26 {
 	fn_pass "26.1"
 
 	### Hold the backup
-	"$f_STAT_WATCH" --config "$f_CONF" --hold "$f_BACKUP"
+	"$f_STAT_WATCH" --config "$f_CONF" --hold "$f_BACKUP2"
 	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --list "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" | egrep -c "\s--\s" ) -ne 1 ]]; then
 		fn_fail "26.2.2"
 	fi
@@ -48,7 +52,7 @@ function fn_test_26 {
 	fn_pass "26.3"
 
 	### Add a comment for the backup
-	"$f_STAT_WATCH" --config "$f_CONF" --comment "$f_BACKUP" "This is a comment"
+	"$f_STAT_WATCH" --config "$f_CONF" --comment "$f_BACKUP2" "This is a comment"
 	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --list "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php" | egrep -c "\s--\s" ) -ne 1 ]]; then
 		fn_fail "26.4.2"
 	fi

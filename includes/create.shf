@@ -88,6 +88,14 @@ function fn_create {
 		echo "There already appears to be a stat_watch job at \""$v_DIR"/"$v_NAME".job\". You should probably delete or modify that rather than create a new job." | "$d_PROGRAM"/scripts/fold_out.pl
 		exit
 	fi
+	d_BACKUP="$v_DIR"/backup_"$v_NAME"
+	if [[ -n "$v_BACKUP_DIRECTORY" ]]; then
+		read -ep "Do you want to use the default backup directory for backup storage? (Y/n)" v_YN
+		echo
+		if [[ $( echo "$v_YN" | grep -E -c "^[nN]" ) -eq 0 ]]; then
+			d_BACKUP="$v_BACKUP_DIRECTORY"
+		fi
+	fi
 
 	### Prompt if the job should stop running after 45 days
 	local b_EXPIRE=false
@@ -113,7 +121,7 @@ function fn_create {
 	fi
 
 	### Create the relevant files
-	mkdir -p "$v_DIR"/backup_"$v_NAME"
+	mkdir -p "$d_BACKUP"
 	touch $v_DIR/$v_NAME.log
 	local f_JOB="$v_DIR/$v_NAME".job
 
@@ -121,7 +129,7 @@ function fn_create {
 cat << EOF > "$f_JOB"
 ### This file created by Stat Watch
 I $v_MONITOR
-BackupD $v_DIR/backup_$v_NAME
+BackupD $d_BACKUP
 ### back up the following extensions: .php, .php4, .php5, .php7, .pl, .pm, .py, .js, .json, .css, .cgi .htm, .html, .htaccess, .htpasswd, .sh, .rb
 BackupR \.(p(hp(4|5|7)?|[lym])|js(on)?|c(ss|gi)|ht(ml?|access|passwd)|sh|rb)$
 BackupMD $v_BACKUP_MIN_DAYS

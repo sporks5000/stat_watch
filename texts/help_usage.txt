@@ -124,15 +124,15 @@ For example, to see all of the backups made of '/home/account/public_html/direct
 
 And the output you receive would look something like the following:
 ```    Available Backups for '/home/account/public_html/directory/script.php':
-      '/home/stat_watch/sporks50/backup_sporks50/home/account/public_html/directory/script.php_1533578720' -- Timestamp: 2018-08-06 14:05:20 -0400```
+      '/home/account/public_html/directory/script.php_1533578720' -- Timestamp: 2018-08-06 14:05:20 -0400 -- 1024 bytes```
 
 If there is a comment associated with one of the backups, the output would look something like this:
 ```    Available Backups for '/home/account/public_html/directory/script.php':
-      '/home/stat_watch/sporks50/backup_sporks50/home/account/public_html/directory/script.php_1533532189' -- Timestamp: 2018-08-06 01:09:41 -0400
+      '/home/account/public_html/directory/script.php_1533532189' -- Timestamp: 2018-08-06 01:09:41 -0400 -- 1011 bytes
         - Prior to changes for ticket 12345
-      '/home/stat_watch/sporks50/backup_sporks50/home/account/public_html/directory/script.php_1533578720' -- Timestamp: 2018-08-06 14:05:20 -0400```
+      '/home/account/public_html/directory/script.php_1533578720' -- Timestamp: 2018-08-06 14:05:20 -0400 -- 1024 bytes```
 
-With this output, you have the full path to both the current file and all backups, making it easy to compare them with "diff"
+The file names given here are not the actual full path to the backup file, but rather just a display name, quoted such that if the file contains any newline or non-printing characters, it will all appear on one line, and copying and pasting into the terminal will result in those characters being interpreted appropriately. This display name can be used to reference the file with other Stat Watch functions related to backups, such as "--restore" and "--compare"
 
 #===============================#
 #== Restoring Backed-up Files ==#
@@ -140,7 +140,7 @@ With this output, you have the full path to both the current file and all backup
 
 After getting a list of backed-up files, you can choose to restore one of them using the "--restore" flag:
 
-```    /root/bin/stat_watch --restore '/home/stat_watch/sporks50/backup_sporks50/home/account/public_html/directory/script.php_1533532189'```
+```    /root/bin/stat_watch --restore '/home/account/public_html/directory/script.php_1533532189'```
 
 This would return the version of the file from 2018-08-06 01:09:41 -0400 to its previous location at '/home/account/public_html/directory/script.php' with the same permissions and ownerships that it had had at that time.
 
