@@ -11,6 +11,7 @@ stat_watch --assume [JOB_FILE] [DIRECTORY]
     - If this flag given no arguments, It will return whether or not these is an assumption for the PWD
     - If instead of a job file, the flag "--remove" is given, remove any flags for the directory given
         - Or the PWD, if no directory is given
+    - If "--assume" is only given the "--list" flag, this will list all existing assumptions
 
 stat_watch --backup [REPORT FILE]
     - Create backups of files specified using a Stat Watch report file and the settings within a job file
@@ -38,6 +39,7 @@ stat-watch -a [FULL PATH TO FILE]
 
 stat_watch --comment [BACKED-UP FILE] [COMMENT]
     - Add a comment to an existing backed up file
+    - The "--hold" flag can also be used to add a hold on this file
 
 stat_watch --compare [FILE 1] [FILE 2]
     - Compares stats of two files and outputs a diff of their content
@@ -68,12 +70,14 @@ stat_watch --diff [REPORT FILE 1] [REPORT FILE 2]
     - The "--before" and "--after" flags can be used to specify which is the earlier Stat Watch report file and which is the later
         - Without these flags, the mtimes of the files are used to determine which is which
     - The "--backup-md" and "--backup-mc" flags can be used to set the vaules typically set by the "BackupMD" and "BackupMC" control strings
+    - Note: If "--diff" is only given one file as an argument and that file is an existing backup, this will instead funcation as the "--compare" flag
 
 stat_watch --email-test [EMAIL ADDRESS]
     - Sends a test message to the email address specified so that the end recipient can see an example
 
 stat_watch --hold [BACKED UP FILE]
-    - Flags a backed up file such that it will not be pruned
+    - This flags a backed up file such that it will not be pruned
+    - You can add "--comment" followed by a comment in order to add a comment on this file as well
 
 stat_watch --links [DIRECTORY] ([DIRECTORY 2] ...)
     - Outputs the number of symlinks in each directory
@@ -143,6 +147,8 @@ stat_watch --help backups
 stat_watch --help job-files
 stat_watch --help files
 stat_watch --help tests
+stat_watch --help assume
+stat_watch --help conf
     - Outputs information regarding the specific aspect of Stat Watch requested
 
 stat_watch --version

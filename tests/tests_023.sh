@@ -93,6 +93,12 @@ function fn_test_23_1 {
 		fn_fail "23.1.8.2"
 	fi
 	fn_pass "23.1.8"
+
+	### Verify that listing works as expected
+	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --assume --list | egrep -c "  ->  " ) -ne 1 ]]; then
+		fn_fail "23.1.9"
+	fi
+	fn_pass "23.1.9"
 }
 
 function fn_test_23_2 {

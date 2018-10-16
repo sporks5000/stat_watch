@@ -1,6 +1,8 @@
 #! /bin/bash
 
 function fn_email_test {
+### Given an email address, send a test message to that address.
+### If a second argument is given, that will be included as part of the email message
 	if [[ -z "$1" ]]; then
 		echo "Please provide an email address to test sending messages to"
 		exit

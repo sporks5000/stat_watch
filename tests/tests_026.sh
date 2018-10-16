@@ -61,6 +61,30 @@ function fn_test_26 {
 		fn_fail "26.4.3"
 	fi
 	fn_pass "26.4"
+
+	### Verify that "--hold" can be followed by "--comment"
+	"$f_STAT_WATCH" --config "$f_CONF" --backup-file "$d_STATWATCH_TESTS_WORKING/testing/123?456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+	v_DISP="$( "$f_STAT_WATCH" --config "$f_CONF" --list "$d_STATWATCH_TESTS_WORKING/testing/123?456.php" | egrep "\s--\s" | tail -n1 | cut -d \' -f2 )"
+	"$f_STAT_WATCH" --config "$f_CONF" --hold "$v_DISP" --comment "SASQUATCH"
+	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --list "$d_STATWATCH_TESTS_WORKING/testing/123?456.php" | egrep "\s--\s" | egrep -c "\s--\sHELD" ) -ne 1 ]]; then
+		fn_fail "26.5.1"
+	fi
+	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --list "$d_STATWATCH_TESTS_WORKING/testing/123?456.php" | egrep -A1 "\s--\s" | egrep -c "SASQUATCH" ) -ne 1 ]]; then
+		fn_fail "26.5.2"
+	fi
+	fn_pass "26.5"
+
+	### Verify that "--comment" can be followed by "--hold"
+	"$f_STAT_WATCH" --config "$f_CONF" --backup-file "$d_STATWATCH_TESTS_WORKING/testing/123.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+	v_DISP="$( "$f_STAT_WATCH" --config "$f_CONF" --list "$d_STATWATCH_TESTS_WORKING/testing/123.php" | egrep "\s--\s" | tail -n1 | cut -d \' -f2 )"
+	"$f_STAT_WATCH" --config "$f_CONF" --comment "$v_DISP" "SASQUATCH REVENGE" --hold
+	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --list "$d_STATWATCH_TESTS_WORKING/testing/123.php" | egrep "\s--\s" | egrep -c "\s--\sHELD" ) -ne 1 ]]; then
+		fn_fail "26.6.1"
+	fi
+	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --list "$d_STATWATCH_TESTS_WORKING/testing/123.php" | egrep -A1 "\s--\s" | egrep -c "SASQUATCH REVENGE" ) -ne 1 ]]; then
+		fn_fail "26.6.2"
+	fi
+	fn_pass "26.6"
 }
 
 fn_test_26 "$@"

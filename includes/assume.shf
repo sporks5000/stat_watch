@@ -51,22 +51,36 @@ function fn_create_assumption {
 	### No arguments - give addumptions for the PWD
 		local f_JOB="$( fn_find_pwd )"
 		if [[ -n "$f_JOB" ]]; then
-			echo "Job file: '$f_JOB'"
+			echo -n "Job file: "
+			echo -n "$f_JOB" | "$d_PROGRAM"/scripts/escape.pl -n
 		else
 			echo "No assumed job"
 		fi
-		exit
-	elif [[ ( ! -f "$1" && "$1" != "--remove" ) || ( -n "$2" && ! -d "$2" ) ]]; then
+		exit 0
+	elif [[ "$1" == "--list" ]]; then
+		### List the assumptions
+		if [[ ! -f "$d_WORKING"/assumptions ]]; then
+			return
+		fi
+		### This reads the assumption file, escapes both the job file and the directory, then replaces the newline character between them with "   ->   "
+		perl -e 'require( '\'"$d_PROGRAM"\'' . "/scripts/escape.pm" ); while(<>){chomp($_); my @line = split( m/\x0/, $_ ); print SWEscape::fn_escape_filename($line[0]) . "   ->   " . SWEscape::fn_escape_filename($line[1])}' "$d_WORKING"/assumptions
+		echo
+		exit 0
+	elif [[ ( ! -f "$1" && "$1" != "--remove"  ) || ( -n "$2" && ! -d "$2" ) ]]; then
 		if [[ -d "$1" ]]; then
 		### The first argument was a directory - give assumptions for that directory
 			local f_JOB="$( fn_find_assume "$1" )"
 			if [[ -n "$f_JOB" ]]; then
-				echo "Job file for directory '$1': '$f_JOB'"
+				echo -n "Job file for directory "
+				echo -n "$1" | "$d_PROGRAM"/scripts/escape.pl
+				echo -n " : "
+				echo -n "$f_JOB" | "$d_PROGRAM"/scripts/escape.pl -n
 			else
-				echo "No assumed job for directory '$1'"
+				echo -n "No assumed job for directory "
+				echo -n "$1" | "$d_PROGRAM"/scripts/escape.pl -n
 			fi
 		fi
-		exit
+		exit 0
 	fi
 	### Create a working directory and a file to document assumptions
 	mkdir -p "$d_WORKING"
@@ -91,8 +105,16 @@ function fn_create_assumption {
 	fi
 	if [[ "$1" == "--remove" ]]; then
 	### we've been asked to remove an assumption
-		mv -f "$f_TEMP" "$d_WORKING"/assumptions
-		echo "Assumptions for directory '$d_ASSUME' have been removed"
+		if [[ -n "$( diff -q "$f_TEMP" "$d_WORKING"/assumptions )" ]]; then
+			mv -f "$f_TEMP" "$d_WORKING"/assumptions
+			echo -n "Assumptions for directory "
+			echo -n "$d_ASSUME" | "$d_PROGRAM"/scripts/escape.pl
+			echo "have been removed"
+		else
+			rm -f "$f_TEMP"
+			echo -n "No assumptions to remove for directory "
+			echo -n "$d_ASSUME" | "$d_PROGRAM"/scripts/escape.pl -n
+		fi
 	else
 	### Add the assumption to the list
 		### Add this assumption to the temp file
@@ -101,7 +123,8 @@ function fn_create_assumption {
 		echo "$( cd -P "$s_DIR" && pwd )"/"$s_FILE" >> "$f_TEMP"
 		### Replace the assumptions file with the temp file
 		mv -f "$f_TEMP" "$d_WORKING"/assumptions
-		echo "Assumption created for directory '$d_ASSUME'"
+		echo -n "Assumption created for directory "
+		echo -n "$d_ASSUME" | "$d_PROGRAM"/scripts/escape.pl -n
 	fi
 }
 

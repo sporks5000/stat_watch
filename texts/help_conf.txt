@@ -1,0 +1,5 @@
+
+CONFIGURATION FILE
+
+Stat Watch keeps a configuration file which is located by default at '/usr/local/stat_watch/stat_watch.conf' (This location will be different if you are using a non-standart installation directory). The configuration file itself includes details and explanations for all of the configuration options that are present.
+

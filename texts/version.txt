@@ -1,5 +1,9 @@
 
-Current Version: 1.6.0
+Current Version: 1.6.1
+
+Version 1.6.1 (2018-10-16) -
+    - All file names and directories should be output appropriately escaped
+    - Fixed a bug where the log file was being assumed rather than being read from the job file
 
 Version 1.6.0 (2018-10-15) -
     - Major rewrite of the backup process, allowing changes to permissions to be stored without having to save a complete additional copy of the file

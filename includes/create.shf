@@ -43,7 +43,7 @@ function fn_create {
 		v_HOMEDIR="$( grep -E "^""$v_ACCOUNT"":" /etc/passwd | cut -d ":" -f6 )"
 	fi
 	if [[ -d "$v_HOMEDIR""/public_html" ]]; then
-		read -ep "Monitor directory \"$v_HOMEDIR""/public_html\" (y/N)? " v_YN
+		read -ep "Monitor directory $( echo -n "$v_HOMEDIR/public_html" | "$d_PROGRAM"/scripts/escape.pl ) (y/N)? " v_YN
 		if [[ $( echo "$v_YN" | grep -E -c "^[yY]" ) -gt 0 ]]; then
 			v_MONITOR="$v_HOMEDIR""/public_html"
 		fi
@@ -63,7 +63,7 @@ function fn_create {
 	local v_DIR
 	echo "Next we need a directory to designate as the working directory for this job. It's recommended that this directory not contain any other files and directories so that its contents can be completely dedicated to this job. Be sure that the directory exists on a partition with enough extra space to store the files that we will be backing up. Also, if this Stat Watch job is being created out of concern that malicious users might have access to the files that are being monitored, it is best to select a directory outside of that threat." | "$d_PROGRAM"/scripts/fold_out.pl
 	echo
-	read -ep "What directory do you want to use as the working directory for this job (Default: /home/stat_watch/$v_NAME)? " v_DIR
+	read -ep "What directory do you want to use as the working directory for this job (Default: $( echo -n "/home/stat_watch/$v_NAME" | "$d_PROGRAM"/scripts/escape.pl ))? " v_DIR
 	echo
 	if [[ -z "$v_DIR" ]]; then
 		v_DIR="/home/stat_watch/$v_NAME"
@@ -76,7 +76,7 @@ function fn_create {
 		echo "Directory '$s_DIR' does not exist"
 		exit
 	elif [[ ! -d "$v_DIR" ]]; then
-		read -ep "Directory '$v_DIR' does not exist. Do you want me to create it for you (Y/n)? " v_YN
+		read -ep "Directory $( echo -n "$v_DIR" | "$d_PROGRAM"/scripts/escape.pl ) does not exist. Do you want me to create it for you (Y/n)? " v_YN
 		echo
 		if [[ $( echo "$v_YN" | grep -E -c "^[nN]" ) -gt 0 ]]; then
 			echo "exiting"
@@ -85,11 +85,13 @@ function fn_create {
 		mkdir -p "$v_DIR"
 	fi
 	if [[ -f "$v_DIR"/"$v_NAME".job ]]; then
-		echo "There already appears to be a stat_watch job at \""$v_DIR"/"$v_NAME".job\". You should probably delete or modify that rather than create a new job." | "$d_PROGRAM"/scripts/fold_out.pl
+		echo "There already appears to be a stat_watch job at $( echo -n "$v_DIR/$v_NAME.job" | "$d_PROGRAM"/scripts/escape.pl ). You should probably delete or modify that rather than create a new job." | "$d_PROGRAM"/scripts/fold_out.pl
 		exit
 	fi
 	d_BACKUP="$v_DIR"/backup_"$v_NAME"
 	if [[ -n "$v_BACKUP_DIRECTORY" ]]; then
+		echo -n "The default backup directory is "
+		echo -n "$v_BACKUP_DIRECTORY" | "$d_PROGRAM"/scripts/escape.pl -n
 		read -ep "Do you want to use the default backup directory for backup storage? (Y/n)" v_YN
 		echo
 		if [[ $( echo "$v_YN" | grep -E -c "^[nN]" ) -eq 0 ]]; then
@@ -114,7 +116,7 @@ function fn_create {
 		echo "If $v_EMAIL is a customer-facing address, MAKE SURE that appropriate expectations have been set for how these emails will be followed up on." | "$d_PROGRAM"/scripts/fold_out.pl
 		echo "Here is an example of setting such expectations: https://raw.githubusercontent.com/sporks5000/stat_watch/master/texts/expectations.txt" | "$d_PROGRAM"/scripts/fold_out.pl
 		echo
-		echo "Note: If you create a file at \"$v_DIR/$v_NAME""_message_head.txt\" or \"$v_DIR/$v_NAME""_message_foot.txt\", the contents of that file will be sent at the top or bottom, respectively, of each email message. It might be wise to set expectations there as well" | "$d_PROGRAM"/scripts/fold_out.pl
+		echo "Note: If you create a file at $( echo -n "$v_DIR/$v_NAME""_message_head.txt" | "$d_PROGRAM"/scripts/escape.pl ) or $( echo -n "$v_DIR/$v_NAME""_message_foot.txt" | "$d_PROGRAM"/scripts/escape.pl ), the contents of that file will be sent at the top or bottom, respectively, of each email message. It might be wise to set expectations there as well" | "$d_PROGRAM"/scripts/fold_out.pl
 		echo -e "\e[0m"
 		### Pause here, because I SUPER want people to read this
 		sleep 10
@@ -150,7 +152,7 @@ EOF
 	fi
 
 	### Log that the job was created by this script
-	echo "$( date +%Y-%m-%d" "%T" "%z ) - Job \"$f_JOB\" created by $f_PROGRAM" >> "$v_DIR"/"$v_NAME".log
+	echo "$( date +%Y-%m-%d" "%T" "%z ) - Job \"$f_JOB\" created by $( echo -n "$f_PROGRAM" | "$d_PROGRAM"/scripts/escape.pl )" >> "$v_DIR"/"$v_NAME".log
 
 	### Create a working directory and a file to document jobs created
 	mkdir -p "$d_WORKING"
@@ -164,15 +166,15 @@ EOF
 
 	### Output text telling the user what next steps they need to take
 	echo
-	echo -e "A job file has been created at \"\e[92m$f_JOB\e[0m\""
+	echo -e "A job file has been created at \e[92m$( echo -n "$f_JOB" | "$d_PROGRAM"/scripts/escape.pl )\e[0m"
 	echo "Run \"stat_watch --help job\" for further information on how it can be edited to suit your needs"
 	echo "Once you have that file organized as you need it, run the following command:"
 	echo
-	echo "$d_PROGRAM/$f_PROGRAM --run \"$f_JOB\""
+	echo "$( echo -n "$d_PROGRAM/$f_PROGRAM" | "$d_PROGRAM"/scripts/escape.pl ) --run $( echo -n "$f_JOB" | "$d_PROGRAM"/scripts/escape.pl )"
 	echo
 	echo "Then add the following line to root's crontab (adjusting times as desired):"
 	echo
 	### set a random minute from 1 to 59 for the cron job to run
-	echo "$(( 1 + RANDOM % 58 )) */2 * * * $d_PROGRAM/$f_PROGRAM --run "$f_JOB" > /dev/null 2>&1"
+	echo "$(( 1 + RANDOM % 58 )) */2 * * * "$( echo -n "$d_PROGRAM/$f_PROGRAM" | "$d_PROGRAM"/scripts/escape.pl ) --run $( echo -n "$f_JOB" | "$d_PROGRAM"/scripts/escape.pl )" > /dev/null 2>&1"
 	echo
 }

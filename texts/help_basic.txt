@@ -22,3 +22,9 @@ For information on files that are part of Stat Watch:
 For information on testing Stat Watch in order to verify it is functioning correctly:
     stat_watch --help tests
 
+For information on creating rules for always loading a job file when in a specific directory:
+    stat_watch --help assume
+
+For information regarding the Stat Watch configuration file:
+    stat_watch --help conf
+

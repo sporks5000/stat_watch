@@ -33,10 +33,10 @@ Next get the stats for the current contents of the directory:
 Run "stat_watch --diff" as was done in the earlier example:
 ```    /root/bin/stat_watch --diff /root/stat_watch1.txt /root/stat_watch2.txt```
 
-Note: It's likely that the backups were stored in such a way that the ctime of the files will not have been retained, and that the mtime of the files will have been truncated to full seconds. In order to compensate for these things, you will likely want to use the "--no-ctime" and "--no-partial-seconds" flags
+Note: It's likely that the backups were stored in such a way that the ctime of the files will not have been retained. In order to compensate for this, you will likely want to use the "--no-ctime" flag.
 
 Note: It's possible that there's a cache directory present where a lot of changes have occurred. If you want to avoid outputting changes from a specific directory, just use the "--ignore" flag with the full path to that directory after:
-```    /root/bin/stat_watch --diff /root/stat_watch1.txt /root/stat_watch2.txt --ignore /home/account/public_html/cache --no-ctime --no-partial-seconds```
+```    /root/bin/stat_watch --diff /root/stat_watch1.txt /root/stat_watch2.txt --ignore /home/account/public_html/cache --no-ctime```
 
 Now that we know what files have changed, we can use the Linux "diff" command to see how they differ and make an assessment on if those changes are malicious:
 ```    diff /home/lwtemp/account/homedir/public_html/.htaccess /home/account/public_html/.htaccess```
@@ -58,7 +58,7 @@ Be aware that "stat_watch --diff" will use the timestamps on the files it's give
 In this circumstance, we need to run it against the newer set of files first, so to eliminate confusion, you can use the "--before" and "--after" flags to indicate which file was which:
 ```    /root/bin/stat_watch --diff --before /root/stat_watch1.txt --after /root/stat_watch2.txt```
 
-Note: As above, it's possible that you will want to use the "--no-ctime", "--no-partial-seconds", and "--ignore" flags
+Note: As above, it's possible that you will want to use the "--no-ctime" and "--ignore" flags
 
 We won't have access to any of the changed files in order to compare their contents, but we will at least have the relevant timestamps so that we can search relevant logs to see if there is anything there worthy of note.
 
@@ -67,7 +67,7 @@ We won't have access to any of the changed files in order to compare their conte
 #====================#
 
 If there are specific files or file extensions that you want Stat Watch to include or ignore when generating a report, you can create a Stat Watch job file and specify that Stat Watch adhere to the rules outlined in that file by referencing it with the "-i" flag:
-```    /root/bin/stat_watch --record /home/account/public_html -i /root/include_file.txt > /root/stat_watch1.txt```
+```    /root/bin/stat_watch --record /home/account/public_html -i /root/job_file.txt > /root/stat_watch1.txt```
 
 For more information about what can be accomplished with the include/ignore file, run stat_watch with "--help job"
 ```    /root/bin/stat_watch --help job```
@@ -97,7 +97,7 @@ Then backup the files that you're interested in using the "--backup" flag in con
 ```    mkdir -p /home/stat_watch/temp_backup
     /root/bin/stat_watch --backup /root/stat_watch1.txt --backupr '\.(p(hp(4|5|7)?|[lym])|js|css|ht(ml?|access|passwd)|sh|rb)$' --backupd /home/stat_watch/temp_backup```
 
-The files will be stored with the backup directory specified with the "--backupd" functioning as the equivalent of "/", and with a unix timestamp appended to the end of their file name. Thus with the above command, the file '/home/account/public_html/directory/script.php' would have a backup located at '/home/stat_watch/temp_backup/home/account/public_html/directory/script.php_1533578720' (or some other epoch timestamp). "cp -a" is used to make the copy, so all stat data should be retained. The ctime of the file is documented by writing it to a file with a name ending in "_ctime", so for the above example, it would be '/home/stat_watch/temp_backup/home/account/public_html/directory/script.php_1533578720_ctime'
+The files will be stored with the backup directory specified with the "--backupd" functioning as the equivalent of "/", and with a number appended to the end of their file name. Thus with the above command, the file '/home/account/public_html/directory/script.php' would have a backup located at '/home/stat_watch/temp_backup/home/account/public_html/directory/script.php_15335787200' (or some other string of numbers: The number at the end is the epoch timestamp at which the backup occurred followed by an additional digit). The ownership, permissions, and timestamps of the file are documented by writing them to a file with a name ending in "_stat", so for the above example, it would be '/home/stat_watch/temp_backup/home/account/public_html/directory/script.php_15335787200_stat'
 
 #=================================#
 #== Backing Up Individual Files ==#
@@ -107,7 +107,7 @@ You can have Stat Watch create a backup of a single file using the "--backup-fil
 
 ```    /root/bin/stat_watch -a /home/account/public_html/directory/script.php --backupd /home/stat_watch/temp_backup```
 
-As above, the backup created would end up located at '/home/stat_watch/temp_backup/home/account/public_html/directory/script.php_1533578720' (or some other epoch timestamp).
+As above, the backup created would end up located at '/home/stat_watch/temp_backup/home/account/public_html/directory/script.php_15335787200' (or some other string of numbers).
 
 You can also leave a comment when backing up a file. Such comments can be viewed when listing backed-up copies for files (see "Listing Backed-up Files" below):
 
@@ -124,13 +124,13 @@ For example, to see all of the backups made of '/home/account/public_html/direct
 
 And the output you receive would look something like the following:
 ```    Available Backups for '/home/account/public_html/directory/script.php':
-      '/home/account/public_html/directory/script.php_1533578720' -- Timestamp: 2018-08-06 14:05:20 -0400 -- 1024 bytes```
+      '/home/account/public_html/directory/script.php_15335787200' -- Timestamp: 2018-08-06 14:05:20 -0400 -- 1024 bytes```
 
 If there is a comment associated with one of the backups, the output would look something like this:
 ```    Available Backups for '/home/account/public_html/directory/script.php':
-      '/home/account/public_html/directory/script.php_1533532189' -- Timestamp: 2018-08-06 01:09:41 -0400 -- 1011 bytes
+      '/home/account/public_html/directory/script.php_15335321890' -- Timestamp: 2018-08-06 01:09:49 -0400 -- 1011 bytes
         - Prior to changes for ticket 12345
-      '/home/account/public_html/directory/script.php_1533578720' -- Timestamp: 2018-08-06 14:05:20 -0400 -- 1024 bytes```
+      '/home/account/public_html/directory/script.php_15335787200' -- Timestamp: 2018-08-06 14:05:20 -0400 -- 1024 bytes```
 
 The file names given here are not the actual full path to the backup file, but rather just a display name, quoted such that if the file contains any newline or non-printing characters, it will all appear on one line, and copying and pasting into the terminal will result in those characters being interpreted appropriately. This display name can be used to reference the file with other Stat Watch functions related to backups, such as "--restore" and "--compare"
 
@@ -140,9 +140,9 @@ The file names given here are not the actual full path to the backup file, but r
 
 After getting a list of backed-up files, you can choose to restore one of them using the "--restore" flag:
 
-```    /root/bin/stat_watch --restore '/home/account/public_html/directory/script.php_1533532189'```
+```    /root/bin/stat_watch --restore '/home/account/public_html/directory/script.php_15335321890'```
 
-This would return the version of the file from 2018-08-06 01:09:41 -0400 to its previous location at '/home/account/public_html/directory/script.php' with the same permissions and ownerships that it had had at that time.
+This would return the version of the file from 2018-08-06 01:09:49 -0400 to its previous location at '/home/account/public_html/directory/script.php' with the same permissions and ownerships that it had had at that time.
 
 #==========================#
 #== Watching a Directory ==#

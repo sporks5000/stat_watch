@@ -56,7 +56,7 @@ sub fn_check_retention {
 			if ( ((time() * 10) - $v_stamp) > (864000 * $Main::v_retention_min_days) ) {
 				### Delete anything outside of the retention count that's too old and that doesn't have a "_hold" file
 				if ( ! -f $v_file . "_hold" ) {
-					my $v_file_escape = &Main::fn_escape_filename($v_file);
+					my $v_file_escape = &SWEscape::fn_escape_filename($v_file);
 					&Main::fn_log("Removing backed-up file " . $v_file_escape . "\n");
 					unlink( $v_file );
 					if ( -f $v_file . "_comment" ) {
@@ -105,7 +105,7 @@ sub fn_prune_backups {
 ### $_[0] is the backup directory
 	my $v_dir = $_[0];
 	if ($Main::b_verbose) {
-		my $v_dir_escape = &Main::fn_escape_filename($v_dir);
+		my $v_dir_escape = &SWEscape::fn_escape_filename($v_dir);
 		print STDERR "Directory: " . $v_dir_escape . "\n";
 	}
 	if ( -e $v_dir && -d $v_dir ) {
@@ -215,7 +215,7 @@ sub fn_backup_file {
 				chmod( 0700, $d_backup );
 			}
 		}
-		my $v_file_escape = &Main::fn_escape_filename($v_file);
+		my $v_file_escape = &SWEscape::fn_escape_filename($v_file);
 		if ( -d $d_backup ) {
 			( my $f_content, my $b_stats ) = fn_compare_backup($v_file, $d_backup);
 			if ( $f_content && $b_stats ) {
@@ -248,10 +248,14 @@ sub fn_backup_file {
 					close($fh_write);
 				}
 				if ($Main::b_verbose) {
-					my $f_backup_escape = &Main::fn_escape_filename($f_backup);
+					my $f_backup_escape = &SWEscape::fn_escape_filename($f_backup);
 					print STDERR $v_file_escape . " -> " . $f_backup_escape . "\n";
 				}
-				&Main::fn_log("Backed up file " . $v_file_escape . "\n");
+				if ( $f_content ) {
+					&Main::fn_log("Backed up changed to file stats for file " . $v_file_escape . "\n");
+				} else {
+					&Main::fn_log("Backed up file " . $v_file_escape . "\n");
+				}
 				if ($Main::b_retention) {
 					fn_check_retention( $d_backup . "/" . $v_name );
 				}
@@ -482,7 +486,7 @@ sub fn_restore {
 	### Find the location of the backup and the original file path
 	my $f_backup = fn_find_backup($v_disp);
 	if ( ! $f_backup ) {
-		print STDERR "No such backup " . &Main::fn_escape_filename($v_disp) . "\n";
+		print STDERR "No such backup " . &SWEscape::fn_escape_filename($v_disp) . "\n";
 		exit 1
 	}
 	( my $f_stats, my $f_origin, my $f_content, my $d_backup, my $v_name, my $d_backup2 ) = fn_backup_details($f_backup);
@@ -503,7 +507,7 @@ sub fn_restore {
 		my $f_backup2 = fn_backup_file($f_origin, $d_backup2);
 
 		if ( ! $f_backup2 ) {
-			print STDERR "Failed to create backup of " . &Main::fn_escape_filename($f_origin) . ". File left as-is.\n";
+			print STDERR "Failed to create backup of " . &SWEscape::fn_escape_filename($f_origin) . ". File left as-is.\n";
 			exit 1;
 		}
 		unlink($f_origin)
@@ -545,7 +549,7 @@ sub fn_create_pointer {
 	no warnings;
 	if ( -e $v_new ) {
 		use warnings;
-		print STDERR "There is already a file at " . &Main::fn_escape_filename($v_new) . "\n";
+		print STDERR "There is already a file at " . &SWEscape::fn_escape_filename($v_new) . "\n";
 		exit 1;
 	}
 	use warnings;
@@ -562,7 +566,7 @@ sub fn_create_pointer {
 		}
 		use warnings;
 	} else {
-		print STDERR "Failed to move file to " . &Main::fn_escape_filename($v_new) . "\n";
+		print STDERR "Failed to move file to " . &SWEscape::fn_escape_filename($v_new) . "\n";
 		exit 1;
 	}
 }
@@ -692,7 +696,7 @@ sub fn_list_file {
 		}
 	}
 	### Output the details
-	my $v_file_escape = &Main::fn_escape_filename($v_file);
+	my $v_file_escape = &SWEscape::fn_escape_filename($v_file);
 	print "\nAvailable Backups for " . $v_file_escape . ":\n";
 	if (%v_files) {
 		my @v_files = sort {$a cmp $b} keys( %v_files );
@@ -727,8 +731,8 @@ sub fn_list_file {
 			}
 
 			use warnings;
-			my $v_file_escape = &Main::fn_escape_filename($v_disp_name);
-#			my $v_file_escape = &Main::fn_escape_filename($v_file);
+			my $v_file_escape = &SWEscape::fn_escape_filename($v_disp_name);
+#			my $v_file_escape = &SWEscape::fn_escape_filename($v_file);
 			print "  " . $v_file_escape . " -- Timestamp: " . $v_stamp . " -- " . $v_size . " bytes";
 			no warnings;
 			if ( -f $v_file . "_hold" ) {
@@ -764,7 +768,7 @@ sub fn_compare_contents {
 		$f_comp1 = $v_disp1;
 		$f_content1 = $v_disp1
 	} elsif ( ! $f_comp1 ) {
-		print STDERR "No such backup " . &Main::fn_escape_filename($v_disp1) . "\n";
+		print STDERR "No such backup " . &SWEscape::fn_escape_filename($v_disp1) . "\n";
 		exit 1;
 	} else {
 		( $f_stats1, $f_origin, $f_content1 ) = fn_backup_details($f_comp1, 0, 1, 2);
@@ -786,11 +790,11 @@ sub fn_compare_contents {
 			$v_disp2 = $_[1];
 			$f_content2 = $_[1];
 		} else {
-			print STDERR "No such file " . &Main::fn_escape_filename($_[1]) . "\n";
+			print STDERR "No such file " . &SWEscape::fn_escape_filename($_[1]) . "\n";
 			exit 1;
 		}
 	} elsif ( ! $f_origin ) {
-		print STDERR "Nothing to compare " . &Main::fn_escape_filename($v_disp1) . "against \n";
+		print STDERR "Nothing to compare " . &SWEscape::fn_escape_filename($v_disp1) . "against \n";
 	}
 
 	### Get the stats for both files
@@ -809,7 +813,7 @@ sub fn_compare_contents {
 
 	### Begin output
 	print "\n";
-	print "     Comparing\n" . &Main::fn_escape_filename($f_comp1) . "\n     To\n" . &Main::fn_escape_filename($f_comp2) . "\n\n";
+	print "     Comparing\n" . &SWEscape::fn_escape_filename($f_comp1) . "\n     To\n" . &SWEscape::fn_escape_filename($f_comp2) . "\n\n";
 
 	print "     Type and Permissions:\n" . &Main::fn_format_perms($v_stats1[0]) . "  >  " . &Main::fn_format_perms($v_stats2[0]) . "\n";
 	print "     User:\n" . $v_stats1[1] . "  >  " . $v_stats2[1] . "\n";
@@ -820,8 +824,8 @@ sub fn_compare_contents {
 
 	### Now just diff the files
 	print "     Content:\n\n";
-	my $diff1_escape = &Main::fn_shell_escape_filename($f_content1);
-	my $diff2_escape = &Main::fn_shell_escape_filename($f_content2);
+	my $diff1_escape = &SWEscape::fn_shell_escape_filename($f_content1);
+	my $diff2_escape = &SWEscape::fn_shell_escape_filename($f_content2);
 	print `diff $diff1_escape $diff2_escape 2>&1`;
 }
 
@@ -854,17 +858,20 @@ sub fn_single_backup {
 
 sub fn_hold {
 ### Given a backup file, create a hold for that backup
-	my $v_disp = $_[0];
+	my $v_disp = shift(@_);
 
 	### Find the location of the backup and the original file path
 	my $f_backup = fn_find_backup($v_disp);
 	if ( ! $f_backup ) {
-		print STDERR "No such backup " . &Main::fn_escape_filename($v_disp) . "\n";
+		print STDERR "No such backup " . &SWEscape::fn_escape_filename($v_disp) . "\n";
 		exit 1
 	}
 
 	if ( open( my $fh_write, ">", $f_backup . "_hold" ) ) {
 		close($fh_write);
+	}
+	if ( defined $_[0] && $_[0] eq "--comment" && defined $_[1] ) {
+		fn_comment($v_disp, $_[1]);
 	}
 }
 
@@ -875,7 +882,7 @@ sub fn_unhold {
 	### Find the location of the backup and the original file path
 	my $f_backup = fn_find_backup($v_disp);
 	if ( ! $f_backup ) {
-		print STDERR "No such backup " . &Main::fn_escape_filename($v_disp) . "\n";
+		print STDERR "No such backup " . &SWEscape::fn_escape_filename($v_disp) . "\n";
 		exit 1
 	}
 	if ( -f $f_backup . '_hold' ) {
@@ -885,13 +892,13 @@ sub fn_unhold {
 
 sub fn_comment {
 ### Given a backup file, add a comment to that backup
-	my $v_disp = $_[0];
-	my $v_comment = ( $_[1] || '' );
+	my $v_disp = shift(@_);
+	my $v_comment = shift(@_);
 
 	### Find the location of the backup and the original file path
 	my $f_backup = fn_find_backup($v_disp);
 	if ( ! $f_backup ) {
-		print STDERR "No such backup " . &Main::fn_escape_filename($v_disp) . "\n";
+		print STDERR "No such backup " . &SWEscape::fn_escape_filename($v_disp) . "\n";
 		exit 1
 	}
 	if ($v_comment) {
@@ -899,6 +906,9 @@ sub fn_comment {
 			print $fh_write $v_comment . "\n";
 			close($fh_write);
 		}
+	}
+	if ( defined $_[0] && $_[0] eq "--hold" ) {
+		fn_hold($v_disp);
 	}
 }
 

@@ -15,6 +15,7 @@ Control Strings:
         - "R" - Pass over all files and directories that match the following Perl interpreted regex
         - "I" - Add the following file or directory to the list of files and directories to be checked (as if it was listed at the command line). Has no effect with "--diff"
         - "Include" - Interpret the contents of the following file as if it was listed at the command line as a job file
+            - Every line of the included job file will be read and interpreted before interpreting any of the rest of the lines in the current file
         - "BackupR" - If a file matches the regular expression that follows, and the appropriate flags are set, they will be backed up
         - "Backup+" - In any instance where there are changes to the following file, it will be backed up
         - "Time-" - Stat changes to this file will not be reported by "--diff" if the only change is to mtime or ctime

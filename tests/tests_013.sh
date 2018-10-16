@@ -10,6 +10,7 @@ function fn_test_13 {
 	### Logging is controlled with the control string "Log", which populates the variable "$f_log".
 	### Logging is handled by the subroutine fn_log
 	### By default, no logging is done; there is no command line flag to set logging
+	echo -e "\e[35mNOT YET IMPLIMENTED\e[00m"
 }
 
 fn_test_13 "$@"

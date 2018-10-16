@@ -37,7 +37,7 @@ How do I view the backups that have been taken of a file?
 
 How can I compare a backup to the current file or restore a backup
     - By running Stat Watch with the "--compare" flag and giving it the display name shown with "--list", Stat Watch will output differences in file stats and a diff of the file contents
-    - By running Stat Watch with the "--Restore" flag and giving it the display name shown with "--list", Stat Watch will replace the current file with the backup specified, ensuring that the permissions, ownership, and mtime are the same as they were previously
+    - By running Stat Watch with the "--restore" flag and giving it the display name shown with "--list", Stat Watch will replace the current file with the backup specified, ensuring that the permissions, ownership, and mtime are the same as they were previously
 
 How would one go about automating backups
     - Creating Stat Watch jobs with the "--create" flag, and then setting up a cron job to run them with the "--run" flag is the easiest way to automate creating backups with Stat Watch

@@ -70,7 +70,7 @@ sub fn_check_file {
 	my $v_file = $_[0];
 	my $v_file_escape;
 	if ($b_verbose) {
-		$v_file_escape = fn_escape_filename($v_file);
+		$v_file_escape = &SWEscape::fn_escape_filename($v_file);
 	}
 	for my $_string (@v_temp_ignore){
 		if ( $v_file eq $_string ) {
@@ -152,7 +152,7 @@ sub fn_report_line {
 	my $v_line;
 	### Pulling file stats using the stat binary is deprecated and will be removed in future versions
 	if ($b_ext_stat) {
-		my $v_file_escape = fn_shell_escape_filename($v_file);
+		my $v_file_escape = &SWEscape::fn_shell_escape_filename($v_file);
 		$v_line = `stat -c \%A" -- "\%u" -- "\%g" -- "\%s" -- "\%y" -- "\%z $v_file_escape 2> /dev/null`;
 		chomp( $v_line );
 	} elsif ( -l $v_file ) {
@@ -172,7 +172,7 @@ sub fn_stat_watch {
 	my $v_timestamp = $_[1];
 	my $c_links = 0;
 	if ($b_verbose) {
-		my $v_dir_escape = fn_escape_filename($v_dir);
+		my $v_dir_escape = &SWEscape::fn_escape_filename($v_dir);
 		print STDERR "Directory: " . $v_dir_escape . "\n";
 	}
 	if ( -e $v_dir && ! -d $v_dir ) {
@@ -181,11 +181,11 @@ sub fn_stat_watch {
 		if ( fn_check_file($v_file) ) {
 			if ($b_links) {
 				if ( -l $v_file ) {
-					print "1 - " . fn_escape_filename($v_file) . "\n";
+					print "1 - " . &SWEscape::fn_escape_filename($v_file) . "\n";
 				}
 			} elsif ( $b_new_lines ) {
 				if ( $v_file =~ m/[\001-\037\x7F\n]/ ) {
-					print fn_escape_filename($v_file) . "\n";
+					print &SWEscape::fn_escape_filename($v_file) . "\n";
 				}
 			} else {
 				fn_report_line($v_file, $v_timestamp);
@@ -217,7 +217,7 @@ sub fn_stat_watch {
 						}
 					} elsif ( $b_new_lines ) {
 						if ( $v_file =~ m/[\001-\037\x7F\n]/ ) {
-							print fn_escape_filename($v_file) . "\n";
+							print &SWEscape::fn_escape_filename($v_file) . "\n";
 						}
 					} else {
 						fn_report_line($v_file, $v_timestamp);
@@ -225,7 +225,7 @@ sub fn_stat_watch {
 				}
 			}
 			if ( $c_links ) {
-				print $c_links . " - " . fn_escape_filename($v_dir) . "\n";
+				print $c_links . " - " . &SWEscape::fn_escape_filename($v_dir) . "\n";
 			}
 			for my $_dir (@dirs) {
 			### For each of the directories we found, go through RECURSIVELY!
@@ -233,7 +233,7 @@ sub fn_stat_watch {
 				if ( $v_cur_depth <= $v_max_depth ) {
 					fn_stat_watch( $_dir, $v_timestamp);
 				} else {
-					fn_log("Maximum depth reached at " . fn_escape_filename($v_dir) . "\n");
+					fn_log("Maximum depth reached at " . &SWEscape::fn_escape_filename($v_dir) . "\n");
 					### If it contains a newline character, then it needs to be processed specially
 					my $v_dir_name = fn_get_file_name($_dir, $v_timestamp);
 					print $fh_output "Maximum depth reached at '" . $v_dir_name . "' - " . $v_timestamp . "\n";
@@ -276,8 +276,8 @@ sub fn_diff {
 	my $f_diff1 = $_[0];
 	my $f_diff2 = $_[1];
 	### Make the file names quote safe
-	my $diff1_escape = fn_shell_escape_filename($f_diff1);
-	my $diff2_escape = fn_shell_escape_filename($f_diff2);
+	my $diff1_escape = &SWEscape::fn_shell_escape_filename($f_diff1);
+	my $diff2_escape = &SWEscape::fn_shell_escape_filename($f_diff2);
 	### With the file sizes we're looking at, most of the time the diff binary will be quicker than any tool Perl itself can provide
 	my @v_diff = `diff $diff1_escape $diff2_escape 2> /dev/null`;
 	@v_diff = fn_diff_check_lines( 2, undef, @v_diff );
@@ -294,7 +294,7 @@ sub fn_diff {
 					pop(@v_line);
 					shift(@v_line);
 					my $v_file = join( "'", @v_line );
-					push( @v_deep_dirs, fn_escape_filename($v_file) );
+					push( @v_deep_dirs, &SWEscape::fn_escape_filename($v_file) );
 				}
 				next;
 			}
@@ -304,7 +304,7 @@ sub fn_diff {
 			### Most files won't have single quotes in them, but just in case...
 			my $v_file = join( "'", @v_line );
 			if ( ! exists $ref_diff->{$v_file} ) {
-				my $v_file_escape = fn_escape_filename($v_file);
+				my $v_file_escape = &SWEscape::fn_escape_filename($v_file);
 				$ref_diff->{$v_file}->{'escape'} = $v_file_escape;
 			}
 			$ref_diff->{$v_file}->{$v_first}->{'line'} = $_line;
@@ -692,7 +692,7 @@ sub fn_diff_check_lines {
 	if ($b_file) {
 	### If we're reading from a file
 		my $f_read = shift(@_);
-		my $f_read_escape = fn_escape_filename($f_read);
+		my $f_read_escape = &SWEscape::fn_escape_filename($f_read);
 		$v_error = "File " . $f_read_escape . " does not appear to be a Stat Watch file\n";
 		if ( open( my $fh_read, "<", $f_read ) ) {
 			while (<$fh_read>) {
@@ -725,7 +725,7 @@ sub fn_get_include {
 ### $_[0] is the file in question.
 	my $f_ignore = $_[0];
 	if ( ! -r $f_ignore ) {
-		my $f_ignore_escape = fn_escape_filename($f_ignore);
+		my $f_ignore_escape = &SWEscape::fn_escape_filename($f_ignore);
 		print STDERR "Cannot read file " . $f_ignore_escape . "\n";
 	}
 	### Make sure we don't read a file twice
@@ -887,7 +887,7 @@ sub fn_sort_prep {
 	if ( defined $f_output && open( $fh_output, ">", $f_output ) ) {
 		return 1;
 	} elsif ( defined $f_output ) {
-		my $f_output_escape = fn_escape_filename($f_output);
+		my $f_output_escape = &SWEscape::fn_escape_filename($f_output);
 		print STDERR "Cannot open file " . $f_output_escape . " for writing\n";
 		exit 1;
 	} else {
@@ -965,7 +965,7 @@ sub fn_test_file {
 	use warnings;
 	if ( $b_exist ) {
 		if ( ! -e $v_file ) {
-			print STDERR "File " . fn_escape_filename($v_orig_file) . " Does not appear to exist\n";
+			print STDERR "File " . &SWEscape::fn_escape_filename($v_orig_file) . " Does not appear to exist\n";
 			exit 1;
 		}
 	}
@@ -975,12 +975,12 @@ sub fn_test_file {
 			### Sometimes files are pipes.
 				return $v_file;
 			} elsif ( ! -f $v_file && -e $v_file ) {
-				print STDERR fn_escape_filename($v_orig_file) . " is not a file\n";
+				print STDERR &SWEscape::fn_escape_filename($v_orig_file) . " is not a file\n";
 				exit 1;
 			}
 		} elsif ( $v_type eq "d" ) {
 			if ( ! -d $v_file && -e $v_file ) {
-				print STDERR fn_escape_filename($v_orig_file) . " is not a directory\n";
+				print STDERR &SWEscape::fn_escape_filename($v_orig_file) . " is not a directory\n";
 				exit 1;
 			}
 		}
@@ -1011,116 +1011,6 @@ sub fn_report_unknown {
 	}
 	print STDERR "\n";
 	sleep( 2 );
-}
-
-sub fn_escape_filename {
-### Given a file name that might have unprintable characters, appropriately escape and quote everything
-	my $v_file = $_[0];
-	if ( $v_file =~ m/'/ ) {
-		### replace all single quotes with a single quote, a backslash, and then two single quotes
-		$v_file =~ s/'/'\\''/g;
-	}
-	if ( $v_file =~ m/[\001-\037\x7F]/ ) {
-		### For blocks of unprintable characters, place "'$'" at the start, and "'" at the end
-		$v_file =~ s/([\x01-\x1F\x7F]+)/'\$'$1''/g;
-		### Replace unprintable characters with their hex value or special character
-		$v_file =~ s/\001/\\001/g;
-		$v_file =~ s/\002/\\002/g;
-		$v_file =~ s/\003/\\003/g;
-		$v_file =~ s/\004/\\004/g;
-		$v_file =~ s/\005/\\005/g;
-		$v_file =~ s/\006/\\006/g;
-		$v_file =~ s/\007/\\a/g;
-		$v_file =~ s/\010/\\b/g;
-		$v_file =~ s/\011/\\t/g;
-		$v_file =~ s/\012/\\n/g;
-		$v_file =~ s/\013/\\v/g;
-		$v_file =~ s/\014/\\f/g;
-		$v_file =~ s/\015/\\r/g;
-		$v_file =~ s/\016/\\016/g;
-		$v_file =~ s/\017/\\017/g;
-		$v_file =~ s/\020/\\020/g;
-		$v_file =~ s/\021/\\021/g;
-		$v_file =~ s/\022/\\022/g;
-		$v_file =~ s/\023/\\023/g;
-		$v_file =~ s/\024/\\024/g;
-		$v_file =~ s/\025/\\025/g;
-		$v_file =~ s/\026/\\026/g;
-		$v_file =~ s/\027/\\027/g;
-		$v_file =~ s/\030/\\030/g;
-		$v_file =~ s/\031/\\031/g;
-		$v_file =~ s/\032/\\032/g;
-		$v_file =~ s/\033/\\033/g;
-		$v_file =~ s/\034/\\034/g;
-		$v_file =~ s/\035/\\035/g;
-		$v_file =~ s/\036/\\036/g;
-		$v_file =~ s/\037/\\037/g;
-		$v_file =~ s/\x7F/\\177/g;
-	}
-	### Add a quote at the start of the file name
-	$v_file = "'" . $v_file . "'";
-	return $v_file;
-}
-
-sub fn_shell_escape_filename {
-### Escape the file name such that it can be used in a command run with backticks
-	my $v_file = $_[0];
-	$v_file =~ s/'/'\\''/g;
-	$v_file = "'" . $v_file . "'";
-	return $v_file;
-}
-
-sub fn_unescape_filename {
-### Experimental - has not be thoroughly tested
-### Take the results of fn_escape_filename and return them to their original form
-	my $v_file = $_[0];
-	while ( $v_file =~ m/'\$'[\\0-7abtnvfr]+''/ ) {
-	### for each block of escaped hex characters
-		### separate out the block, and use a null character as a place holder
-		my $v_file2 = substr( $&, 3, -2 );
-		$v_file = $` . "\000" . $';
-		### Replace all of the escaped characters
-		$v_file2 =~ s/\\001/\001/g;
-		$v_file2 =~ s/\\002/\002/g;
-		$v_file2 =~ s/\\003/\003/g;
-		$v_file2 =~ s/\\004/\004/g;
-		$v_file2 =~ s/\\005/\005/g;
-		$v_file2 =~ s/\\006/\006/g;
-		$v_file2 =~ s/\\a/\007/g;
-		$v_file2 =~ s/\\b/\010/g;
-		$v_file2 =~ s/\\t/\011/g;
-		$v_file2 =~ s/\\n/\012/g;
-		$v_file2 =~ s/\\v/\013/g;
-		$v_file2 =~ s/\\f/\014/g;
-		$v_file2 =~ s/\\r/\015/g;
-		$v_file2 =~ s/\\016/\016/g;
-		$v_file2 =~ s/\\017/\017/g;
-		$v_file2 =~ s/\\020/\020/g;
-		$v_file2 =~ s/\\021/\021/g;
-		$v_file2 =~ s/\\022/\022/g;
-		$v_file2 =~ s/\\023/\023/g;
-		$v_file2 =~ s/\\024/\024/g;
-		$v_file2 =~ s/\\025/\025/g;
-		$v_file2 =~ s/\\026/\026/g;
-		$v_file2 =~ s/\\027/\027/g;
-		$v_file2 =~ s/\\030/\030/g;
-		$v_file2 =~ s/\\031/\031/g;
-		$v_file2 =~ s/\\032/\032/g;
-		$v_file2 =~ s/\\033/\033/g;
-		$v_file2 =~ s/\\034/\034/g;
-		$v_file2 =~ s/\\035/\035/g;
-		$v_file2 =~ s/\\036/\036/g;
-		$v_file2 =~ s/\\037/\037/g;
-		$v_file2 =~ s/\\177/\x7F/g;
-		### Put the block of non-printable characters back in place
-		$v_file =~ s/\000/$v_file2/;
-	}
-	if ( $v_file =~ m/'\\''/ ) {
-		$v_file =~ s/'\\''/'/g;
-	}
-	### Remove the first and last character, because they're single quotes
-	$v_file = substr( $v_file, 1, -1 );
-	return $v_file;
 }
 
 sub fn_get_working {
@@ -1329,6 +1219,7 @@ if ( ! -d $d_working ) {
 }
 
 require( $d_program . '/scripts/backup.pm' );
+require( $d_program . '/scripts/escape.pm' );
 
 ### Process the commandline arguments
 my @v_unknown;
@@ -1376,8 +1267,17 @@ if ( ! defined $args[0] ) {
 		fn_report_unknown(@v_unknown);
 	}
 	if ( ! defined $v_file1 || ! defined $v_file2 || ! -r $v_file1 || ! -r $v_file2 ) {
-		print STDERR "With \"--diff\", must specify two files\n";
-		exit 1;
+		### It's possible that someone was trying to compare a file to a backup, but used "--diff" instead of "--compare"
+		my $f_backup;
+		if ( defined $v_file1 && -r $v_file1 ) {
+			$f_backup = &SWBackup::fn_find_backup($v_file1);
+		}
+		if ($f_backup) {
+			&SWBackup::fn_compare_contents($v_file1);
+		} else {
+			print STDERR "With \"--diff\", must specify two files\n";
+			exit 1;
+		}
 	} elsif ( ! $b_no_sort ) {
 		( $v_file1, $v_file2 ) = fn_date_files( $v_file1, $v_file2 );
 	}
@@ -1399,8 +1299,8 @@ if ( ! defined $args[0] ) {
 	### Sort the relevant arrays
 	my $b_close = fn_sort_prep();
 	fn_document_backup();
-	my $v_file1_escape = fn_escape_filename($v_file1);
-	my $v_file2_escape = fn_escape_filename($v_file2);
+	my $v_file1_escape = &SWEscape::fn_escape_filename($v_file1);
+	my $v_file2_escape = &SWEscape::fn_escape_filename($v_file2);
 	fn_log("Processing diff of files " . $v_file1_escape . " and " . $v_file2_escape . "\n");
 	fn_diff( $v_file1, $v_file2 );
 	fn_log("Finished processing diff\n");
@@ -1514,7 +1414,7 @@ if ( ! defined $args[0] ) {
 	}
 	### Output to the log and begin the job
 	if ( $v_type eq "--backup" ) {
-		my $d_backup_escape = fn_escape_filename($d_backup);
+		my $d_backup_escape = &SWEscape::fn_escape_filename($d_backup);
 		fn_log("Checking to see if there are files that need to be backed up " . $d_backup_escape . "\n");
 		fn_document_backup();
 		&SWBackup::fn_backup_initial($v_file);
@@ -1575,7 +1475,7 @@ if ( ! defined $args[0] ) {
 		fn_report_unknown(@v_unknown);
 	}
 	if ($d_backup) {
-		my $d_backup_escape = fn_escape_filename($d_backup);
+		my $d_backup_escape = &SWEscape::fn_escape_filename($d_backup);
 		fn_log("Pruning old backups from directory " . $d_backup_escape . "\n");
 		&SWBackup::fn_prune_backups($d_backup);
 	}
@@ -1638,7 +1538,7 @@ if ( ! defined $args[0] ) {
 		fn_check_strings( $_dir );
 		if ( -d $_dir && (! $b_links || ! $b_new_lines) ) {
 			### Individual files can be listed as well, but there's no need to log the fact we're looking at those. Just directories will suffice
-			my $_dir_escape = fn_escape_filename($_dir);
+			my $_dir_escape = &SWEscape::fn_escape_filename($_dir);
 			fn_log("Running a report for directory " . $_dir_escape . "\n");
 		}
 		fn_stat_watch( $_dir, $v_timestamp );

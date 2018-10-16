@@ -1,0 +1,35 @@
+
+ABOUT ASSUMPTIONS
+
+It is possible to create rules for Stat Watch to make it automately assume that a specific job file should be used if the stat_watch command is ran within a specified directory, or a subdirectory of that directory. Such rules are referred to as "assumptions". This functionality can be useful if you are regularly using Stat Watch to make backups of files, as it allows you to use the "--backup-file" flag or the "-a" flag without needing to specify a backup directory.
+
+Only one job file can be assumed per directory. If you attempt to create an assumption for a directory that already has an existing assumption, it will be overwritten to point to the new job file. Note that the "Include" control string within job files can be used to include additional job files.
+
+When checking for assumptions, Stat Watch first checks the current directory, then its parent directory, and so on. Because of this, if a directory and its parent directory both have assumptions and a Stat Watch command is run within the directory, the assumption for the directory will be used, and the assumption for the parent directory will not be referenced at all.
+
+
+COMMANDS REGARDING ASSUMPTIONS
+
+stat_watch --assume [JOB_FILE] [DIRECTORY]
+    - Tells Stat Watch that when ever a Stat Watch command is ran in the directory specified, It should assume that the job file specified needs to be included (unless the "-i" or "--include" flags are used to include rules from a different job file, or the "--no-assume" flag is used)
+
+stat_watch --assume --list
+    - List all currently existing assumptions
+
+stat_watch --assume [JOB_FILE]
+    - Creates an assumption for the directory that the command was in
+    - This is functionally the same as running "stat_watch --assume [JOB_FILE] $(pwd)"
+
+stat_watch --assume [DIRECTORY]
+    - Outputs whether or not there are any job files that would be assumed for the directory specified, and if so, the full path to that job file
+
+stat_watch --assume
+    - When given no additional arguments, this will output if there is a job file that would be assumed for the current working directory
+
+stat_watch --assume --remove [DIRECTORY]
+    - Removes any assumptions for the specified directory
+    - Note that if there is an assumption that would be applied to the specified directory, but only because that assumption was created for one of its parent directories, this will have no effect
+
+stat_watch --assume --remove
+    - Removes any assumptions for the current working directory
+
