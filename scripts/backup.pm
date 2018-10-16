@@ -131,6 +131,7 @@ sub fn_prune_backups {
 					}
 					next;
 				}
+				### Only the actual backup files should still be present at this point
 				$_file =~ s/_[0-9]+$//;
 				push( @files2, $_file );
 			}
@@ -542,7 +543,7 @@ sub fn_create_pointer {
 	my $v_new = $_[1];
 	my $v_stamp = ( $_[2] || '' );
 	no warnings;
-	if ( -f $v_new ) {
+	if ( -e $v_new ) {
 		use warnings;
 		print STDERR "There is already a file at " . &Main::fn_escape_filename($v_new) . "\n";
 		exit 1;
@@ -552,7 +553,7 @@ sub fn_create_pointer {
 		$v_stamp = (split( m/_/, $v_new ))[-1];
 	}
 	rename( $v_orig, $v_new );
-	if ( -f $v_new ) {
+	if ( -e $v_new ) {
 		fn_write_pointer( $v_orig, $v_stamp );
 		no warnings;
 		if ( -f $v_orig . '_md5' ) {
@@ -605,8 +606,9 @@ sub fn_backup_details {
 	$d_backup2 =~ s/\Q$v_path\E$//;
 	$v_name =~ s/_[0-9]+//;
 	my $f_content = fn_follow_pointers($f_backup, $d_backup, $v_name);
+	my $f_orig = $v_path . '/' . $v_name;
 
-	my @v_return = ( $f_stat, ($v_path . '/' . $v_name), $f_content, $d_backup, $v_name, $d_backup2 );
+	my @v_return = ( $f_stat, $f_orig, $f_content, $d_backup, $v_name, $d_backup2 );
 	if (! @v_return_nums) {
 		return( @v_return );
 	} elsif ( scalar(@v_return_nums) == 1 ) {
@@ -626,19 +628,20 @@ sub fn_follow_pointers {
 	my $d_backup = $_[1];
 	my $v_name = $_[2];
 	my $v_file2 = $v_file;
+	my $v_file3 = $v_file;
 	no warnings;
 	if ( -f $v_file . "_pointer" ) {
 		use warnings;
-		$v_file = $d_backup . '/' . $v_name . '_' . fn_read_first_line($v_file . "_pointer");
-		$v_file2 = fn_follow_pointers($v_file, $d_backup, $v_name);
+		$v_file2 = $d_backup . '/' . $v_name . '_' . fn_read_first_line($v_file . "_pointer");
+		$v_file3 = fn_follow_pointers($v_file2, $d_backup, $v_name);
 		### Eliminate pointer chains by pointing them to the most recent file
-		if ( $v_file ne $v_file2 ) {
-			my $v_stamp = (split( m/_/, $v_file2 ))[-1];
-			fn_write_pointer( $v_file . "_pointer", $v_stamp );
+		if ( $v_file ne $v_file3 ) {
+			my $v_stamp = (split( m/_/, $v_file3 ))[-1];
+			fn_write_pointer( $v_file, $v_stamp );
 		}
 	}
 	use warnings;
-	return($v_file2);
+	return($v_file3);
 }
 
 sub fn_list_file {

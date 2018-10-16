@@ -1,12 +1,12 @@
 
 Current Version: 1.6.0
 
-Version 1.6.0 (2018-10-13) -
-    - Major rewrite of the backup process, allowing changes to permissions to be stored without having so save a complete additional copy of the file
+Version 1.6.0 (2018-10-15) -
+    - Major rewrite of the backup process, allowing changes to permissions to be stored without having to save a complete additional copy of the file
         - Updated help documentation to match this
-    - Added a simpler way to compare backed-up files to the current file (or eachother)
+    - Added "--compare", a simpler way to compare backed-up files to the current file (or eachother)
     - Added a configuration directive allowing the user to specify a default backup directory
-        - If jobs are asociated with the default backup directory, there is now code to prevent pruning from happening more often than is needed
+        - If jobs are asociated with the default backup directory, there is now code in run.shf to prevent pruning from happening more often than is needed
     - Moved "--hold", "--unhold", "--comment", and "--restore" functionality into perl.
 
 Version 1.5.0 (2018-10-10) -
