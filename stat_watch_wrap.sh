@@ -20,7 +20,7 @@ function fn_locate {
 if [[ ${d_PROGRAM:0:1} != "/" ]]; then
 	fn_locate
 else
-	### If any of the argumentssay that we can't trust the hard-coded location, find it manually
+	### If any of the arguments say that we can't trust the hard-coded location, find it manually
 	a_CL_ARGUMENTS=( "$@" )
 	for (( c=0; c<=$(( ${#a_CL_ARGUMENTS[@]} - 1 )); c++ )); do
 		v_ARG="${a_CL_ARGUMENTS[$c]}"
