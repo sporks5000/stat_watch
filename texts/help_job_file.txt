@@ -42,7 +42,11 @@ Control Strings:
         - "Email-no-changes" - If this control string is present, send emails even if there are no changes.
         - "Log-max" - A number following this control string will designate the maximum size (in bytes) of the log before it's trimmed. Without this set, the default is 10485760.
         - "Email-retain" - the number of days to retain old email messages. If this is set to "0", old email messages will never be deleted.
+        - "Working-dir" - The working directory for Stat Watch to keep all files related to this job in.
+            - If this is not specified, Stat Watch will assume that the directory containing the job file should be used as a working directory for this job.
         - "Nice" - The niceness at which to run any potentially processor intensive commands. By default this is 15.
+        - "Db-watch" - If desired, this should be followed by the full path to a db_watch job file
+            - Run 'stat_watch --help db-watch' for more information
         - There are five control strings that allow the user to run a custom script at various points during the process of a typical Stat Watch job run: "Run-start", "Run-post", "Run-end", "Run-pre-e", and "Run-post-e":
             - For any of these, the full path to the script must be used.
             - Anything following the control string (and any whitespace after it) will be interpreted by the "eval" command

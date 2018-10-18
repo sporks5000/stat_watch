@@ -9,6 +9,10 @@ There are a number of files assiciated with each Stat Watch job. Here is an expl
 ./[JOB NAME]_changes_[EPOCH STAMP].txt
     - When changes are detected, this is a copy of file that's sent to the customer describing those changes
 
+./[JOB NAME]_db_watch
+    - A directory to store db_watch files in the "Db-watch" control string has been used
+    - Run "stat_watch --help db-watch" for more details
+
 ./[JOB NAME]_files.txt
     - This is the most recent Stat Watch report that was generated
 

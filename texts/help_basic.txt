@@ -28,3 +28,6 @@ For information on creating rules for always loading a job file when in a specif
 For information regarding the Stat Watch configuration file:
     stat_watch --help conf
 
+For information on how to watch database contents:
+    stat_watch --help db-watch
+

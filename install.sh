@@ -128,7 +128,12 @@ if [[ "$v_FAIL" == true ]]; then
 fi
 
 ### Get all of the appropriate permissions in place
-chmod 700 "$d_INST"/stat_watch.pl "$d_INST"/stat_watch_wrap.sh "$d_INST"/scripts/fold_out.pl "$d_INST"/scripts/escape.pl "$d_INST"/tests/test.sh 2> "$v_OUT" || v_FAIL=true
+chmod 700 "$d_INST"/stat_watch.pl 2> "$v_OUT" || v_FAIL=true
+chmod 700 "$d_INST"/stat_watch_wrap.sh 2> "$v_OUT" || v_FAIL=true
+chmod 700 "$d_INST"/scripts/fold_out.pl 2> "$v_OUT" || v_FAIL=true
+chmod 700 "$d_INST"/scripts/escape.pl 2> "$v_OUT" || v_FAIL=true
+chmod 700 "$d_INST"/scripts/db_watch.sh 2> "$v_OUT" || v_FAIL=true
+chmod 700 "$d_INST"/tests/test.sh 2> "$v_OUT" || v_FAIL=true
 chown -R root:root "$d_INST" 2> "$v_OUT" || v_FAIL=true
 if [[ "$v_FAIL" == true ]]; then
 	echo "Failed ensure that all the files had the correct ownership and permissions"

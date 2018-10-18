@@ -1,0 +1,68 @@
+
+WATCHING DATABASES
+
+The Stat Watch project includes a tool, db_watch.sh, designed to help monitor and recognize changes to database content. While tracking changes to files is relatively easy, monitoring for changes to a database is less straightforward. db_watch.sh goes about this from the angle or running queries that track key components of a database, and then running a diff against the output.
+
+For example, It is not necessary to compare all of the text in all of the posts from a WordPress database to know that a change has been made - runnng a query that outputs the post titles, update timestamps, and character count should be more tha enough to detect there being a difference.
+
+
+USING DB_WATCH WITH STAT WATCH
+
+When running a Stat Watch job in "--run" mode, you can add the "Db-watch" control string to the Stat Watch job file, followed by the full path to the db_watch job file that you want db_watch.sh to run against. Having this present will automatically run db_watch.sh against that job file and append the results (if any) to the end of the email contents
+
+
+DB_WATCH COMMAND LINE FLAGS
+
+--run [JOB FILE]
+    - This tells db_watch.sh which job file to run against.
+
+--out [FILE NAME]
+    - This allows the user to specify the name of the file that db_watch.sh should putput to
+    - If this is not specified, db_watch.sh will output to "${d_OUTPUT}/report_${v_TIMESTAMP}.txt" or "${d_OUTPUT}/${v_NAME}_report_${v_TIMESTAMP}.txt", where $d_OUTPUT is the output directory specified in the job file, $v_NAME is a name specified in the job file, and $v_TIMESTAMP is the epoch timestamp at which the job began
+    - When run as part of a Stat Watch "--run" operation, the "--out" flag will be used to ensure that the the output of db_watch.sh, if any, ends up in the email file
+
+--out-dir [DIRECTORY]
+    - This overrides the "OutputDir" control strings from a db_watch.sh job file and instead specifies one directory for db_watch.sh to create comparison files within
+    - When run as part of a Stat Watch "--run" operation, the "--out-dir" flag is used to ensure that these files are created within the job's working directory
+
+
+DB_WATCH JOB FILE PROCESSING
+
+db_watch.sh will read line by line through the job file, storing values or performing the operations within. Each line should begin with any amount of whitespace, followed by a control string, then any amount of whitespace followed by the value for that control string (if a value is required for a control string of that type).
+
+Any whitespace at the beginning or end of the line, or between the control string and the value will be ignored (so do your best to not need values that require whitespace at the start or end). Values SHOULD NOT be quoted (though there are potential circumstances where they will need to contain quotes, and that is okay).
+
+As each line from the job file is read, any line that specifies a job type will be performed, thus it is necessary to ensure that an output directory and appropriate credentials are given before any lines that include a job type.
+
+All lines that don't begin with one of the directives specified below will be ignored
+
+
+DB_WATCH JOB FILE CONTROL STRINGS
+
+Providing credentials
+    - MyUser [USERNAME] - the username to connect with. Each time a new one is defined it replaces the old one.
+        - Note: It is highly recommended that any mysql users created for this only are given the privaleges necessary to see the results desired (usually just "select")
+    - MyPassword [PASSWORD] - The password to connect with. Each time a new one is defined it replaces the old one.
+    - MyHost [HOSTNAME] - The hostname to connect to (if this is not specified, "localhost" is assumed)
+    - MySQL [PATH TO MYSQL BINARY] - "/usr/bin/mysql" is assumed by default. If the path to the mysql binary is different than this, you can specify it with this control string
+
+Styles of output
+    - OnlyDifferences - For every job type specified after this line, if there are differences, only output those differences (default)
+    - FullResults - For every job type specified after this line, If there are differences output the full results before and after
+
+Job types
+    - ShowTables [DATABASE] - Capture the output of "show tables" for a specified database
+    - RowCount [DATABASE].[TABLE] - Capture the count of rows for a specified table
+    - WPPosts [DATABASE].[TABLE] - Capture specific data about WordPress posts
+    - WPUsers [DATABASE].[TABLE] - Capture specific data about WordPress users
+    - Query [MYSQL QUERY] - Capture the output of a specific query
+
+Other control strings
+    - Name [STRING] - A string to place at the beginning of file names
+        - This will continue to apply until a new "Name" control string is used
+    - Ident [STRING] - An identifier or explanation to present in the report
+        - By default, each job will have a header in the report showing the control string and the value from the job file. Using this control string will replace that header
+        - This is only applied to one job and then cleared
+    - OutputDir [DIRECTORY] - A directory in which files should be created
+        - This will only apply if the "--out-dir" flah has not been used
+

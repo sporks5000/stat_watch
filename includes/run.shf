@@ -50,7 +50,13 @@ function fn_run {
 	if [[ -z $f_LOG ]]; then
 		f_LOG="/dev/stdout"
 	fi
+
+	### Find what directory we should be storing files in
 	fn_file_path "$f_JOB"; local v_DIR="$s_DIR"
+	fn_get_direc "Working-dir"; local v_DIR2="$v_DIREC"
+	if [[ -n "$v_DIR2" && -d "$v_DIR2" ]]; then
+		v_DIR="$v_DIR2"
+	fi
 	fn_get_direc "Expire"; v_EXPIRE="$v_DIREC"
 	### Create a directory to stand as an indicator that a job is running
 	v_EXIT=false
@@ -106,13 +112,17 @@ function fn_run {
 			exit
 		fi
 	fi
+
 	### Find all of the scripts we might want to run
 	fn_get_script "Run-start"; v_RUN_START="$v_SCRIPT"
 	fn_get_script "Run-post"; v_RUN_POST="$v_SCRIPT"
 	fn_get_script "Run-pre-e"; v_RUN_PRE_E="$v_SCRIPT"
 	fn_get_script "Run-post-e"; v_RUN_POST_E="$v_SCRIPT"
 	fn_get_script "Run-end"; v_RUN_END="$v_SCRIPT"
-	fn_get_direc "NICE"; v_NICE2="$v_DIREC"
+	### Create a variable that makes the email file available to scripts
+	export f_EMAIL="$v_DIR"/"$v_NAME"_changes_"$( date +%s )".txt
+
+	fn_get_direc "Nice"; v_NICE2="$v_DIREC"
 	if [[ -n $v_NICE2 && $( echo "$v_NICE2" | grep -E -c "^-?[0-9]+$" ) -gt 0 && $v_NICE2 -ge -20 && $v_NICE2 -le 19 ]]; then
 		v_NICE="$v_NICE2"
 	fi
@@ -134,14 +144,28 @@ function fn_run {
 			### update the stat file so that we know not to do that next time
 			stat -c '%Y' "$f_JOB" > "$v_DIR"/"$v_NAME"_stamp
 		fi
-		v_STAMP="$( date +%s )"
-		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" --diff --no-check-retention -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt --format text 2> "$v_ERROR_OUT"
+		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" --diff --no-check-retention -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt --backup -o "$f_EMAIL" --format text 2> "$v_ERROR_OUT"
+
+		### If a db_watch job has been specified, run that
+		fn_get_direc "Db-watch"; v_DB_WATCH="$v_DIREC"
+		if [[ -n "$v_DB_WATCH" && -f "$v_DB_WATCH" ]]; then
+			mkdir -p "$v_DIR"/"$v_NAME"_db_watch
+			"$d_PROGRAM"/scripts/db_watch.sh --run "$v_DB_WATCH" --out-dir "$v_DIR"/"$v_NAME"_db_watch --out "$f_EMAIL"_
+			if [[ -f "$f_EMAIL"_ ]]; then
+				### If there were results, append them to the end of the email
+				echo >> "$f_EMAIL"
+				cat "$f_EMAIL"_ >> "$f_EMAIL"
+				### Get rid of the original file
+				rm -f "$f_EMAIL"_
+			fi
+		fi
+
 		eval "$v_RUN_POST"
 		### this file should contain at least two lines
 		if [[ $( wc -l "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -gt 1 ]]; then
 			mv -f "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_files.txt
 			fn_get_direc "Email"; v_EMAIL="$v_DIREC"
-			if [[ $( wc -l "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -lt 2 ]]; then
+			if [[ $( wc -l "$f_EMAIL" 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -lt 2 ]]; then
 				### This is the one instances where we're getting a directive from the job file without fn_get_direc
 				v_NO_CHANGE="$( grep -E -c "^\s*Email-no-changes\s*$" "$f_JOB" )"
 				if [[ $v_NO_CHANGE -gt 1 ]]; then
@@ -167,7 +191,7 @@ function fn_run {
 						eval "$v_RUN_POST_E"
 					fi
 				else
-					rm -f "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt
+					rm -f "$f_EMAIL"
 				fi
 			else
 			### If there were changes, check if we have an email address and then send a message to it
@@ -178,7 +202,7 @@ function fn_run {
 							cat "$v_DIR"/"$v_NAME"_message_head.txt; 
 							echo
 						fi
-						cat "$v_DIR"/"$v_NAME"_changes_"$v_STAMP".txt 
+						cat "$f_EMAIL"
 						echo
 						if [[ -f "$v_DIR"/"$v_NAME"_message_foot.txt ]]; then 
 							cat "$v_DIR"/"$v_NAME"_message_foot.txt; 

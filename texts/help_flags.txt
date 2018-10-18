@@ -149,6 +149,7 @@ stat_watch --help files
 stat_watch --help tests
 stat_watch --help assume
 stat_watch --help conf
+stat_watch --help db-watch
     - Outputs information regarding the specific aspect of Stat Watch requested
 
 stat_watch --version

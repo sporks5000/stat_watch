@@ -1,5 +1,8 @@
 
-Current Version: 1.6.1
+Current Version: 1.7.0
+
+Version 1.7.0 (2018-10-18) -
+    - Added db_watch functionality and documentation for that functionality
 
 Version 1.6.1 (2018-10-16) -
     - All file names and directories should be output appropriately escaped
