@@ -26,6 +26,9 @@ USAGE
     - Process the tests scripts that are present in order, starting with the test script specified
     - When using "--start" and "--skip", "--start" must be declared first
 
+/usr/local/stat_watch/tests/test.sh --help
+    - Outputs this text
+
 
 FILES
 

@@ -1,5 +1,11 @@
 
-Current Version: 1.7.0
+Current Version: 1.7.1
+
+Version 1.7.1 (2018-10-19) -
+    - "--create" no longer requires that the job be associated with an account
+    - "--run" now sends an email if the job is terminated for running too long
+    - "--run" now assumes a default log file if no file is specified
+    - Added the "--log" flag to specify a log file
 
 Version 1.7.0 (2018-10-18) -
     - Added db_watch functionality and documentation for that functionality

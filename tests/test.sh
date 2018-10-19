@@ -115,7 +115,10 @@ if [[ "$1" == "--list" ]]; then
 	b_LIST=true
 	shift
 fi
-if [[ -n "$1" && "$1" != "--skip" && "$1" != "--start" ]]; then
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+	"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_tests.txt "$d_PROGRAM"/texts/help_feedback.txt
+	exit
+elif [[ -n "$1" && "$1" != "--skip" && "$1" != "--start" ]]; then
 ### Run a single test script
 	b_SPECIFIC=true
 	while [[ -n "$1" ]]; do

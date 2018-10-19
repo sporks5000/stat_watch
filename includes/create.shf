@@ -7,7 +7,7 @@ v_NAME=
 function fn_name {
 	echo -n "What name do you want to use for this job"
 	if [[ -n "$v_ACCOUNT" ]]; then
-		echo -n "(leave blank for \"$v_ACCOUNT\")"
+		echo -n " (leave blank for \"$v_ACCOUNT\")"
 	fi
 	read -ep "? " v_NAME
 	echo
@@ -36,22 +36,25 @@ function fn_create {
 	### Prompt for basic details about the job that we're going to create
 	read -ep "What is the name of the account that you're creating a stat_watch job for? " v_ACCOUNT
 	echo
-	if [[ $( grep -E "^""$v_ACCOUNT"":" -c /etc/passwd ) -lt 1 ]]; then
+	if [[ $( grep -E "^""$v_ACCOUNT"":" -c /etc/passwd ) -gt 0 ]]; then
 		echo "Account \"$v_ACCOUNT\" Does not exist"
-		exit
+		v_ACCOUNT=
 	else
 		v_HOMEDIR="$( grep -E "^""$v_ACCOUNT"":" /etc/passwd | cut -d ":" -f6 )"
-	fi
-	if [[ -d "$v_HOMEDIR""/public_html" ]]; then
-		read -ep "Monitor directory $( echo -n "$v_HOMEDIR/public_html" | "$d_PROGRAM"/scripts/escape.pl ) (y/N)? " v_YN
-		if [[ $( echo "$v_YN" | grep -E -c "^[yY]" ) -gt 0 ]]; then
-			v_MONITOR="$v_HOMEDIR""/public_html"
+		if [[ -d "$v_HOMEDIR""/public_html" ]]; then
+			read -ep "Monitor directory $( echo -n "$v_HOMEDIR/public_html" | "$d_PROGRAM"/scripts/escape.pl ) (y/N)? " v_YN
+			if [[ $( echo "$v_YN" | grep -E -c "^[yY]" ) -gt 0 ]]; then
+				v_MONITOR="$v_HOMEDIR""/public_html"
+			fi
 		fi
 	fi
-	if [[ -z $v_MONITOR ]]; then
+	if [[ -z "$v_MONITOR" ]]; then
 		read -ep "Name one directory we should monitor (you can add more later): " v_MONITOR
 		if [[ ! -e $v_MONITOR ]]; then
 			echo "\"$v_MONITOR\" is not a directory"
+			exit
+		elif [[ ${v_MONITOR:0:1} != "/" ]]; then
+			echo "Please provide the full path to the directory"
 			exit
 		fi
 	fi
@@ -111,7 +114,7 @@ function fn_create {
 	local v_EMAIL
 	read -ep "What email address should reports be sent to (leave blank for none)? " v_EMAIL
 	echo
-	if [[ -n $v_EMAIL ]]; then
+	if [[ -n "$v_EMAIL" ]]; then
 		echo -e "\e[91m"
 		echo "If $v_EMAIL is a customer-facing address, MAKE SURE that appropriate expectations have been set for how these emails will be followed up on." | "$d_PROGRAM"/scripts/fold_out.pl
 		echo "Here is an example of setting such expectations: https://raw.githubusercontent.com/sporks5000/stat_watch/master/texts/expectations.txt" | "$d_PROGRAM"/scripts/fold_out.pl
@@ -144,7 +147,7 @@ Email-retain $v_EMAIL_RETAIN
 EOF
 
 	### Returning to previous indentation
-	if [[ -n $v_EMAIL ]]; then
+	if [[ -n "$v_EMAIL" ]]; then
 		echo "Email $v_EMAIL" >> "$f_JOB"
 	fi
 	if [[ $b_EXPIRE == true ]]; then

@@ -229,16 +229,20 @@ sub fn_stat_watch {
 			}
 			for my $_dir (@dirs) {
 			### For each of the directories we found, go through RECURSIVELY!
-				$v_cur_depth++;
-				if ( $v_cur_depth <= $v_max_depth ) {
-					fn_stat_watch( $_dir, $v_timestamp);
+				if ( ! -r $_dir ) {
+					fn_log("Unreadable directory: " . &SWEscape::fn_escape_filename($v_dir) . "\n");
 				} else {
-					fn_log("Maximum depth reached at " . &SWEscape::fn_escape_filename($v_dir) . "\n");
-					### If it contains a newline character, then it needs to be processed specially
-					my $v_dir_name = fn_get_file_name($_dir, $v_timestamp);
-					print $fh_output "Maximum depth reached at '" . $v_dir_name . "' - " . $v_timestamp . "\n";
+					$v_cur_depth++;
+					if ( $v_cur_depth <= $v_max_depth ) {
+						fn_stat_watch( $_dir, $v_timestamp);
+					} else {
+						fn_log("Maximum depth reached at " . &SWEscape::fn_escape_filename($v_dir) . "\n");
+						### If it contains a newline character, then it needs to be processed specially
+						my $v_dir_name = fn_get_file_name($_dir, $v_timestamp);
+						print $fh_output "Maximum depth reached at '" . $v_dir_name . "' - " . $v_timestamp . "\n";
+					}
+					$v_cur_depth--;
 				}
-				$v_cur_depth--;
 			}
 		}
 	}
@@ -988,6 +992,15 @@ sub fn_test_file {
 	return $v_file;
 }
 
+sub fn_not_file {
+### Given an argument and variable that should contain a file name, if that variable does not return true, indicate that the argument should have been followed by a file name
+	if ( ! $_[1] ) {
+		print STDERR "Argument '" . $_[0] . "' must be followed by a file name\n";
+		return(0);
+	}
+	return(1)
+}
+
 sub fn_uniq {
 ### Given an array, reduce the array to unique elements
 ### @_ is the array
@@ -1115,7 +1128,7 @@ my $d_working2;
 my @args;
 while ( defined $ARGV[0] ) {
 	my $v_arg = shift( @ARGV );
-	my $v_file;
+	my $v_file='';
 	if ( $v_arg =~ m/^-[a-zA-Z0-9][a-zA-Z0-9]+$/ ) {
 	### If there's a string of single character arguments, break them up and process them separately
 		my @v_args = split( m//, substr($v_arg,1) );
@@ -1129,7 +1142,7 @@ while ( defined $ARGV[0] ) {
 		unshift( @ARGV, pop(@v_args) );
 		unshift( @ARGV, pop(@v_args) );
 	} elsif ( $v_arg =~ m/^--.*=/ ) {
-	### If it's a full-style argument with an euals sign, split at the equals sign and make it two arguments
+	### If it's a full-style argument with an equals sign, split at the equals sign and make it two arguments
 		my @v_args = split( m/=/, $v_arg, 2 );
 		for my $a (@v_args) {
 			unshift( @ARGV, $a );
@@ -1140,32 +1153,33 @@ while ( defined $ARGV[0] ) {
 		if ( defined $ARGV[0] ) {
 			$d_working2 = shift( @ARGV );
 		}
+	} elsif ( $v_arg eq "--log" ) {
+		if ( defined $ARGV[0] ) {
+			$v_file = fn_test_file(shift( @ARGV ));
+		}
+		if ( fn_not_file( $v_arg, $v_file ) ) {
+			$f_log = $v_file;
+		}
 	} elsif ( $v_arg eq "--ignore" ) {
 		if ( defined $ARGV[0] ) {
 			$v_file = fn_test_file(shift( @ARGV ));
 		}
-		if ( $v_file ) {
+		if ( fn_not_file( $v_arg, $v_file ) ) {
 			push( @v_ignore, $v_file );
-		} else {
-			print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
 		}
 	} elsif ( $v_arg eq "-i" || $v_arg eq "--include" ) {
 		if ( defined $ARGV[0] ) {
 			$v_file = fn_test_file(shift( @ARGV ), 1);
 		}
-		if ( $v_file ) {
+		if ( fn_not_file( $v_arg, $v_file ) ) {
 			fn_get_include( $v_file );
-		} else {
-			print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
 		}
 	} elsif ( $v_arg eq "--output" || $v_arg eq "-o" ) {
 		if ( defined $ARGV[0] ) {
 			$v_file = fn_test_file(shift( @ARGV ));
 		}
-		if ( $v_file ) {
+		if ( fn_not_file( $v_arg, $v_file ) ) {
 			$f_output = $v_file;
-		} else {
-			print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
 		}
 	} elsif ( $v_arg eq "-v" || $v_arg eq "--verbose" ) {
 		if (!$b_verbose) {
@@ -1204,7 +1218,7 @@ while ( defined $ARGV[0] ) {
 				$d_backup = $v_file;
 			}
 		} else {
-			print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
+			print STDERR "Argument '" . $v_arg . "' must be followed by a directory name\n";
 		}
 	} else {
 		push( @args, $v_arg );
@@ -1362,7 +1376,7 @@ if ( ! defined $args[0] ) {
 			if ( defined $args[0] ) {
 				push( @v_backupr, shift( @args ) );
 			} else {
-				print STDERR "Argument '" . $v_arg . "' must be followed by a file name\n";
+				print STDERR "Argument '" . $v_arg . "' must be followed by a regular expression\n";
 			}
 		} elsif ( $v_arg eq "--comment" && $v_type eq "--backup-file" ) {
 			if ( $v_comment ) {
