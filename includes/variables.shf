@@ -16,6 +16,7 @@ function fn_conf_defaults {
 	v_BACKUP_MIN_DAYS=7
 	v_BACKUP_MAX_COPIES=4
 	v_BACKUP_DIRECTORY=
+	v_DEFAULT_JOB_DIRECTORY=
 	v_PARTIAL_SECONDS=1
 	v_MAX_DEPTH=20
 }
@@ -47,6 +48,7 @@ function fn_read_conf {
 	local DEFv_BACKUP_MIN_DAYS="$v_BACKUP_MIN_DAYS"
 	local DEFv_BACKUP_MAX_COPIES="$v_BACKUP_MAX_COPIES"
 	local DEFv_BACKUP_DIRECTORY="$v_BACKUP_DIRECTORY"
+	local DEFv_DEFAULT_JOB_DIRECTORY="$v_DEFAULT_JOB_DIRECTORY"
 	local DEFv_PARTIAL_SECONDS="$v_PARTIAL_SECONDS"
 	local DEFv_MAX_DEPTH="$v_MAX_DEPTH"
 
@@ -91,6 +93,9 @@ function fn_read_conf {
 	fi
 	if [[ -z "$v_BACKUP_DIRECTORY" || ! -d "$v_BACKUP_DIRECTORY" ]]; then
 		v_BACKUP_DIRECTORY="$DEFv_BACKUP_DIRECTORY"
+	fi
+	if [[ -z "$v_DEFAULT_JOB_DIRECTORY" || ! -d "v_DEFAULT_JOB_DIRECTORY" ]]; then
+		v_DEFAULT_JOB_DIRECTORY="$DEFv_DEFAULT_JOB_DIRECTORY"
 	fi
 	if [[ -z "$v_PARTIAL_SECONDS" ]]; then
 		v_PARTIAL_SECONDS="$DEFv_PARTIAL_SECONDS"
@@ -168,6 +173,7 @@ function fn_write_conf2 {
 	echo "v_BACKUP_MIN_DAYS=\"$v_BACKUP_MIN_DAYS\"" >> "$f_CONF2"
 	echo "v_BACKUP_MAX_COPIES=\"$v_BACKUP_MAX_COPIES\"" >> "$f_CONF2"
 	echo "v_BACKUP_DIRECTORY=\"$v_BACKUP_DIRECTORY\"" >> "$f_CONF2"
+	echo "v_DEFAULT_JOB_DIRECTORY=\"$v_DEFAULT_JOB_DIRECTORY\"" >> "$f_CONF2"
 	echo "v_PARTIAL_SECONDS=\"$v_PARTIAL_SECONDS\"" >> "$f_CONF2"
 	echo "v_MAX_DEPTH=\"$v_MAX_DEPTH\"" >> "$f_CONF2"
 }
@@ -186,6 +192,7 @@ function fn_make_conf {
 	sed -i "s@####BACKUP_MIN_DAYS####@$v_BACKUP_MIN_DAYS@" "$f_CONF"
 	sed -i "s@####BACKUP_MAX_COPIES####@$v_BACKUP_MAX_COPIES@" "$f_CONF"
 	sed -i "s@####BACKUP_DIRECTORY####@$v_BACKUP_DIRECTORY@" "$f_CONF"
+	sed -i "s@####DEFAULT_JOB_DIRECTORY####@$v_DEFAULT_JOB_DIRECTORY@" "$f_CONF"
 	sed -i "s@####PARTIAL_SECONDS####@$v_PARTIAL_SECONDS@" "$f_CONF"
 	sed -i "s@####MAX_DEPTH####@$v_MAX_DEPTH@" "$f_CONF"
 }

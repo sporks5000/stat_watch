@@ -138,7 +138,10 @@ function fn_run {
 			### If we're 15 days past expiration, delete everything
 				echo "$( date +%Y-%m-%d" "%T" "%z ) - Removing job $( echo -n "$f_JOB" | "$d_PROGRAM"/scripts/escape.pl )" >> "$f_LOG"
 				rm -f "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_changes_*.txt "$v_DIR"/"$v_NAME"_message_head.txt "$v_DIR"/"$v_NAME"_message_foot.txt "$v_DIR"/"$v_NAME"_stamp
-				rm -rf "$v_DIR"/backup_"$v_NAME"
+				if [[ -d "$v_DIR"/backup_"$v_NAME" ]]; then
+					##### This should reference the backup directory from the job file rather than assuming, however I don't want to risk this removing a communal directory (like the one from the conf)
+					rm -rf "$v_DIR"/backup_"$v_NAME"
+				fi
 				rm -f "$f_JOB"
 			fi
 			rm -rf "$v_DIR"/"$v_NAME"_run

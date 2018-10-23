@@ -34,7 +34,7 @@ function fn_create {
 	local v_MONITOR
 	local v_YN
 	### Prompt for basic details about the job that we're going to create
-	read -ep "What is the name of the account that you're creating a stat_watch job for? " v_ACCOUNT
+	read -ep "What is the name of the account that you're creating a Stat Watch job for? " v_ACCOUNT
 	echo
 	if [[ $( grep -E "^""$v_ACCOUNT"":" -c /etc/passwd ) -gt 0 ]]; then
 		echo "Account \"$v_ACCOUNT\" Does not exist"
@@ -66,12 +66,23 @@ function fn_create {
 	local v_DIR
 	echo "Next we need a directory to designate as the working directory for this job. It's recommended that this directory not contain any other files and directories so that its contents can be completely dedicated to this job. Be sure that the directory exists on a partition with enough extra space to store the files that we will be backing up. Also, if this Stat Watch job is being created out of concern that malicious users might have access to the files that are being monitored, it is best to select a directory outside of that threat." | "$d_PROGRAM"/scripts/fold_out.pl
 	echo
-	read -ep "What directory do you want to use as the working directory for this job (Default: $( echo -n "/home/stat_watch/$v_NAME" | "$d_PROGRAM"/scripts/escape.pl ))? " v_DIR
+	local v_PATH="$v_DEFAULT_JOB_DIRECTORY"
+	if [[ -z "$v_DEFAULT_JOB_DIRECTORY" ]]; then
+		v_PATH="/home/stat_watch"
+		if [[ -d "/home/stat_watch" ]]; then
+			v_PATH="/home/stat_watch"
+		elif [[ -d "/backup/stat_watch" ]]; then
+			v_PATH="/backup/stat_watch"
+		elif [[ -n "$( cd /*/stat_watch2 2> /dev/null && pwd )" ]]; then
+			v_PATH="$( cd /*/stat_watch2 2> /dev/null && pwd )"
+		fi
+	fi
+	read -ep "What directory do you want to use as the working directory for this job (Default: $( echo -n "$v_PATH/$v_NAME" | "$d_PROGRAM"/scripts/escape.pl ))? " v_DIR
 	echo
 	if [[ -z "$v_DIR" ]]; then
-		v_DIR="/home/stat_watch/$v_NAME"
-		if [[ ! -d "/home/stat_watch" ]]; then
-			mkdir -p "/home/stat_watch"
+		v_DIR="$v_PATH/$v_NAME"
+		if [[ ! -d "$v_PATH" ]]; then
+			mkdir -p "$v_PATH"
 		fi
 	fi
 	fn_file_path "$v_DIR"
@@ -88,7 +99,7 @@ function fn_create {
 		mkdir -p "$v_DIR"
 	fi
 	if [[ -f "$v_DIR"/"$v_NAME".job ]]; then
-		echo "There already appears to be a stat_watch job at $( echo -n "$v_DIR/$v_NAME.job" | "$d_PROGRAM"/scripts/escape.pl ). You should probably delete or modify that rather than create a new job." | "$d_PROGRAM"/scripts/fold_out.pl
+		echo "There already appears to be a Stat Watch job at $( echo -n "$v_DIR/$v_NAME.job" | "$d_PROGRAM"/scripts/escape.pl ). You should probably delete or modify that rather than create a new job." | "$d_PROGRAM"/scripts/fold_out.pl
 		exit
 	fi
 	d_BACKUP="$v_DIR"/backup_"$v_NAME"
@@ -102,13 +113,14 @@ function fn_create {
 		fi
 	fi
 
-	### Prompt if the job should stop running after 45 days
-	local b_EXPIRE=false
-	read -ep "Do you want this job to stop running after 45 days, and for all backed up files to be removed after 60 days (Y/n)? " v_YN
-	echo
-	if [[ $( echo "$v_YN" | grep -E -c "^[nN]" ) -eq 0 ]]; then
-		b_EXPIRE=true
-	fi
+##### This probably shouldn't be a default question
+#	### Prompt if the job should stop running after 45 days
+#	local b_EXPIRE=false
+#	read -ep "Do you want this job to stop running after 45 days, and for all backed up files to be removed after 60 days (Y/n)? " v_YN
+#	echo
+#	if [[ $( echo "$v_YN" | grep -E -c "^[nN]" ) -eq 0 ]]; then
+#		b_EXPIRE=true
+#	fi
 
 	### Prompt for an email address to send reports to
 	local v_EMAIL

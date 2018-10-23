@@ -883,10 +883,10 @@ sub fn_check_strings {
 
 sub fn_sort_prep {
 ### Sort the relevant arrays, then open the output file
-	@v_dirs = sort {$a cmp $b} @v_dirs;
-	@v_ignore = sort {$a cmp $b} @v_ignore;
-	@v_rignore = sort {$a cmp $b} @v_rignore;
-	@v_star_ignore = sort {$a cmp $b} @v_star_ignore;
+	@v_dirs = sort {$a cmp $b} fn_uniq(@v_dirs);
+	@v_ignore = sort {$a cmp $b} fn_uniq(@v_ignore);
+	@v_rignore = sort {$a cmp $b} fn_uniq(@v_rignore);
+	@v_star_ignore = sort {$a cmp $b} fn_uniq(@v_star_ignore);
 	### Open the file for output
 	if ( defined $f_output && open( $fh_output, ">", $f_output ) ) {
 		return 1;
@@ -967,6 +967,7 @@ sub fn_test_file {
 		}
 	}
 	use warnings;
+	require( $d_program . '/scripts/escape.pm' );
 	if ( $b_exist ) {
 		if ( ! -e $v_file ) {
 			print STDERR "File " . &SWEscape::fn_escape_filename($v_orig_file) . " Does not appear to exist\n";
@@ -1493,6 +1494,14 @@ if ( ! defined $args[0] ) {
 		fn_log("Pruning old backups from directory " . $d_backup_escape . "\n");
 		&SWBackup::fn_prune_backups($d_backup);
 	}
+} elsif ( $args[0] eq "--report-details" || $args[0] eq "--rd" ) {
+	require( $d_program . '/scripts/report_details.pm' );
+	shift( @args );
+	&SWReportDetails::fn_rd_parse( @args );
+} elsif ( $args[0] eq "--backup-stat" || $args[0] eq "--bs" ) {
+	require( $d_program . '/scripts/report_details.pm' );
+	shift( @args );
+	&SWBackup::fn_backup_stat(@args);
 } elsif ( $args[0] eq "--record" || $args[0] eq "--links" || $args[0] eq "--new-lines" || substr($args[0],0,2) ne "--" ) {
 ### The part where we capture the stats of files
 	while ( defined $args[0] ) {

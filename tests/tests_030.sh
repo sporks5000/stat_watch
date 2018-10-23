@@ -122,18 +122,16 @@ function fn_test_30_2 {
 	"$f_STAT_WATCH" --config "$f_CONF" --restore "$d_STATWATCH_TESTS_WORKING/testing/123.php""$v_NEW_STAMP1" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
 
 	### At this point, the second backup should point to the newest file with a pointer (6th), and the first backup should point to the newest file (10th)
-	v_STAMP6="$( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING/testing/" | sort | egrep -o "_[0-9]+_pointer$" | egrep -o "_[0-9]+" | tail -n1 )"
+	# v_STAMP6="$( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING/testing/" | sort | egrep -o "_[0-9]+_pointer$" | egrep -o "_[0-9]+" | tail -n1 )"
 	v_STAMP10="$( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING/testing/" | sort | egrep -o "_[0-9]+$" | tail -n1 )"
 
 	### Test if 2 points to 6, 1 points to 10, and 6 points to 10
 	if [[ "_$( cat "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING/testing/123.php""$v_NEW_STAMP1"_pointer )" != "$v_STAMP10" ]]; then
 		fn_fail "30.2.1.1"
 	fi
-	if [[ "_$( cat "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING/testing/123.php""$v_NEW_STAMP2"_pointer )" != "$v_STAMP6" ]]; then
-		fn_fail "30.2.1.2"
-	fi
+	v_STAMP6="_$( cat "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING/testing/123.php""$v_NEW_STAMP2"_pointer )"
 	if [[ "_$( cat "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING/testing/123.php""$v_STAMP6"_pointer )" != "$v_STAMP10" ]]; then
-		fn_fail "30.2.1.3"
+		fn_fail "30.2.1.2"
 	fi
 	fn_pass "30.2.1"
 

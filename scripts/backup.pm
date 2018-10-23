@@ -856,6 +856,27 @@ sub fn_single_backup {
 	return $f_backup;
 }
 
+sub fn_backup_stat {
+	my $v_disp = shift(@_);
+
+	### Find the location of the backup and the original file path
+	my $f_backup = fn_find_backup($v_disp);
+	if ( ! $f_backup ) {
+		print STDERR "No such backup " . &SWEscape::fn_escape_filename($v_disp) . "\n";
+	} else {
+		my $v_stats = fn_read_first_line( $f_backup . "_stat" );
+		if ( -f $f_backup . "_md5" ) {
+			$v_stats .= " -- " . fn_read_first_line( $f_backup . "_md5" );
+		}
+		&SWReportDetails::fn_stat_file( $v_disp, $v_stats );
+	}
+
+	### If we were given more files, do those too
+	if (@_) {
+		fn_backup_stat(@_);
+	}
+}
+
 sub fn_hold {
 ### Given a backup file, create a hold for that backup
 	my $v_disp = shift(@_);

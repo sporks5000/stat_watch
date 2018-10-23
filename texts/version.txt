@@ -1,5 +1,10 @@
 
-Current Version: 1.7.1
+Current Version: 1.7.2
+
+Version 1.7.2 (2018-10-22) -
+    - Added the "--report-details" and "--rd" flags for getting informatino out of reports generated with "--report"
+    - Added the "--backup-stat" and "--bs" flags for getting the stats of backups
+    - Added a configuration directive item for setting a default job directory
 
 Version 1.7.1 (2018-10-19) -
     - "--create" no longer requires that the job be associated with an account

@@ -62,6 +62,24 @@ Note: As above, it's possible that you will want to use the "--no-ctime" and "--
 
 We won't have access to any of the changed files in order to compare their contents, but we will at least have the relevant timestamps so that we can search relevant logs to see if there is anything there worthy of note.
 
+#===================================================#
+#== Finding the Stat of a File Listed in a Report ==#
+#===================================================#
+
+Assuming that we previously created a Stat Watch report, we can check that report for the stats of a specific file using either the "--report-details" or the "--rd" flag, hollowed by the name of the report and the name of the file that we're interested in.
+
+```    /root/bin/stat_watch --report-details /root/stat_watch1.txt /home/account/public_html/directory/script.php```
+
+The output would look something like this:
+
+```    Processing of '/home/account/public_html' started at '2018-10-23 02:00:03 -0400'
+    
+      FILE: '/home/account/public_html/directory/script.php_15335321890'
+      SIZE: 1011 bytes   MD5 Sum: de31e27abb48dad3b8a2fcc61fdc575a
+    ACCESS: f-0644  USER: (510 / account)  GROUP: (515 / account)
+    MODIFY: 2018-08-06 01:09:49 -0400
+    CHANGE: 2018-08-06 01:09:49 -0400```
+
 #====================#
 #== Advanced Rules ==#
 #====================#
@@ -113,9 +131,9 @@ You can also leave a comment when backing up a file. Such comments can be viewed
 
 ```    /root/bin/stat_watch -a /home/account/public_html/directory/script.php --comment "Prior to changes for ticket 12345" --backupd /home/stat_watch/temp_backup```
 
-#=============================#
-#== Listing Backed-up Files ==#
-#=============================#
+#=======================================#
+#== Listing Copies of Backed-up Files ==#
+#=======================================#
 
 Stat Watch maintains a list of all of the directories that it has backed up to, so it's easy to check from the command line if it has created a backup of a file.
 
@@ -133,6 +151,22 @@ If there is a comment associated with one of the backups, the output would look 
       '/home/account/public_html/directory/script.php_15335787200' -- Timestamp: 2018-08-06 14:05:20 -0400 -- 1024 bytes```
 
 The file names given here are not the actual full path to the backup file, but rather just a display name, quoted such that if the file contains any newline or non-printing characters, it will all appear on one line, and copying and pasting into the terminal will result in those characters being interpreted appropriately. This display name can be used to reference the file with other Stat Watch functions related to backups, such as "--restore" and "--compare"
+
+#==============================#
+#== Stats of Backed-up Files ==#
+#==============================#
+
+If you want to view the stats of a backed-up file, you can use the "--backup-stat" or "--bs" flag, along with the display name that was output by "--list":
+
+```    /root/bin/stat_watch --backup-stat '/home/account/public_html/directory/script.php_15335321890'```
+
+The output will look something like this:
+
+```      FILE: '/home/account/public_html/directory/script.php_15335321890'
+      SIZE: 1011 bytes   MD5 Sum: de31e27abb48dad3b8a2fcc61fdc575a
+    ACCESS: f-0644  USER: (510 / account)  GROUP: (515 / account)
+    MODIFY: 2018-08-06 01:09:49 -0400
+    CHANGE: 2018-08-06 01:09:49 -0400```
 
 #===============================#
 #== Restoring Backed-up Files ==#

@@ -149,8 +149,8 @@ elif [[ -n "$1" && "$1" != "--create" ]]; then
 	source "$d_PROGRAM"/includes/assume.shf
 	f_ASSUME="$( fn_find_pwd )"
 
-	b_ADD_INCLUDE=true
 	if [[ -n "$f_ASSUME" ]]; then
+		b_ADD_INCLUDE=true
 		fn_assume_include "$@"
 	fi
 
