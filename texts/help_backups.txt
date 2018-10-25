@@ -43,7 +43,7 @@ How would one go about automating backups
     - Creating Stat Watch jobs with the "--create" flag, and then setting up a cron job to run them with the "--run" flag is the easiest way to automate creating backups with Stat Watch
 
 
-REGARDING BACKUP STORAGE
+REGARDING BACKUP STORAGE & ADDITIONAL FILES
 
 Stat Watch creates backups by emulating the file system's directory tree in the backup directory specified. For example, if Stat Watch were told to backup the file '/usr/local/src/stat_watch.tar.gz' with a backup directory of '/home/stat_watch/backups', it would first create the directory '/home/stat_watch/backups/usr', then '/home/stat_watch/backups/usr/local', then '/home/stat_watch/backups/usr/local/src', and finally it would make a copy of the file stat_watch.tar.gz.
 
@@ -69,4 +69,15 @@ Along with the backed up contents, Stat Watch backups may also include files tha
 '_pointer' - 
     - The presence of this file indicates that the file contents of a later backup were the same as this backup (in otherwords, only permissions or timestamps had changed), and thus rather than wasting space storing the same backup content twice, it's just referencing the other file.
     - Think of this as being similar to a symlink
+
+Additionally, Stat Watch backup directories will also contain the following files:
+
+'__last_prune' -
+    - This file is kept in the root directory of a Stat Watch backup and contains a timestamp indicating when the directory as a whole was last pruned
+
+'__origin_path' - 
+    - This file contains the path that backups in this directory are relevant to. Any backed-up file in this directory was backed-up from an original file in the directory stored in this file.
+
+'__prune_rules' -
+    - If a backup directory contains this file, and the text of this file is a number, followed by a colon, followed by another number, the first number will override "BackupMC" and the second number will override "BackupMD" for the files within this directory and all of its subdirectories
 

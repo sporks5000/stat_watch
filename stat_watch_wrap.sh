@@ -92,7 +92,7 @@ done
 ### Test to ensure that the necessary perl modules are present
 if [[ ! -f "$d_WORKING"/perl_modules ]]; then
 	v_MODULES=''
-	for i in "Digest::MD5" "Digest::MD5::File" "Cwd" "POSIX" "Fcntl"; do
+	for i in $( egrep "(^|^.*;)\s*use\s" "$d_PROGRAM"/stat_watch.pl "$d_PROGRAM"/modules/*.pm "$d_PROGRAM"/scripts/*.pl | egrep -o "use\s+[^ ]+" | egrep -v "use\s(warnings|strict)" | sed -E "s/^use\s*//" | sed "s/;$//" | sort -u | tr "\n" " " ); do
 		if [[ $( "$v_PERL" -e "use $i;" 2>&1 | head -n1 | grep -E -c "^Can't locate" ) -gt 0 ]]; then
 			v_MODULES="$v_MODULES $i"
 		fi
@@ -132,6 +132,7 @@ if [[ "$1" == "--run" ]]; then
 	fi
 elif [[ "$1" == "--email-test" ]]; then
 	source "$d_PROGRAM"/includes/email_test.shf
+	source "$d_PROGRAM"/includes/run.shf
 	shift
 	if [[ "$1" == "--locate" ]]; then
 		shift

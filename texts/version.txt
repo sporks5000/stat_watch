@@ -1,5 +1,13 @@
 
-Current Version: 1.7.2
+Current Version: 1.7.3
+
+Version 1.7.3 (2018-10-24) -
+    - Removed the options for searching for symlinks and files with new line characters
+    - Separated out perl modules from the ./scripts directory
+    - Allow directories to set their own pruning rules with the '__prune_rules' file
+    - Fixed a big with "--report-details"
+    - Modified "--compare" to allow comparing an existing file to its most recent backup
+    - Fixed an issue where it was not possible to create a manual backup of a symlink that pointed to a directory
 
 Version 1.7.2 (2018-10-22) -
     - Added the "--report-details" and "--rd" flags for getting informatino out of reports generated with "--report"

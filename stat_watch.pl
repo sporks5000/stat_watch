@@ -56,8 +56,6 @@ my $v_max_depth = 20;
 my $v_cur_depth = 0;
 my $v_as_dir;
 my $v_current_dir;
-my $b_links;
-my $b_new_lines;
 my $b_ext_stat;
 
 #===================#
@@ -170,7 +168,6 @@ sub fn_stat_watch {
 ### $_[0] is the directory in question; $_[1] is the timestamp associated with this process
 	my $v_dir = $_[0];
 	my $v_timestamp = $_[1];
-	my $c_links = 0;
 	if ($b_verbose) {
 		my $v_dir_escape = &SWEscape::fn_escape_filename($v_dir);
 		print STDERR "Directory: " . $v_dir_escape . "\n";
@@ -179,20 +176,10 @@ sub fn_stat_watch {
 	### If we were given a file instead of a directory
 		my $v_file = $v_dir;
 		if ( fn_check_file($v_file) ) {
-			if ($b_links) {
-				if ( -l $v_file ) {
-					print "1 - " . &SWEscape::fn_escape_filename($v_file) . "\n";
-				}
-			} elsif ( $b_new_lines ) {
-				if ( $v_file =~ m/[\001-\037\x7F\n]/ ) {
-					print &SWEscape::fn_escape_filename($v_file) . "\n";
-				}
-			} else {
-				fn_report_line($v_file, $v_timestamp);
-			}
+			fn_report_line($v_file, $v_timestamp);
 		}
 	} elsif ( -e $v_dir ) {
-		if ( $v_dir eq $v_current_dir && ! $b_links && ! $b_new_lines ) {
+		if ( $v_dir eq $v_current_dir ) {
 			fn_report_line($v_dir, $v_timestamp);
 		}
 		### Open the directory and get a file list
@@ -211,21 +198,8 @@ sub fn_stat_watch {
 					if ( -d $v_file && ! -l $v_file ) {
 						push( @dirs, $v_file );
 					}
-					if ($b_links) {
-						if ( -l $v_file ) {
-							$c_links++;
-						}
-					} elsif ( $b_new_lines ) {
-						if ( $v_file =~ m/[\001-\037\x7F\n]/ ) {
-							print &SWEscape::fn_escape_filename($v_file) . "\n";
-						}
-					} else {
-						fn_report_line($v_file, $v_timestamp);
-					}
+					fn_report_line($v_file, $v_timestamp);
 				}
-			}
-			if ( $c_links ) {
-				print $c_links . " - " . &SWEscape::fn_escape_filename($v_dir) . "\n";
 			}
 			for my $_dir (@dirs) {
 			### For each of the directories we found, go through RECURSIVELY!
@@ -391,6 +365,7 @@ sub fn_diff {
 			if ( $v_dir ne "d" ) {
 				push( @v_files2, $v_file );
 			}
+			##### If we stored details about the directory in $d_backup/[DIRECTORY]/._[TIMESTAMP]_stat, we could capture instances where permissions or ownership changed
 			if ( $v_dir ne "d" && $b_backup ) {
 				if ( exists $ref_diff->{$v_file}->{'>'}->{'md5'} ) {
 					$b_md5_all = 1;
@@ -825,6 +800,8 @@ sub fn_get_include {
 
 sub fn_document_backup {
 ### Document the backup locations we've seen so that we can check all of them when necessary
+	##### If the directory that we're given is within another directory that has previously been used for backups, use that directory instead.
+	##### I would hope that no one would ever do this, but we really don't want weird nested backups
 	if ( $d_backup ) {
 	### If the job file listed a backup directory, add that to the list of backup directories
 		my @v_backup_dirs;
@@ -947,6 +924,7 @@ sub fn_date_files {
 sub fn_test_file {
 ### Given a file name, test against it. Does it exist? What's it's file type?
 ### $_[0] is the path to the file; $_[1] is whether or not it needs to exist; $_[2] is whether it needs to test as a certain type.
+### "f" for file or synlink that points to a file, "d" for directory, "lf" for a file or symlink regardless of where it points
 	my $v_file = $_[0];
 	my $v_orig_file = $v_file;
 	my $b_exist = ( $_[1] || 0 );
@@ -967,7 +945,7 @@ sub fn_test_file {
 		}
 	}
 	use warnings;
-	require( $d_program . '/scripts/escape.pm' );
+	require( $d_program . '/modules/escape.pm' );
 	if ( $b_exist ) {
 		if ( ! -e $v_file ) {
 			print STDERR "File " . &SWEscape::fn_escape_filename($v_orig_file) . " Does not appear to exist\n";
@@ -975,11 +953,14 @@ sub fn_test_file {
 		}
 	}
 	if ( $v_type ) {
-		if ( $v_type eq "f" ) {
+		if ( $v_type eq "f" || $v_type eq "lf" ) {
 			if ( -p $v_file ) {
 			### Sometimes files are pipes.
 				return $v_file;
 			} elsif ( ! -f $v_file && -e $v_file ) {
+				if ( $v_type eq "lf" && -l $v_file ) {
+					return $v_file;
+				}
 				print STDERR &SWEscape::fn_escape_filename($v_orig_file) . " is not a file\n";
 				exit 1;
 			}
@@ -1233,8 +1214,8 @@ if ( ! -d $d_working ) {
 	mkdir( $d_working, 0755 );
 }
 
-require( $d_program . '/scripts/backup.pm' );
-require( $d_program . '/scripts/escape.pm' );
+require( $d_program . '/modules/backup.pm' );
+require( $d_program . '/modules/escape.pm' );
 
 ### Process the commandline arguments
 my @v_unknown;
@@ -1304,10 +1285,10 @@ if ( ! defined $args[0] ) {
 	}
 	### Check if the ability to use md5sums is present
 	$b_use_md5 = fn_mod_check( 'Digest::MD5', 'Digest::MD5::File', 0 );
-	if ( $b_use_md5 && ! -f $d_program . '/scripts/md5.pm' ) {
+	if ( $b_use_md5 && ! -f $d_program . '/modules/md5.pm' ) {
 		$b_use_md5 = 0;
 	} elsif ( $b_use_md5 ) {
-		require( $d_program . '/scripts/md5.pm' );
+		require( $d_program . '/modules/md5.pm' );
 	}
 	### Check to make sure that the necessary binaries are here
 	fn_bin_check ('stat', 'diff');
@@ -1328,11 +1309,11 @@ if ( ! defined $args[0] ) {
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
 		if ( $v_arg && -e $v_arg && ! -p $v_arg ) {
-			my $v_file = fn_test_file($v_arg, 0, 'f');
+			my $v_file = fn_test_file($v_arg, 0, 'lf');
 			push( @v_files, $v_file );
 			if ( -l $v_file ) {
 				$v_file = ( abs_path($v_file) || '' );
-				if ( $v_file ) {
+				if ( $v_file && -f $v_file || (-l $v_file && ! -d $v_file)) {
 					push( @v_files, $v_file );
 				}
 			}
@@ -1347,7 +1328,7 @@ if ( ! defined $args[0] ) {
 		print STDERR "A file must be given to look for\n";
 		exit 1;
 	}
-	require( $d_program . '/scripts/fold_print.pm' );
+	require( $d_program . '/modules/fold_print.pm' );
 	for my $_file (@v_files) {
 		&SWBackup::fn_list_file($_file);
 	}
@@ -1366,7 +1347,7 @@ if ( ! defined $args[0] ) {
 		my $v_arg = shift( @args );
 		if ( $v_arg eq "--backup+" ) {
 			if ( defined $args[0] ) {
-				my $v_file = fn_test_file( shift( @args ), 0, 'f' );
+				my $v_file = fn_test_file( shift( @args ), 0, 'lf' );
 				if ( $v_file ) {
 					push( @v_backup_plus, $v_file );
 				}
@@ -1393,7 +1374,7 @@ if ( ! defined $args[0] ) {
 			if ( $v_type eq "--backup" ) {
 				$v_file = fn_test_file($v_arg, 1, 'f');
 			} else {
-				push( @v_files, fn_test_file($v_arg, 1, 'f') );
+				push( @v_files, fn_test_file($v_arg, 1, 'lf') );
 			}
 		} else {
 			push ( @v_unknown, $v_arg );
@@ -1422,10 +1403,10 @@ if ( ! defined $args[0] ) {
 	}
 	### Check if the ability to use md5sums is present
 	$b_use_md5 = fn_mod_check( 'Digest::MD5', 'Digest::MD5::File', 0 );
-	if ( $b_use_md5 && ! -f $d_program . '/scripts/md5.pm' ) {
+	if ( $b_use_md5 && ! -f $d_program . '/modules/md5.pm' ) {
 		$b_use_md5 = 0;
 	} elsif ( $b_use_md5 ) {
-		require( $d_program . '/scripts/md5.pm' );
+		require( $d_program . '/modules/md5.pm' );
 	}
 	### Output to the log and begin the job
 	if ( $v_type eq "--backup" ) {
@@ -1443,15 +1424,15 @@ if ( ! defined $args[0] ) {
 		}
 	}
 } elsif ( $args[0] eq "--md5-test" ) {
-	if ( -f $d_program . '/scripts/md5.pm' ) {
+	if ( -f $d_program . '/modules/md5.pm' ) {
 		fn_mod_check( 'Digest::MD5', 'Digest::MD5::File' );
-		require( $d_program . '/scripts/md5.pm' );
+		require( $d_program . '/modules/md5.pm' );
 		### Check to make sure that the necessary binaries are here
 		fn_bin_check ('stat', 'diff');
 		print "It looks as if everything you need is in place for MD5 functionality\n";
 		exit;
 	} else {
-		print STDERR "\nCannot check md5sums without module '" . $d_program . "/scripts/md5.pm':\n";
+		print STDERR "\nCannot check md5sums without module '" . $d_program . "/modules/md5.pm':\n";
 		print STDERR "Reinstall Stat Watch to get this module\n\n";
 		exit 1;
 	}
@@ -1492,17 +1473,17 @@ if ( ! defined $args[0] ) {
 	if ($d_backup) {
 		my $d_backup_escape = &SWEscape::fn_escape_filename($d_backup);
 		fn_log("Pruning old backups from directory " . $d_backup_escape . "\n");
-		&SWBackup::fn_prune_backups($d_backup);
+		&SWBackup::fn_prune_backups_main($d_backup);
 	}
 } elsif ( $args[0] eq "--report-details" || $args[0] eq "--rd" ) {
-	require( $d_program . '/scripts/report_details.pm' );
+	require( $d_program . '/modules/report_details.pm' );
 	shift( @args );
 	&SWReportDetails::fn_rd_parse( @args );
 } elsif ( $args[0] eq "--backup-stat" || $args[0] eq "--bs" ) {
-	require( $d_program . '/scripts/report_details.pm' );
+	require( $d_program . '/modules/report_details.pm' );
 	shift( @args );
 	&SWBackup::fn_backup_stat(@args);
-} elsif ( $args[0] eq "--record" || $args[0] eq "--links" || $args[0] eq "--new-lines" || substr($args[0],0,2) ne "--" ) {
+} elsif ( $args[0] eq "--record" || substr($args[0],0,2) ne "--" ) {
 ### The part where we capture the stats of files
 	while ( defined $args[0] ) {
 		my $v_arg = shift( @args );
@@ -1516,12 +1497,6 @@ if ( ! defined $args[0] ) {
 			my $v_dir = fn_test_file( $v_arg, 0, 'd');
 			push( @v_dirs, $v_dir );
 		} elsif ( $v_arg eq "--record" ) {
-		} elsif ( $v_arg eq "--links" ) {
-			$b_ignore_on_record = 1;
-			$b_links = 1;
-		} elsif ( $v_arg eq "--new-lines" ) {
-			$b_ignore_on_record = 1;
-			$b_new_lines = 1;
 		} else {
 			push ( @v_unknown, $v_arg );
 		}
@@ -1541,9 +1516,9 @@ if ( ! defined $args[0] ) {
 	my $b_close = fn_sort_prep();
 	### If we're supposed to be getting md5sums, check to ensure that that's possible
 	if ( @v_md5r || $b_md5_all || @v_md5 ) {
-		if ( -f $d_program . '/scripts/md5.pm' ) {
+		if ( -f $d_program . '/modules/md5.pm' ) {
 			fn_mod_check( 'Digest::MD5', 'Digest::MD5::File' );
-			require( $d_program . '/scripts/md5.pm' );
+			require( $d_program . '/modules/md5.pm' );
 			$b_use_md5 = 1;
 		}
 	}
@@ -1555,11 +1530,9 @@ if ( ! defined $args[0] ) {
 	for my $_dir ( @v_dirs ) {
 		$v_current_dir = $_dir;
 		my $v_output_dir = fn_get_file_name($_dir);
-		if ( ! $b_links && ! $b_new_lines ) {
-			print $fh_output "Processing: '" . $v_output_dir . "' - " . $v_timestamp . "\n";
-		}
+		print $fh_output "Processing: '" . $v_output_dir . "' - " . $v_timestamp . "\n";
 		fn_check_strings( $_dir );
-		if ( -d $_dir && (! $b_links || ! $b_new_lines) ) {
+		if ( -d $_dir ) {
 			### Individual files can be listed as well, but there's no need to log the fact we're looking at those. Just directories will suffice
 			my $_dir_escape = &SWEscape::fn_escape_filename($_dir);
 			fn_log("Running a report for directory " . $_dir_escape . "\n");

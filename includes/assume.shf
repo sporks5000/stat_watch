@@ -63,7 +63,7 @@ function fn_create_assumption {
 			return
 		fi
 		### This reads the assumption file, escapes both the job file and the directory, then replaces the newline character between them with "   ->   "
-		perl -e 'require( '\'"$d_PROGRAM"\'' . "/scripts/escape.pm" ); while(<>){chomp($_); my @line = split( m/\x0/, $_ ); print SWEscape::fn_escape_filename($line[0]) . "   ->   " . SWEscape::fn_escape_filename($line[1])}' "$d_WORKING"/assumptions
+		perl -e 'require( '\'"$d_PROGRAM"\'' . "/modules/escape.pm" ); while(<>){chomp($_); my @line = split( m/\x0/, $_ ); print SWEscape::fn_escape_filename($line[0]) . "   ->   " . SWEscape::fn_escape_filename($line[1])}' "$d_WORKING"/assumptions
 		echo
 		exit 0
 	elif [[ ( ! -f "$1" && "$1" != "--remove"  ) || ( -n "$2" && ! -d "$2" ) ]]; then

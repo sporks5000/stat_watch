@@ -109,7 +109,7 @@ function fn_test_14_2 {
 
 	### The "R" string should ignore anything that matches regex
 	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing -i <( echo "R ing/subdir[0-9]"; echo "R \n" ) --ignore-on-record --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
-	if [[ $( egrep -c "subdir" "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt ) -ne 8 ]]; then
+	if [[ $( egrep -c "subdir" "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt ) -ne 9 ]]; then
 		fn_fail "14.2.3.1"
 	fi
 	if [[ $( egrep -c "mlfn" "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt ) -ne 0 ]]; then

@@ -10,8 +10,8 @@ my $f_report;
 my @v_files;
 my @v_files_temp;
 
-my %v_users;
-my %v_groups;
+our %v_users;
+our %v_groups;
 
 sub fn_rd_out {
 ### Given a report file, output when each section was started as well as the stats on any files requested
@@ -128,6 +128,16 @@ sub fn_get_users_groups {
 	}
 }
 
+sub fn_get_user_group {
+### Given a user number and group number, make sure that it exists
+	if ( ! exists $v_users{$_[0]} ) {
+		$v_users{$_[0]} = "???";
+	}
+	if ( ! exists $v_groups{$_[1]} ) {
+		$v_groups{$_[1]} = "???";
+	}
+}
+
 sub fn_stat_file {
 ### Given the name of a file and the stat line of a file, output stats in a more human readable format
 	my $v_file = $_[0];
@@ -135,6 +145,9 @@ sub fn_stat_file {
 
 	my $v_md5;
 	my @v_line = split( m/ -- /, $v_stat );
+	if ( $v_stat =~ m/^ -- / ) {
+		shift(@v_line);
+	}
 	if ( scalar(@v_line) == 7 ) {
 		if ( length($v_line[6]) == 32 ) {
 			### If there's an md5sum, capture it
@@ -161,12 +174,7 @@ sub fn_stat_file {
 	if ( ! %v_users ) {
 		fn_get_users_groups();
 	}
-	if ( ! exists $v_users{$v_owner} ) {
-		$v_users{$v_owner} = "???";
-	}
-	if ( ! exists $v_groups{$v_group} ) {
-		$v_groups{$v_group} = "???";
-	}
+	fn_get_user_group($v_owner, $v_group);
 
 	### Output the file stats
 	print "  FILE: " . &SWEscape::fn_escape_filename($v_file) . "\n";

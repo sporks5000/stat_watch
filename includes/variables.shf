@@ -109,6 +109,11 @@ function fn_read_conf {
 	else
 		unset v_WORKING
 	fi
+
+	if [[ -z "$1" && -n "$v_BACKUP_DIRECTORY" && -d "$v_BACKUP_DIRECTORY" ]]; then
+		### If there is a default backup directory, write the default prune rules to its '__prune_rules' file
+		echo -n "$v_BACKUP_MAX_COPIES:$v_BACKUP_MIN_DAYS" > "$v_BACKUP_DIRECTORY"/__prune_rules
+	fi
 }
 
 function fn_perl_args {
@@ -138,10 +143,11 @@ function fn_check_conf {
 	if [[ -f "$f_CONF" ]]; then
 		if [[ -f "$f_CONF2" ]]; then
 			if [[ $( stat -c %Z "$f_CONF" ) -gt $( stat -c %Z "$f_CONF2" ) ]]; then
-			### If the main configuration is newer, read from it
+			### If the main configuration is newer, read from it and write to the mini conf
 				fn_read_conf
 				fn_write_conf2
 			else
+			### Otherwise, just read from the mini-conf
 				fn_read_conf2
 			fi
 		else
@@ -150,9 +156,11 @@ function fn_check_conf {
 			fn_write_conf2
 		fi
 	elif [[ -f "$f_CONF2" ]]; then
+	### If only the mini conf exists, read from it and create a main conf
 		fn_read_conf2
 		fn_make_conf
 	else
+	### If neither exists write the defaults to both
 		fn_conf_defaults
 		fn_write_conf2
 		fn_make_conf

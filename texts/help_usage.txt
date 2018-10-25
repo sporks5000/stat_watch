@@ -67,11 +67,9 @@ We won't have access to any of the changed files in order to compare their conte
 #===================================================#
 
 Assuming that we previously created a Stat Watch report, we can check that report for the stats of a specific file using either the "--report-details" or the "--rd" flag, hollowed by the name of the report and the name of the file that we're interested in.
-
 ```    /root/bin/stat_watch --report-details /root/stat_watch1.txt /home/account/public_html/directory/script.php```
 
 The output would look something like this:
-
 ```    Processing of '/home/account/public_html' started at '2018-10-23 02:00:03 -0400'
     
       FILE: '/home/account/public_html/directory/script.php_15335321890'
@@ -122,13 +120,11 @@ The files will be stored with the backup directory specified with the "--backupd
 #=================================#
 
 You can have Stat Watch create a backup of a single file using the "--backup-file" flag or the "-a" flag. Note that a backup directory must be specified.
-
 ```    /root/bin/stat_watch -a /home/account/public_html/directory/script.php --backupd /home/stat_watch/temp_backup```
 
 As above, the backup created would end up located at '/home/stat_watch/temp_backup/home/account/public_html/directory/script.php_15335787200' (or some other string of numbers).
 
 You can also leave a comment when backing up a file. Such comments can be viewed when listing backed-up copies for files (see "Listing Backed-up Files" below):
-
 ```    /root/bin/stat_watch -a /home/account/public_html/directory/script.php --comment "Prior to changes for ticket 12345" --backupd /home/stat_watch/temp_backup```
 
 #=======================================#
@@ -157,23 +153,32 @@ The file names given here are not the actual full path to the backup file, but r
 #==============================#
 
 If you want to view the stats of a backed-up file, you can use the "--backup-stat" or "--bs" flag, along with the display name that was output by "--list":
-
 ```    /root/bin/stat_watch --backup-stat '/home/account/public_html/directory/script.php_15335321890'```
 
 The output will look something like this:
-
 ```      FILE: '/home/account/public_html/directory/script.php_15335321890'
       SIZE: 1011 bytes   MD5 Sum: de31e27abb48dad3b8a2fcc61fdc575a
     ACCESS: f-0644  USER: (510 / account)  GROUP: (515 / account)
     MODIFY: 2018-08-06 01:09:49 -0400
     CHANGE: 2018-08-06 01:09:49 -0400```
 
+#=======================================================#
+#== Comparing a Backed-up File to the Current Version ==#
+#=======================================================#
+
+Given a scenario where you've discovered that a file has been changed, it's useful to be able to compare it to an existing backup. Stat Watch can do this as well:
+```    /root/bin/stat_watch --compare '/home/account/public_html/directory/script.php'```
+
+The output from this command will show any stat differences between the file and its most recent backup (not including any backups that have the same ctime stamp), as well as print a diff of the contents.
+
+If you want to compare a file to a backup other than the most recent, just give the display name of the backup that you want to compare it to as well:
+```  /root/bin/stat_watch --compare '/home/account/public_html/directory/script.php' '/home/account/public_html/directory/script.php_15335321890'```
+
 #===============================#
 #== Restoring Backed-up Files ==#
 #===============================#
 
 After getting a list of backed-up files, you can choose to restore one of them using the "--restore" flag:
-
 ```    /root/bin/stat_watch --restore '/home/account/public_html/directory/script.php_15335321890'```
 
 This would return the version of the file from 2018-08-06 01:09:49 -0400 to its previous location at '/home/account/public_html/directory/script.php' with the same permissions and ownerships that it had had at that time.

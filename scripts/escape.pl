@@ -15,7 +15,7 @@ if ( substr($d_progdir, 0, 1) ne "/" ) {
 	$d_progdir = join( "/", @progdir );
 }
 
-require( $d_progdir . '/escape.pm' );
+require( $d_progdir . '/../modules/escape.pm' );
 
 my $b_nl;
 if ( $ARGV[0] && $ARGV[0] eq "-n" ) {

@@ -11,7 +11,7 @@ function fn_test_7 {
 	### Test recording with md5's
 	fn_md5_modules
 	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --md5
-	if [[ $( cat "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt | awk -F" -- " '{print $8}' | egrep -c "^[0-9a-f]{32}$" ) -ne 14 ]]; then
+	if [[ $( cat "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt | awk -F" -- " '{print $8}' | egrep -c "^[0-9a-f]{32}$" ) -ne 15 ]]; then
 		fn_fail "7.1"
 	fi
 	fn_pass "7.1"

@@ -1,8 +1,13 @@
 #! /bin/bash
 
 function fn_get_direc {
-	local v_DIREC_IDENT="$1"
-	v_DIREC="$( grep -E "^\s*$v_DIREC_IDENT" "$f_JOB" | tail -n1 | sed "s/^[[:blank:]]*$v_DIREC_IDENT[[:blank:]]*//;s/[[:blank:]]*$//" )"
+### Given the identifier for a directive, get the value of that directive
+	if [[ -n "$f_JOB" ]]; then
+		local v_DIREC_IDENT="$1"
+		v_DIREC="$( grep -E "^\s*$v_DIREC_IDENT" "$f_JOB" | tail -n1 | sed "s/^[[:blank:]]*$v_DIREC_IDENT[[:blank:]]*//;s/[[:blank:]]*$//" )"
+	else
+		v_DIREC=
+	fi
 }
 
 function fn_send_email {
@@ -10,14 +15,27 @@ function fn_send_email {
 ### "1" - Send that no changes were detected
 ### "2" - Send Stat Watch results
 ### "3" - Send that the job ran too long
+### "4" - Test message
+### Optionally, "$2" can be the address to send to
 	local v_TYPE="$1"
-	fn_get_direc "Email"; v_EMAIL="$v_DIREC"
+	local v_EMAIL=
+
+	### Get the email address
+	if [[ -z "$2" ]]; then
+		fn_get_direc "Email"; v_EMAIL="$v_DIREC"
+	else
+		v_EMAIL="$2"
+	fi
+
+	### Send the email
 	if [[ -n "$v_EMAIL" && -n "$v_TYPE" ]]; then
-		eval "$v_RUN_PRE_E"
+		if [[ -n "$v_RUN_PRE_E" ]]; then
+			eval "$v_RUN_PRE_E"
+		fi
 		local v_SUBJECT=
 		if [[ "$v_TYPE" == "1" ]]; then
 			v_SUBJECT="Stat Watch - No changed detected on $(hostname)"
-		elif [[ "$v_TYPE" == "2" ]]; then
+		elif [[ "$v_TYPE" == "2" || "$v_TYPE" == "4" ]]; then
 			v_SUBJECT="Stat Watch - File changes on $(hostname)"
 		elif [[ "$v_TYPE" == "3" ]]; then
 			v_SUBJECT="Stat Watch - Job was terminated on $(hostname)"
@@ -33,6 +51,10 @@ function fn_send_email {
 				cat "$f_EMAIL"
 			elif [[ "$v_TYPE" == "3" ]]; then
 				echo "Job '$v_NAME' was terminated for having run longer then that maximum allowed time of $v_MAX_RUN seconds. You can increase this time by adjusting the 'Max-run' control string in the file $( echo -n "$f_JOB" | "$d_PROGRAM"/scripts/escape.pl )"
+			elif [[ "$v_TYPE" == "4" ]]; then
+				echo "This is a test message to confirm that mesages from server $(hostname) are reaching the address \"$v_EMAIL\"."
+				echo
+				echo "If you were not expecting this message, please ignore it as it was likely sent in error."
 			fi
 			echo
 			if [[ -f "$v_DIR"/"$v_NAME"_message_foot.txt ]]; then 
@@ -46,7 +68,9 @@ function fn_send_email {
 			fi
 		### $v_EMAIL isn't in quotes here because it's possible that they have specified more than one email address
 		) | mail -s "$v_SUBJECT" $v_EMAIL
-		eval "$v_RUN_POST_E"
+		if [[ -n "$v_RUN_POST_E" ]]; then
+			eval "$v_RUN_POST_E"
+		fi
 	fi
 }
 
@@ -136,11 +160,12 @@ function fn_run {
 		if [[ $( date +%s ) -gt $v_EXPIRE ]]; then
 			if [[ $( date --date="now - 15 days" +%s ) -gt $v_EXPIRE ]]; then
 			### If we're 15 days past expiration, delete everything
+				fn_get_direc "BackupD"; d_BACKUP="$v_DIREC"
 				echo "$( date +%Y-%m-%d" "%T" "%z ) - Removing job $( echo -n "$f_JOB" | "$d_PROGRAM"/scripts/escape.pl )" >> "$f_LOG"
 				rm -f "$v_DIR"/"$v_NAME"_files.txt "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_changes_*.txt "$v_DIR"/"$v_NAME"_message_head.txt "$v_DIR"/"$v_NAME"_message_foot.txt "$v_DIR"/"$v_NAME"_stamp
-				if [[ -d "$v_DIR"/backup_"$v_NAME" ]]; then
-					##### This should reference the backup directory from the job file rather than assuming, however I don't want to risk this removing a communal directory (like the one from the conf)
-					rm -rf "$v_DIR"/backup_"$v_NAME"
+				### Only remove the backup directory if it's not the default backup directory
+				if [[ -d "$d_BACKUP" && "$d_BACKUP" != "$v_BACKUP_DIRECTORY" ]]; then
+					rm -rf "$d_BACKUP"
 				fi
 				rm -f "$f_JOB"
 			fi
@@ -164,14 +189,20 @@ function fn_run {
 	fi
 	if [[ ! -f "$v_DIR"/"$v_NAME"_files.txt ]]; then
 	### If this is the first run, do an initial backup of files
-		eval "$v_RUN_START"
+		if [[ -n "$v_RUN_START" ]]; then
+			eval "$v_RUN_START"
+		fi
 		stat -c '%Y' "$f_JOB" > "$v_DIR"/"$v_NAME"_stamp
 		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" --record --log "$f_LOG" -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files.txt -v 2> "$v_ERROR_OUT"
 		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" --backup --log "$f_LOG" -i "$f_JOB" "$v_DIR"/"$v_NAME"_files.txt 2> "$v_ERROR_OUT"
-		eval "$v_RUN_POST"
+		if [[ -n "$v_RUN_POST" ]]; then
+			eval "$v_RUN_POST"
+		fi
 	else
 	### If this is a later run, diff the reports, and if there were changes, email them out
-		eval "$v_RUN_START"
+		if [[ -n "$v_RUN_START" ]]; then
+			eval "$v_RUN_START"
+		fi
 		nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" --record --log "$f_LOG" -i "$f_JOB" -o "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT"
 		if [[ $( stat -c '%Y' "$f_JOB" ) -gt $( cat "$v_DIR"/"$v_NAME"_stamp 2> "$v_ERROR_OUT" ) ]]; then
 			### If the job file has been updated, there's a chance that we need to back up additional files
@@ -196,7 +227,9 @@ function fn_run {
 			fi
 		fi
 
-		eval "$v_RUN_POST"
+		if [[ -n "$v_RUN_POST" ]]; then
+			eval "$v_RUN_POST"
+		fi
 		### This file should contain at least two lines - one indicating it's processing and one for the file or directory.
 		if [[ $( wc -l "$v_DIR"/"$v_NAME"_files2.txt 2> "$v_ERROR_OUT" | cut -d " " -f1 ) -gt 1 ]]; then
 			mv -f "$v_DIR"/"$v_NAME"_files2.txt "$v_DIR"/"$v_NAME"_files.txt
@@ -217,6 +250,7 @@ function fn_run {
 			rm -f "$v_DIR"/"$v_NAME"_files2.txt
 		fi
 
+		##### Instead of pruning based on a random chance, if we're already storing a file at "$d_BACKUP"/__last_prune, why not just base it on the amount of time elapsed since that time?
 		### Check to see if the user set the prune variables to soemthing different
 		fn_get_direc "Prune-max"; v_PRUNE_MAX2="$v_DIREC"
 		if [[ -n "$v_PRUNE_MAX2" && $( echo "$v_PRUNE_MAX2" | grep -E -c "^[0-9]+$" ) -gt 0 ]]; then
@@ -236,9 +270,7 @@ function fn_run {
 				v_LAST_PRUNE="$( cat "$d_BACKUP"/__last_prune )"
 			fi
 			if [[ $(( v_LAST_PRUNE + 10800 )) -le "$( date +%s )" ]]; then
-				echo -n "$( date +%s )" > "$d_BACKUP"/__last_prune 2> /dev/null
 				nice -n "$v_NICE" "$v_PERL" "$d_PROGRAM"/"$f_PERL_SCRIPT" "${a_PERL_ARGS[@]}" --prune --log "$f_LOG" -i "$f_JOB" 2> "$v_ERROR_OUT"
-				echo -n "$( date +%s )" > "$d_BACKUP"/__last_prune 2> /dev/null
 			fi
 		fi
 
@@ -267,7 +299,9 @@ function fn_run {
 		sed -i "1,1000d" "$f_LOG" 2> "$v_ERROR_OUT"
 	fi
 
-	eval "$v_RUN_POST"
+	if [[ -n "$v_RUN_END" ]]; then
+		eval "$v_RUN_END"
+	fi
 	rm -rf "$v_DIR"/"$v_NAME"_run
 	exit
 }

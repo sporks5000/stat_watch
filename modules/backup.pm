@@ -100,15 +100,44 @@ sub fn_check_retention {
 	}
 }
 
-sub fn_prune_backups {
+sub fn_prune_backups_main {
 ### This is the main function that's run with the "--prune" option
+	my @v_dirs = @_;
+	for my $_dir (@v_dirs) {
+		if ( -d $_dir ) {
+			### Note the start time for pruning the backup
+			if ( open( my $fh_write, ">", $_dir . "/__last_prune" ) ) {
+				print $fh_write time();
+				close($fh_write);
+			}
+			fn_prune_backups($_dir);
+			### And the overwrite the start time with the time when we finished
+			if ( open( my $fh_write, ">", $_dir . "/__last_prune" ) ) {
+				print $fh_write time();
+				close($fh_write);
+			}
+		}
+	}
+}
+
+sub fn_prune_backups {
+### When pruning backups wee will recurse through this function
 ### $_[0] is the backup directory
 	my $v_dir = $_[0];
 	if ($Main::b_verbose) {
 		my $v_dir_escape = &SWEscape::fn_escape_filename($v_dir);
 		print STDERR "Directory: " . $v_dir_escape . "\n";
 	}
+	### Capture what the pruning settings are currently
+	my $v_cur_mc = $Main::v_retention_max_copies;
+	my $v_cur_md = $Main::v_retention_min_days;
 	if ( -e $v_dir && -d $v_dir ) {
+		if ( -f $v_dir . '/__prune_rules' ) {
+			my $v_rules = fn_read_first_line( $v_dir . '/__prune_rules' );
+			if ( $v_rules =~ m/^[0-9]+:[0-9]+$/ ) {
+				( $Main::v_retention_max_copies, $Main::v_retention_min_days ) = split( m/:/, $v_rules );
+			}
+		}
 		### Open the directory and get a file list
 		if ( opendir my $fh_dir, $v_dir ) {
 			my @files = readdir $fh_dir;
@@ -116,7 +145,7 @@ sub fn_prune_backups {
 			my @dirs;
 			my @files2;
 			for my $_file (@files) {
-				if ( $_file eq "." || $_file eq ".." || $_file eq "__origin_path" ) {
+				if ( $_file eq "." || $_file eq ".." || $_file eq "__origin_path" || $_file eq "__last_prune" || $_file eq "__prune_rules" ) {
 					next;
 				} elsif ( -d ($v_dir . "/" . $_file) && ! -l ($v_dir . "/" . $_file) ) {
 					push( @dirs, ($v_dir . "/" . $_file) );
@@ -126,7 +155,9 @@ sub fn_prune_backups {
 					$_file = $v_dir . "/" . $_file;
 					my $v_base = $_file;
 					$v_base =~ s/_(hold|comment|stat|md5|pointer)$//;
-					if ( ! -f $v_base ) {
+					if ( -d $v_base ) {
+
+					} elsif ( ! -f $v_base && ! -l $v_base ) {
 						unlink( $_file );
 					}
 					next;
@@ -140,12 +171,17 @@ sub fn_prune_backups {
 				$_file = $v_dir . "/" . $_file;
 				fn_check_retention($_file);
 			}
+			### Sorting here is only necessary so that we can get verifiably consistant results during testing
+			@dirs = sort {$a cmp $b} @dirs;
 			for my $_dir (@dirs) {
 			### For each of the directories we found, go through RECURSIVELY!
 				fn_prune_backups($_dir);
 			}
 		}
 	}
+	### reset the pruning settings
+	$Main::v_retention_max_copies = $v_cur_mc;
+	$Main::v_retention_min_days = $v_cur_md;
 }
 
 sub fn_get_backup_name {
@@ -156,7 +192,7 @@ sub fn_get_backup_name {
 	my $v_time = time();
 	my $c = 0;
 	no warnings;
-	while ( -f $v_dir . "/" . $v_name . "_" . $v_time . $c ) {
+	while ( -e $v_dir . "/" . $v_name . "_" . $v_time . $c ) {
 	### The objective here is to allow us to perform two backups of a file within the same second. That alone is an edge case - the thought of us doing ten will probably never occur
 		use warnings;
 		$c++;
@@ -205,14 +241,27 @@ sub fn_backup_file {
 	}
 	if ($b_continue) {
 		my @v_dirs = split( m/\//, $v_file );
-		shift(@v_dirs); ### this will have been empty
 		my $v_name = pop(@v_dirs);
-		my $v_origin_dir = '/' . join( '/', @v_dirs );
-		for my $_dir (@v_dirs) {
+		my $d_origin = '';
+		### Go down the directory path and ensure that each of the directories on the way exist
+		while (@v_dirs) {
+			my $_dir = shift(@v_dirs);
 			$d_backup .= "/" . $_dir;
+			### The origin dir should not end in a slash unless it is ONLY a slash
+			if ( $d_origin ne "/" ) {
+				$d_origin .= "/" . $_dir;
+			} else {
+				$d_origin .= $_dir;
+			}
+			### If the backup directory doesn't exist, create it
 			if ( ! -d $d_backup ) {
 				mkdir( $d_backup );
 				chmod( 0700, $d_backup );
+			}
+			### Save the path to the original directory
+			if ( ! -f $d_backup . "/__origin_path" && open( my $fh_write, ">", $d_backup . "/__origin_path" ) ) {
+				print $fh_write $d_origin;
+				close($fh_write);
 			}
 		}
 		my $v_file_escape = &SWEscape::fn_escape_filename($v_file);
@@ -242,17 +291,12 @@ sub fn_backup_file {
 				}
 
 				undef @v_captured_stats;
-				### Save the path to the original directory
-				if ( ! -f $d_backup . "/__origin_path" && open( $fh_write, ">", $d_backup . "/__origin_path" ) ) {
-					print $fh_write $v_origin_dir;
-					close($fh_write);
-				}
 				if ($Main::b_verbose) {
 					my $f_backup_escape = &SWEscape::fn_escape_filename($f_backup);
 					print STDERR $v_file_escape . " -> " . $f_backup_escape . "\n";
 				}
 				if ( $f_content ) {
-					&Main::fn_log("Backed up changed to file stats for file " . $v_file_escape . "\n");
+					&Main::fn_log("Backed up changes to file stats for file " . $v_file_escape . "\n");
 				} else {
 					&Main::fn_log("Backed up file " . $v_file_escape . "\n");
 				}
@@ -429,7 +473,7 @@ sub fn_find_backup {
 	my $v_disp = $_[0];
 	$v_disp = &Main::fn_test_file($v_disp);
 	my $b_maybe_full_path;
-	if ( -f $v_disp ) {
+	if ( -f $v_disp || (-l $v_disp && ! -d $v_disp) ) {
 		$b_maybe_full_path = 1;
 	}
 	my @v_backup_dirs;
@@ -648,36 +692,39 @@ sub fn_follow_pointers {
 	return($v_file3);
 }
 
-sub fn_list_file {
-### Given a file name, list the backups that are available for it
+sub fn_find_backups {
+### Given the full path to a file, discover all of the backups that exist for that file
 ### $_[0] is the full path for the file
 	my $v_file = $_[0];
 	my @v_backup_dirs;
 	if ($Main::d_backup) {
 		@v_backup_dirs = ($Main::d_backup);
 	}
-	{
+
 	### Find all of the backup directories that have been used
-		if ( ! -d $Main::d_working ) {
-			mkdir( $Main::d_working );
-		}
-		### Open the list and read from it
-		if ( -f $Main::d_working . "/backup_locations" ) {
-			if ( open( my $fh_read, "<", $Main::d_working . "/backup_locations" ) ) {
-				while (<$fh_read>) {
-					my $_line = $_;
-					chomp($_line);
-					if ( ! $Main::d_backup || $_line ne $Main::d_backup ) {
-						push( @v_backup_dirs, $_line );
-					}
+	if ( ! -d $Main::d_working ) {
+		mkdir( $Main::d_working );
+	}
+	### Open the list and read from it
+	if ( -f $Main::d_working . "/backup_locations" ) {
+		if ( open( my $fh_read, "<", $Main::d_working . "/backup_locations" ) ) {
+			while (<$fh_read>) {
+				my $_line = $_;
+				chomp($_line);
+				if ( ! $Main::d_backup || $_line ne $Main::d_backup ) {
+					push( @v_backup_dirs, $_line );
 				}
-				close($fh_read);
 			}
+			close($fh_read);
 		}
 	}
+
 	my @v_dirs = split( m/\//, $v_file );
 	shift(@v_dirs); ### this will have been empty
 	my $v_name = pop(@v_dirs);
+	if ( ! defined $v_name || $v_name eq '' ) {
+		return;
+	}
 	my $d_orig = '/' . join( '/', @v_dirs );
 	my %v_files;
 	### Go through each backup directory to find instances where this file has been backed up
@@ -695,6 +742,14 @@ sub fn_list_file {
 			$v_files{$v_stamp} = $_file
 		}
 	}
+	return( $v_name, $d_orig, %v_files );
+}
+
+sub fn_list_file {
+### Given a file name, list the backups that are available for it
+### $_[0] is the full path for the file
+	my $v_file = $_[0];
+	( my $v_name, my $d_orig, my %v_files ) = fn_find_backups($v_file);
 	### Output the details
 	my $v_file_escape = &SWEscape::fn_escape_filename($v_file);
 	print "\nAvailable Backups for " . $v_file_escape . ":\n";
@@ -732,6 +787,7 @@ sub fn_list_file {
 
 			use warnings;
 			my $v_file_escape = &SWEscape::fn_escape_filename($v_disp_name);
+### This would print the full path for the backup rather than just the display name
 #			my $v_file_escape = &SWEscape::fn_escape_filename($v_file);
 			print "  " . $v_file_escape . " -- Timestamp: " . $v_stamp . " -- " . $v_size . " bytes";
 			no warnings;
@@ -757,6 +813,7 @@ sub fn_compare_contents {
 ### Given a backup file, show how it compares to the existing file
 ### If a second file is given, show how the file compares to that file instead
 ### If the first file is just a regular file, and the SECOND file is a backup... yeah we can do that too.
+	require( $Main::d_program . '/modules/report_details.pm' );
 	my $v_disp1 = $_[0];
 
 	### Find the location of the backup and the original file path
@@ -764,14 +821,15 @@ sub fn_compare_contents {
 	my $f_stats1;
 	my $f_origin;
 	my $f_content1;
-	if ( ! $f_comp1 && -f $v_disp1 ) {
-		$f_comp1 = $v_disp1;
-		$f_content1 = $v_disp1
-	} elsif ( ! $f_comp1 ) {
-		print STDERR "No such backup " . &SWEscape::fn_escape_filename($v_disp1) . "\n";
-		exit 1;
-	} else {
+	if ( $f_comp1 ) {
 		( $f_stats1, $f_origin, $f_content1 ) = fn_backup_details($f_comp1, 0, 1, 2);
+	} elsif ( -f $v_disp1 || (-l $v_disp1 && ! -d $v_disp1) ) {
+		$f_comp1 = &Main::fn_test_file($v_disp1, 1, 'lf');
+		$f_content1 = $f_comp1;
+	}
+	if ( ! $f_comp1 ) {
+		print STDERR "No such file or backup " . &SWEscape::fn_escape_filename($v_disp1) . "\n";
+		exit 1;
 	}
 
 	### And figure out what we're comparing it to
@@ -779,13 +837,14 @@ sub fn_compare_contents {
 	my $f_comp2 = $f_origin;
 	my $f_content2 = $f_origin;
 	my $f_stats2;
+	my $b_matches_current;
 	if ( defined $_[1] ) {
 		my $v_file = fn_find_backup($_[1]);
 		if ( $v_file ) {
 			$f_comp2 = $v_file;
 			$v_disp2 = $_[1];
 			( $f_stats2, $f_content2 ) = fn_backup_details($f_comp2, 0, 2);
-		} elsif ( -f $_[1] ) {
+		} elsif ( -f $_[1] || (-l $_[1] && ! -d $_[1]) ) {
 			$f_comp2 = $_[1];
 			$v_disp2 = $_[1];
 			$f_content2 = $_[1];
@@ -794,7 +853,36 @@ sub fn_compare_contents {
 			exit 1;
 		}
 	} elsif ( ! $f_origin ) {
-		print STDERR "Nothing to compare " . &SWEscape::fn_escape_filename($v_disp1) . "against \n";
+		### Given a situation where we're only given a file (that is not a backup), we should compare it to the most recent backup that does not have a matching ctime
+		( my $v_name, my $d_orig, my %v_files ) = fn_find_backups($f_comp1);
+		### Get the ctime of the file
+		my $comp1_ctime = (fn_file_stats($f_comp1))[-1];
+		my @v_files = sort {$b cmp $a} keys( %v_files );
+		for my $v_stamp (@v_files) {
+			### Get the string of numbers from the end of the file name, then trim off the last number - this is the timestamp
+			my $v_file = $v_files{$v_stamp};
+			my $comp2_ctime = fn_read_first_line( $v_file . '_stat' );
+			if ($comp2_ctime) {
+				$comp2_ctime = (split( m/ -- /, $comp2_ctime ))[-1];
+				if ( $comp1_ctime > $comp2_ctime ) {
+					### The first file with a ctime lower than the existing file is the one we want
+					$v_disp2 = $d_orig . '/' . $v_name . '_' . $v_stamp;
+					$f_comp2 = $v_file;
+					( $f_stats2, $f_content2 ) = fn_backup_details($f_comp2, 0, 2);
+					last;
+				} elsif ( $comp1_ctime == $comp2_ctime ) {
+					$b_matches_current = 1;
+				}
+			}
+		}
+	}
+	if ( ! $f_content2 ) {
+		if ($b_matches_current) {
+			print STDERR "File " . &SWEscape::fn_escape_filename($v_disp1) . " is the same as the only backup\n";
+		} else {
+			print STDERR "Nothing to compare " . &SWEscape::fn_escape_filename($v_disp1) . " against\n";
+		}
+		exit 1;
 	}
 
 	### Get the stats for both files
@@ -811,22 +899,88 @@ sub fn_compare_contents {
 		@v_stats2 = split( m/ -- /, fn_read_first_line($f_stats2) );
 	}
 
+	### Get the names of users and groups
+	&SWReportDetails::fn_get_users_groups();
+	&SWReportDetails::fn_get_user_group($v_stats1[1], $v_stats1[2]);
+	&SWReportDetails::fn_get_user_group($v_stats2[1], $v_stats2[2]);
+
+	### Put the stat differences into strings
+	my @stat1 = (
+		&Main::fn_format_perms($v_stats1[0]),
+		'(' . $v_stats1[1] . ' / ' . $SWReportDetails::v_users{$v_stats1[1]} . ')',
+		'(' . $v_stats1[2] . ' / ' . $SWReportDetails::v_groups{$v_stats1[2]} . ')',
+		$v_stats1[3] . ' bytes',
+		&Main::strftime( '%Y-%m-%d %T %z', localtime($v_stats1[4]) ),
+		&Main::strftime( '%Y-%m-%d %T %z', localtime($v_stats1[5]) )
+	);
+	my @stat2 = (
+		&Main::fn_format_perms($v_stats2[0]),
+		'(' . $v_stats2[1] . ' / ' . $SWReportDetails::v_users{$v_stats2[1]} . ')',
+		'(' . $v_stats2[2] . ' / ' . $SWReportDetails::v_groups{$v_stats2[2]} . ')',
+		$v_stats2[3] . ' bytes',
+		&Main::strftime( '%Y-%m-%d %T %z', localtime($v_stats2[4]) ), 
+		&Main::strftime( '%Y-%m-%d %T %z', localtime($v_stats2[5]) )
+	);
+	my $v_len1 = 0;
+	my @v_len1;
+	for (@stat1) {
+		my $len = length($_);
+		push( @v_len1, $len );
+		if ( $len > $v_len1 ) {
+			$v_len1 = $len;
+		}
+	}
+
+	### Find if there are stat differences
+	for (my $c=0; $c < scalar(@stat1); $c++) {
+		if ( $stat1[$c] ne $stat2[$c] ) {
+			$stat1[$c] = "\e[33m" . $stat1[$c] . "\e[00m";
+			$stat2[$c] = "\e[33m" . $stat2[$c] . "\e[00m";
+		}
+	}
+
 	### Begin output
 	print "\n";
-	print "     Comparing\n" . &SWEscape::fn_escape_filename($f_comp1) . "\n     To\n" . &SWEscape::fn_escape_filename($f_comp2) . "\n\n";
+	print "Comparing\n  " . &SWEscape::fn_escape_filename($v_disp1) . "\nTo\n  " . &SWEscape::fn_escape_filename($v_disp2) . "\n\n";
 
-	print "     Type and Permissions:\n" . &Main::fn_format_perms($v_stats1[0]) . "  >  " . &Main::fn_format_perms($v_stats2[0]) . "\n";
-	print "     User:\n" . $v_stats1[1] . "  >  " . $v_stats2[1] . "\n";
-	print "     Group:\n" . $v_stats1[2] . "  >  " . $v_stats2[2] . "\n";
-	print "     File Size:\n" . $v_stats1[3] . " bytes  >  " . $v_stats2[3] . " bytes\n";
-	print "     Modify Time:\n" . &Main::strftime( '%Y-%m-%d %T %z', localtime($v_stats1[4]) ) . "  >  " . &Main::strftime( '%Y-%m-%d %T %z', localtime($v_stats2[4]) ) . "\n";
-	print "     Change Time:\n" . &Main::strftime( '%Y-%m-%d %T %z', localtime($v_stats1[5]) ) . "  >  " . &Main::strftime( '%Y-%m-%d %T %z', localtime($v_stats2[5]) ) . "\n\n";
+	print 'Type and Perms:  ' . $stat1[0] . ( ' ' x ($v_len1 - $v_len1[0]) ) . '   >   ' . $stat2[0] . "\n";
+	print 'User:            ' . $stat1[1] . ( ' ' x ($v_len1 - $v_len1[1]) ) . '   >   ' . $stat2[1] . "\n";
+	print 'Group:           ' . $stat1[2] . ( ' ' x ($v_len1 - $v_len1[2]) ) . '   >   ' . $stat2[2] . "\n";
+	print 'File Size:       ' . $stat1[3] . ( ' ' x ($v_len1 - $v_len1[3]) ) . '   >   ' . $stat2[3] . "\n";
+	print 'Modify Time:     ' . $stat1[4] . ( ' ' x ($v_len1 - $v_len1[4]) ) . '   >   ' . $stat2[4] . "\n";
+	print 'Change Time:     ' . $stat1[5] . ( ' ' x ($v_len1 - $v_len1[5]) ) . '   >   ' . $stat2[5] . "\n\n";
 
 	### Now just diff the files
-	print "     Content:\n\n";
-	my $diff1_escape = &SWEscape::fn_shell_escape_filename($f_content1);
-	my $diff2_escape = &SWEscape::fn_shell_escape_filename($f_content2);
-	print `diff $diff1_escape $diff2_escape 2>&1`;
+	if ( ! -l $f_content1 && ! -l $f_content2 ) {
+		print "Content Diff:\n\n";
+		my $diff1_escape = &SWEscape::fn_shell_escape_filename($f_content1);
+		my $diff2_escape = &SWEscape::fn_shell_escape_filename($f_content2);
+		### This just uses the binary version of diff, as it's faster and easier
+		my $b_lines;
+		if ( open( my $fh_pipe, "diff $diff1_escape $diff2_escape |" ) ) {
+			while (<$fh_pipe>) {
+				$b_lines = 1;
+				print $_;
+			}
+			close($fh_pipe);
+			if ( ! $b_lines ) {
+				print "Same\n";
+			}
+			print "\n";
+		}
+	} elsif ( -l $f_content1 && -l $f_content2 ) {
+		my $v_readlink1 = readlink($f_content1);
+		my $v_readlink2 = readlink($f_content2);
+		print "Content Diff:\n\n";
+		if ( $v_readlink1 eq $v_readlink2 ) {
+			print "Same\n\n";
+		} else {
+			print "< " . &SWEscape::fn_escape_filename($v_readlink1) . "\n";
+			print "> " . &SWEscape::fn_escape_filename($v_readlink2) . "\n\n";
+		}
+	} else {
+		print "Cannot show the difference between a file and a symlink\n\n";
+	}
 }
 
 sub fn_single_backup {

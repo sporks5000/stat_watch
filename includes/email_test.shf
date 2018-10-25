@@ -8,14 +8,6 @@ function fn_email_test {
 		exit
 	fi
 	v_EMAIL="$1"
-	(  
-		echo "This is a test message to confirm that mesages from server $(hostname) are reaching the address \"$v_EMAIL\"."
-		echo
-		echo "If you were not expecting this message, please ignore it as it was likely sent in error."
-		if [[ -n "$2" ]]; then 
-			echo
-			echo "$2" 
-		fi
-	) | mail -s "Stat Watch - File changes on $(hostname)" $v_EMAIL
-	echo "Test message sent to \"$v_EMAIL\""
+	fn_send_email 4 "$v_EMAIL"
+	echo "Attempted to send a test message to \"$v_EMAIL\" - check mail logs for details"
 }

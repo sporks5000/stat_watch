@@ -30,6 +30,7 @@ function fn_make_files_1 {
 	echo "1234" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/abc.txt
 	echo "1234" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0010456.html" )"
 	echo "1234" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0033456.html" )"
+	ln -sf "$d_STATWATCH_TESTS_WORKING"'/testing/123!456.php' "$d_STATWATCH_TESTS_WORKING/testing/subdir/123 456.php"
 	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/subdir/123💩456.php"
 	rm -f "$d_STATWATCH_TESTS_WORKING"/testing/subdir/456.php
 }
@@ -158,8 +159,8 @@ function fn_md5_modules {
 		fi
 		echo
 	fi
-	if [[ ! -f "$d_STATWATCH"/scripts/md5.pm ]]; then
-		echo "File \"$v_d_STATWATCH/scripts/md5.pm\" is missing"
+	if [[ ! -f "$d_STATWATCH"/modules/md5.pm ]]; then
+		echo "File \"$v_d_STATWATCH/modules/md5.pm\" is missing"
 		exit 1;
 	fi
 }

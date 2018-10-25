@@ -8,6 +8,7 @@ function fn_test_27 {
 	source "$d_STATWATCH_TESTS"/tests_include.shf
 	fn_make_files_1
 
+	d_BACKUP="$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing
 	### Make backups of filenames with special characters
 	"$f_STAT_WATCH" --config "$f_CONF" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup -a "$d_STATWATCH_TESTS_WORKING"/testing/123.php"' -- d" "$d_STATWATCH_TESTS_WORKING/testing/123'456.php" "$d_STATWATCH_TESTS_WORKING/testing/123\"456.php" "$d_STATWATCH_TESTS_WORKING/testing/123?456.php" "$d_STATWATCH_TESTS_WORKING"'/testing/123!456.php' "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/123\n456.php" )" "$d_STATWATCH_TESTS_WORKING/testing/123ᡘ456.php" "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0010456.html" )" "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0033456.html" )" "$d_STATWATCH_TESTS_WORKING/testing/subdir/123💩456.php"
 	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --list "$d_STATWATCH_TESTS_WORKING"/testing/123.php"' -- d" "$d_STATWATCH_TESTS_WORKING/testing/123'456.php" "$d_STATWATCH_TESTS_WORKING/testing/123\"456.php" "$d_STATWATCH_TESTS_WORKING/testing/123?456.php" "$d_STATWATCH_TESTS_WORKING"'/testing/123!456.php' "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/123\n456.php" )" "$d_STATWATCH_TESTS_WORKING/testing/123ᡘ456.php" "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0010456.html" )" "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0033456.html" )" "$d_STATWATCH_TESTS_WORKING/testing/subdir/123💩456.php" | egrep -c "\s--\s" ) -ne 11 ]]; then
@@ -25,7 +26,7 @@ function fn_test_27 {
 		fn_fail "27.2.1"
 	fi
 	### Make sure that we've actually captured the name of the backup
-	local v_BACKUP="$d_STATWATCH_TESTS_WORKING"/testing2/backup"$v_FILE"_"$( \ls -1 "$d_STATWATCH_TESTS_WORKING"/testing2/backup"$d_STATWATCH_TESTS_WORKING"/testing | egrep "png" | egrep -v "stat" | egrep -o "[0-9]+$" )"
+	local v_BACKUP="$d_STATWATCH_TESTS_WORKING"/testing2/backup"$v_FILE"_"$( \ls -1 "$d_BACKUP" | egrep "png" | egrep -v "stat" | egrep -o "[0-9]+$" )"
 	if [[ ! -f "$v_BACKUP" ]]; then
 		fn_fail "27.2.2"
 	fi
@@ -47,6 +48,20 @@ function fn_test_27 {
 		fn_fail "27.3.3"
 	fi
 	fn_pass "27.3"
+
+	### Test backing up and restoring a symlink	
+	"$f_STAT_WATCH" --config "$f_CONF" --backup-file "$d_STATWATCH_TESTS_WORKING/testing/subdir/123 456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+	v_BACKUP="$d_BACKUP""/subdir/123 456.php_""$( \ls -1 "$d_BACKUP"/subdir | egrep "123 456.php_[0-9]+$" | egrep -o "[0-9]+$" | head -n1 )"
+	ln -sf "$d_STATWATCH_TESTS_WORKING/testing" "$d_STATWATCH_TESTS_WORKING/testing/subdir/123 456.php"
+	"$f_STAT_WATCH" --config "$f_CONF" --backup-file "$d_STATWATCH_TESTS_WORKING/testing/subdir/123 456.php" --backupd "$d_STATWATCH_TESTS_WORKING"/testing2/backup
+	if [[ ! -d "$d_STATWATCH_TESTS_WORKING/testing/subdir/123 456.php" ]]; then
+		fn_fail "27.4.1"
+	fi
+	"$f_STAT_WATCH" --config "$f_CONF" --restore "$v_BACKUP" > /dev/null
+	if [[ -d "$d_STATWATCH_TESTS_WORKING/testing/subdir/123 456.php" ]]; then
+		fn_fail "27.4.2"
+	fi
+	fn_pass "27.4"
 }
 
 fn_test_27 "$@"

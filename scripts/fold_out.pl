@@ -13,7 +13,7 @@ if ( substr($d_progdir, 0, 1) ne "/" ) {
 	$d_progdir = join( "/", @progdir );
 }
 
-require( $d_progdir . '/fold_print.pm' );
+require( $d_progdir . '/../modules/fold_print.pm' );
 
 ### First print anything piped in
 if ( ! -t STDIN ) {

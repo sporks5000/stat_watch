@@ -21,7 +21,7 @@ function fn_test_5 {
 	fn_pass "5.2"
 
 	### Make sure that all files are being accurately labeled as existing in the new directory
-	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --as-dir /home | egrep -c "^'/home" ) -ne 17 ]]; then
+	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --as-dir /home | egrep -c "^'/home" ) -ne 18 ]]; then
 		fn_fail "5.3"
 	fi
 	fn_pass "5.3"
