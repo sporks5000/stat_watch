@@ -358,14 +358,19 @@ sub fn_file_stats {
 sub fn_read_first_line {
 ### Given the name of a file that we only want to read the frst line from, return that first line
 	my $v_return;
-	if ( -f $_[0] && open( my $fh_read, "<", $_[0] ) ) {
-		while (<$fh_read>) {
-			$v_return = $_;
-			chomp( $v_return );
-			last;
+	no warnings;
+	if ( -f $_[0] ) {
+		use warnings;
+		if ( open( my $fh_read, "<", $_[0] ) ) {
+			while (<$fh_read>) {
+				$v_return = $_;
+				chomp( $v_return );
+				last;
+			}
+			close($fh_read);
 		}
-		close($fh_read);
 	}
+	use warnings;
 	return( $v_return );
 }
 
@@ -473,9 +478,12 @@ sub fn_find_backup {
 	my $v_disp = $_[0];
 	$v_disp = &Main::fn_test_file($v_disp);
 	my $b_maybe_full_path;
+	no warnings;
 	if ( -f $v_disp || (-l $v_disp && ! -d $v_disp) ) {
+		use warnings;
 		$b_maybe_full_path = 1;
 	}
+	use warnings;
 	my @v_backup_dirs;
 	if ($Main::d_backup) {
 		@v_backup_dirs = ($Main::d_backup);
@@ -1019,9 +1027,12 @@ sub fn_backup_stat {
 		print STDERR "No such backup " . &SWEscape::fn_escape_filename($v_disp) . "\n";
 	} else {
 		my $v_stats = fn_read_first_line( $f_backup . "_stat" );
+		no warnings;
 		if ( -f $f_backup . "_md5" ) {
+			use warnings;
 			$v_stats .= " -- " . fn_read_first_line( $f_backup . "_md5" );
 		}
+		use warnings;
 		&SWReportDetails::fn_stat_file( $v_disp, $v_stats );
 	}
 

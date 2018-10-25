@@ -25,7 +25,13 @@ function fn_find_assume {
 	if [[ -z "$v_LINE" ]]; then
 		fn_file_path "$d_CUR"; local d_PARENT="$s_DIR"
 		if [[ -n "$d_PARENT" ]]; then
-			v_RETURN="$( fn_find_assume "$d_PARENT" )"
+			if [[ $( echo "$d_PARENT" | egrep -c "^$d_SAN_CUR/" ) -gt 0 ]]; then
+				### If what we're given as the parent directory, is NOT actually the parent directory, we're not going to find anything
+				##### I get the feeling that there are still weird edge cases that could cause this to infinite loop
+				v_RETURN=
+			else
+				v_RETURN="$( fn_find_assume "$d_PARENT" )"
+			fi
 		fi
 	else
 		v_RETURN="$( tail -n +"$v_LINE" "$d_WORKING"/assumptions 2> /dev/null | head -n1 | cut -d $'\000' -f2 )"
@@ -120,7 +126,7 @@ function fn_create_assumption {
 		### Add this assumption to the temp file
 		printf '%b' "$d_ASSUME"'\0' >> "$f_TEMP"
 		fn_file_path "$1"
-		echo "$( cd -P "$s_DIR" && pwd )"/"$s_FILE" >> "$f_TEMP"
+		echo "$s_DIR"/"$s_FILE" >> "$f_TEMP"
 		### Replace the assumptions file with the temp file
 		mv -f "$f_TEMP" "$d_WORKING"/assumptions
 		echo -n "Assumption created for directory "
