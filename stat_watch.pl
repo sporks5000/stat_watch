@@ -725,6 +725,10 @@ sub fn_get_include {
 			### Regex for files to ignore
 				$_line =~ s/^R\s*//;
 				push( @v_rignore, $_line );
+			} elsif ( $_line =~ m/^IgnoreR\s*[^\s]/ ) {
+			### Another way to give regex for files ot ignore
+				$_line =~ s/^IgnoreR\s*//;
+				push( @v_rignore, $_line );
 			} elsif ( $_line =~ m/^BackupR\s*[^\s]/ ) {
 			### Regex for files to back up
 				$_line =~ s/^BackupR\s*//;
@@ -741,9 +745,17 @@ sub fn_get_include {
 				if ( substr( $_line,0,1 ) eq "/" ) {
 				### Ignore files with this exact name
 					push( @v_ignore, $_line );
+				} elsif ( $_line =~ m/^Ignore\s*\// ) {
+				### We can also ignore a specific file this way
+					$_line =~ s/^Ignore\s*//;
+					push( @v_ignore, $_line );
 				} elsif ( $_line =~ m/^\*\s*\// ) {
 				### Ignore all files whose full path starts with this string
 					$_line =~ s/^\*\s*//;
+					push( @v_star_ignore, $_line );
+				} elsif ( $_line =~ m/^Ignore\*\s*\// ) {
+				### Another way to ignore all files whose full path starts with this string
+					$_line =~ s/^Ignore\*\s*//;
 					push( @v_star_ignore, $_line );
 				} elsif ( $_line =~ m/^Include\s*\// ) {
 				### Process these files as additional job files
