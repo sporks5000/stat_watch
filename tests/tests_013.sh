@@ -6,7 +6,7 @@ function fn_test_13 {
 	if [[ "$1" == "--list" ]]; then
 		return
 	fi
-	source "$d_STATWATCH_TESTS"/tests_include.shf
+	source "$d_PROGRAM_TESTS"/tests_include.shf
 	fn_make_files_1
 	### Logging is controlled with the control string "Log", which populates the variable "$f_log".
 	### Logging is handled by the subroutine fn_log

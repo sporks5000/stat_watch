@@ -10,48 +10,48 @@ function fn_test_21 {
 	if [[ "$1" == "--list" ]]; then
 		return
 	fi
-	source "$d_STATWATCH_TESTS"/tests_include.shf
+	source "$d_PROGRAM_TESTS"/tests_include.shf
 	fn_make_files_1
 	fn_make_files_2
 
 	### Verify that it's skipping files correctly
-	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --ignore "$d_STATWATCH_TESTS_WORKING"/testing/subdir2
-	if [[ $( egrep "subdir2" "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt | egrep -cv "Processing:" ) -ne 0 ]]; then
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_PROGRAM_TESTS_WORKING"/testing --output "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt --ignore "$d_PROGRAM_TESTS_WORKING"/testing/subdir2
+	if [[ $( egrep "subdir2" "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt | egrep -cv "Processing:" ) -ne 0 ]]; then
 		fn_fail "21.1"
 	fi
 	fn_pass "21.1"
 
 	### Make sure that the files within the directory we want are not being skipped
-	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/subdir4 --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt --ignore "$d_STATWATCH_TESTS_WORKING"/testing/subdir2
-	if [[ $( egrep "subdir2" "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt | egrep -cv "Processing:" ) -ne "2" ]]; then
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_PROGRAM_TESTS_WORKING"/testing "$d_PROGRAM_TESTS_WORKING"/testing/subdir2/subdir4 --output "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt --ignore "$d_PROGRAM_TESTS_WORKING"/testing/subdir2
+	if [[ $( egrep "subdir2" "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt | egrep -cv "Processing:" ) -ne "2" ]]; then
 		fn_fail "21.2"
 	fi
 	fn_pass "21.2"
 
 	### What if they're included in a job file
-	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/subdir4 --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt -i <( echo "$d_STATWATCH_TESTS_WORKING"/testing/subdir2 )
-	if [[ $( egrep "subdir2" "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt | egrep -cv "Processing:" ) -ne "2" ]]; then
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_PROGRAM_TESTS_WORKING"/testing "$d_PROGRAM_TESTS_WORKING"/testing/subdir2/subdir4 --output "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt -i <( echo "$d_PROGRAM_TESTS_WORKING"/testing/subdir2 )
+	if [[ $( egrep "subdir2" "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt | egrep -cv "Processing:" ) -ne "2" ]]; then
 		fn_fail "21.3"
 	fi
 	fn_pass "21.3"
 
 	### What if we're using "*"
-	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/subdir4 --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt -i <( echo "* $d_STATWATCH_TESTS_WORKING"/testing/subdir )
-	if [[ $( egrep "subdir2" "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt | egrep -cv "Processing:" ) -ne "2" ]]; then
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_PROGRAM_TESTS_WORKING"/testing "$d_PROGRAM_TESTS_WORKING"/testing/subdir2/subdir4 --output "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt -i <( echo "* $d_PROGRAM_TESTS_WORKING"/testing/subdir )
+	if [[ $( egrep "subdir2" "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt | egrep -cv "Processing:" ) -ne "2" ]]; then
 		fn_fail "21.4"
 	fi
 	fn_pass "21.4"
 
 	### What if we're using "R"
-	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/subdir4 --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt -i <( echo "R subdir" )
-	if [[ $( egrep "subdir2" "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt | egrep -cv "Processing:" ) -ne "2" ]]; then
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_PROGRAM_TESTS_WORKING"/testing "$d_PROGRAM_TESTS_WORKING"/testing/subdir2/subdir4 --output "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt -i <( echo "R subdir" )
+	if [[ $( egrep "subdir2" "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt | egrep -cv "Processing:" ) -ne "2" ]]; then
 		fn_fail "21.5"
 	fi
 	fn_pass "21.5"
 
 	### And another
-	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/subdir4 --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt -i <( echo "R testing" )
-	if [[ $( egrep "subdir2" "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt | egrep -cv "Processing:" ) -ne "6" ]]; then
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_PROGRAM_TESTS_WORKING"/testing "$d_PROGRAM_TESTS_WORKING"/testing/subdir2/subdir4 --output "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt -i <( echo "R testing" )
+	if [[ $( egrep "subdir2" "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt | egrep -cv "Processing:" ) -ne "6" ]]; then
 		fn_fail "21.6"
 	fi
 	fn_pass "21.6"

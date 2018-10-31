@@ -1,88 +1,88 @@
 #! /bin/bash
 
-f_STAT_WATCH="$d_STATWATCH"/stat_watch_wrap.sh
+f_STAT_WATCH="$d_PROGRAM"/stat_watch_wrap.sh
 if [[ ! -f "$f_STAT_WATCH" ]]; then
 	echo "stat_watch.pl must be present and executable one directory level up from the directory where this script exists"
 	exit 1;
 fi
 
-source "$d_STATWATCH"/includes/util.shf
+source "$d_PROGRAM"/includes/util.shf
 
 function fn_make_files_1 {
-	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing
-	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing2
-	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing2/backup
-	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing2/working
-	f_CONF="$d_STATWATCH_TESTS_WORKING"/testing2/stat_watch.conf
-	echo "WORKING = $d_STATWATCH_TESTS_WORKING/testing2/working" > "$f_CONF"
-	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing/subdir
-	echo "1234" > "$d_STATWATCH_TESTS_WORKING"/testing/123.php
-	echo "1234" > "$d_STATWATCH_TESTS_WORKING"/testing/123.php"' -- d"
-	echo "1234" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/123.php
-	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/123'456.php"
-	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/123\"456.php"
-	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/123?456.php"
-	echo "1234" > "$d_STATWATCH_TESTS_WORKING"'/testing/123!456.php'
-	echo "1234" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/123\n456.php" )"
-	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/123ᡘ456.php"
-	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php"
-	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/abc.txt"
-	echo "1234" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/abc.txt
-	echo "1234" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0010456.html" )"
-	echo "1234" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0033456.html" )"
-	ln -sf "$d_STATWATCH_TESTS_WORKING"'/testing/123!456.php' "$d_STATWATCH_TESTS_WORKING/testing/subdir/123 456.php"
-	echo "1234" > "$d_STATWATCH_TESTS_WORKING/testing/subdir/123💩456.php"
-	rm -f "$d_STATWATCH_TESTS_WORKING"/testing/subdir/456.php
+	mkdir -p "$d_PROGRAM_TESTS_WORKING"/testing
+	mkdir -p "$d_PROGRAM_TESTS_WORKING"/testing2
+	mkdir -p "$d_PROGRAM_TESTS_WORKING"/testing2/backup
+	mkdir -p "$d_PROGRAM_TESTS_WORKING"/testing2/working
+	f_CONF="$d_PROGRAM_TESTS_WORKING"/testing2/stat_watch.conf
+	echo "WORKING = $d_PROGRAM_TESTS_WORKING/testing2/working" > "$f_CONF"
+	mkdir -p "$d_PROGRAM_TESTS_WORKING"/testing/subdir
+	echo "1234" > "$d_PROGRAM_TESTS_WORKING"/testing/123.php
+	echo "1234" > "$d_PROGRAM_TESTS_WORKING"/testing/123.php"' -- d"
+	echo "1234" > "$d_PROGRAM_TESTS_WORKING"/testing/subdir/123.php
+	echo "1234" > "$d_PROGRAM_TESTS_WORKING/testing/123'456.php"
+	echo "1234" > "$d_PROGRAM_TESTS_WORKING/testing/123\"456.php"
+	echo "1234" > "$d_PROGRAM_TESTS_WORKING/testing/123?456.php"
+	echo "1234" > "$d_PROGRAM_TESTS_WORKING"'/testing/123!456.php'
+	echo "1234" > "$( echo -e "$d_PROGRAM_TESTS_WORKING/testing/123\n456.php" )"
+	echo "1234" > "$d_PROGRAM_TESTS_WORKING/testing/123ᡘ456.php"
+	echo "1234" > "$d_PROGRAM_TESTS_WORKING/testing/123Ͼ456.php"
+	echo "1234" > "$d_PROGRAM_TESTS_WORKING/testing/abc.txt"
+	echo "1234" > "$d_PROGRAM_TESTS_WORKING"/testing/subdir/abc.txt
+	echo "1234" > "$( echo -e "$d_PROGRAM_TESTS_WORKING/testing/subdir/123\0010456.html" )"
+	echo "1234" > "$( echo -e "$d_PROGRAM_TESTS_WORKING/testing/subdir/123\0033456.html" )"
+	ln -sf "$d_PROGRAM_TESTS_WORKING"'/testing/123!456.php' "$d_PROGRAM_TESTS_WORKING/testing/subdir/123 456.php"
+	echo "1234" > "$d_PROGRAM_TESTS_WORKING/testing/subdir/123💩456.php"
+	rm -f "$d_PROGRAM_TESTS_WORKING"/testing/subdir/456.php
 }
 
 function fn_make_files_2 {
-	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing/subdir2
-	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing/subdir/subdir3
-	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/subdir4
+	mkdir -p "$d_PROGRAM_TESTS_WORKING"/testing/subdir2
+	mkdir -p "$d_PROGRAM_TESTS_WORKING"/testing/subdir/subdir3
+	mkdir -p "$d_PROGRAM_TESTS_WORKING"/testing/subdir2/subdir4
 	### Note that this variable was not made local so that it can be used externally
 	v_ANGRY="123""$( echo -e "\n__\0033__\0010" )""__💩__ᡘ__'__"'"__'
-	mkdir -p "$d_STATWATCH_TESTS_WORKING"/testing/"$v_ANGRY"
-	touch "$d_STATWATCH_TESTS_WORKING"/testing/"$v_ANGRY".png
-	touch "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/123.png
-	touch "$d_STATWATCH_TESTS_WORKING"/testing/sub
-	touch "$d_STATWATCH_TESTS_WORKING"/testing/subdir/subdir3/123.png
-	touch "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/subdir4/123.png
-	touch "$d_STATWATCH_TESTS_WORKING"/testing/"$v_ANGRY"/123.png
+	mkdir -p "$d_PROGRAM_TESTS_WORKING"/testing/"$v_ANGRY"
+	touch "$d_PROGRAM_TESTS_WORKING"/testing/"$v_ANGRY".png
+	touch "$d_PROGRAM_TESTS_WORKING"/testing/subdir2/123.png
+	touch "$d_PROGRAM_TESTS_WORKING"/testing/sub
+	touch "$d_PROGRAM_TESTS_WORKING"/testing/subdir/subdir3/123.png
+	touch "$d_PROGRAM_TESTS_WORKING"/testing/subdir2/subdir4/123.png
+	touch "$d_PROGRAM_TESTS_WORKING"/testing/"$v_ANGRY"/123.png
 }
 
 function fn_change_files_1 {
-	rm -f "$d_STATWATCH_TESTS_WORKING"/testing/123.php
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING"/testing/123.php"' -- d"
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/123.php
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123'456.php"
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123\"456.php"
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123?456.php"
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING"'/testing/123!456.php'
-	echo "1235" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/123\n456.php" )"
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123ᡘ456.php"
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/123Ͼ456.php"
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/abc.txt"
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/abc.txt
-	echo "1235" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0010456.html" )"
-	echo "1235" > "$( echo -e "$d_STATWATCH_TESTS_WORKING/testing/subdir/123\0033456.html" )"
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING/testing/subdir/123💩456.php"
-	echo "1235" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/456.php
+	rm -f "$d_PROGRAM_TESTS_WORKING"/testing/123.php
+	echo "1235" > "$d_PROGRAM_TESTS_WORKING"/testing/123.php"' -- d"
+	echo "1235" > "$d_PROGRAM_TESTS_WORKING"/testing/subdir/123.php
+	echo "1235" > "$d_PROGRAM_TESTS_WORKING/testing/123'456.php"
+	echo "1235" > "$d_PROGRAM_TESTS_WORKING/testing/123\"456.php"
+	echo "1235" > "$d_PROGRAM_TESTS_WORKING/testing/123?456.php"
+	echo "1235" > "$d_PROGRAM_TESTS_WORKING"'/testing/123!456.php'
+	echo "1235" > "$( echo -e "$d_PROGRAM_TESTS_WORKING/testing/123\n456.php" )"
+	echo "1235" > "$d_PROGRAM_TESTS_WORKING/testing/123ᡘ456.php"
+	echo "1235" > "$d_PROGRAM_TESTS_WORKING/testing/123Ͼ456.php"
+	echo "1235" > "$d_PROGRAM_TESTS_WORKING/testing/abc.txt"
+	echo "1235" > "$d_PROGRAM_TESTS_WORKING"/testing/subdir/abc.txt
+	echo "1235" > "$( echo -e "$d_PROGRAM_TESTS_WORKING/testing/subdir/123\0010456.html" )"
+	echo "1235" > "$( echo -e "$d_PROGRAM_TESTS_WORKING/testing/subdir/123\0033456.html" )"
+	echo "1235" > "$d_PROGRAM_TESTS_WORKING/testing/subdir/123💩456.php"
+	echo "1235" > "$d_PROGRAM_TESTS_WORKING"/testing/subdir/456.php
 }
 
 function fn_change_files_2 {
-	echo "123" > "$d_STATWATCH_TESTS_WORKING"/testing/"$v_ANGRY".png
-	echo "123" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/123.png
-	echo "123" > "$d_STATWATCH_TESTS_WORKING"/testing/sub
-	echo "123" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir/subdir3/123.png
-	echo "123" > "$d_STATWATCH_TESTS_WORKING"/testing/subdir2/subdir4/123.png
-	rm -f "$d_STATWATCH_TESTS_WORKING"/testing/"$v_ANGRY"/123.png
-	echo "123" > "$d_STATWATCH_TESTS_WORKING"/testing/"$v_ANGRY"/456.png
+	echo "123" > "$d_PROGRAM_TESTS_WORKING"/testing/"$v_ANGRY".png
+	echo "123" > "$d_PROGRAM_TESTS_WORKING"/testing/subdir2/123.png
+	echo "123" > "$d_PROGRAM_TESTS_WORKING"/testing/sub
+	echo "123" > "$d_PROGRAM_TESTS_WORKING"/testing/subdir/subdir3/123.png
+	echo "123" > "$d_PROGRAM_TESTS_WORKING"/testing/subdir2/subdir4/123.png
+	rm -f "$d_PROGRAM_TESTS_WORKING"/testing/"$v_ANGRY"/123.png
+	echo "123" > "$d_PROGRAM_TESTS_WORKING"/testing/"$v_ANGRY"/456.png
 }
 
 function fn_remove_files {
-	rm -rf "$d_STATWATCH_TESTS_WORKING"/testing
-	rm -rf "$d_STATWATCH_TESTS_WORKING"/testing2
-	rm -f "$d_STATWATCH_TESTS_WORKING"/.stat_watch/backup_locations
+	rm -rf "$d_PROGRAM_TESTS_WORKING"/testing
+	rm -rf "$d_PROGRAM_TESTS_WORKING"/testing2
+	rm -f "$d_PROGRAM_TESTS_WORKING"/.stat_watch/backup_locations
 }
 
 function fn_fail {
@@ -93,7 +93,7 @@ function fn_fail {
 	fi
 	echo
 	echo "To assist with troubleshooting, it might be helpful to run the following command:"
-	echo "     d_STATWATCH=\"$d_STATWATCH\"; d_STATWATCH_TESTS=\"$d_STATWATCH_TESTS\"; d_STATWATCH_TESTS_WORKING=\"$d_STATWATCH_TESTS_WORKING\"; f_STAT_WATCH=\"$f_STAT_WATCH\"; f_CONF=\"$f_CONF\""
+	echo "     d_PROGRAM=\"$d_PROGRAM\"; d_PROGRAM_TESTS=\"$d_PROGRAM_TESTS\"; d_PROGRAM_TESTS_WORKING=\"$d_PROGRAM_TESTS_WORKING\"; f_STAT_WATCH=\"$f_STAT_WATCH\"; f_CONF=\"$f_CONF\""
 	echo
 	exit 1;
 }
@@ -123,8 +123,8 @@ function fn_make_user {
 		exit 1
 	fi
 	mkdir -p "$d_USER_HOME"
-	d_USER_STATWATCH="$d_USER_HOME"/"$( echo "$d_STATWATCH" | rev | cut -d "/" -f1 | rev )"
-	cp -a "$d_STATWATCH" "$d_USER_HOME"/
+	d_USER_STATWATCH="$d_USER_HOME"/"$( echo "$d_PROGRAM" | rev | cut -d "/" -f1 | rev )"
+	cp -a "$d_PROGRAM" "$d_USER_HOME"/
 	### I'm just going to assume here that the directory varialbes we have refer to directories stat_watch/tests/working. so long as test.sh doesn't change, this should be a safe bet.
 	chown -R "$v_USER":"$v_USER" "$d_USER_HOME"/
 	### This creates the user but does not delete it. Important to remember that this will need to be done.
@@ -159,8 +159,8 @@ function fn_md5_modules {
 		fi
 		echo
 	fi
-	if [[ ! -f "$d_STATWATCH"/modules/md5.pm ]]; then
-		echo "File \"$v_d_STATWATCH/modules/md5.pm\" is missing"
+	if [[ ! -f "$d_PROGRAM"/modules/md5.pm ]]; then
+		echo "File \"$v_d_PROGRAM/modules/md5.pm\" is missing"
 		exit 1;
 	fi
 }

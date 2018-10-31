@@ -6,7 +6,7 @@ function fn_test_32 {
 	if [[ "$1" == "--list" ]]; then
 		return
 	fi
-	source "$d_STATWATCH_TESTS"/tests_include.shf
+	source "$d_PROGRAM_TESTS"/tests_include.shf
 	fn_make_files_1
 
 	### Is locking to prevent multiple concurrent jobs working as expected?

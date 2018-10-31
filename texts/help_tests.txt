@@ -48,7 +48,30 @@ FILES
     - When ever any test is designated to be skipped, this is accomplished by renaming it such that its file name begins with "skipped_"
     - When test.sh is run, before starting any of the tests, it renames any test files so that "skipped_" is removed from the beginning of their name
 
+/usr/local/stat_watch/tests/tests_pre.sh -
+    - If this script is present, it will be run before any tests
+    - Unlike with the test scripts, this must be a .sh file
+
+/usr/local/stat_watch/tests/tests_post.sh -
+    - If this script is present, it will be run after the conclusion of all tests
+        - If any of the tests fail, this script will not be run
+    - Unlike with the test scripts, this must be a .sh file
+
 /usr/local/stat_watch/tests/working -
     - This directory contains working files for the current test script. When ever possible, tests should not alter files outside of this directory
     - This directory is removed when test.sh successfully completes all tests; it should only be present if a test has failed
+
+
+ENVIRONMENT VARIABLES
+
+The testing process makes the following Environment Varialbes available to the test scripts that it runs:
+
+"d_PROGRAM" -
+    - Points to the installation directory of Stat Watch (typically /usr/local/stat_watch)
+
+"d_PROGRAM_TESTS" - 
+    - Points to "$d_PROGRAM"/tests
+
+"d_PROGRAM_TESTS_WORKING" - 
+    - Points to "$d_PROGRAM_TESTS"/working
 

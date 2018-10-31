@@ -5,9 +5,9 @@ function fn_test_1 {
 	if [[ "$1" == "--list" ]]; then
 		return
 	fi
-	source "$d_STATWATCH_TESTS"/tests_include.shf
+	source "$d_PROGRAM_TESTS"/tests_include.shf
 	fn_make_files_1
-	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing | egrep -c "testing/(subdir/)?123\.php' -- " ) -ne 3 ]]; then
+	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --record "$d_PROGRAM_TESTS_WORKING"/testing | egrep -c "testing/(subdir/)?123\.php' -- " ) -ne 3 ]]; then
 		fn_fail "1.1"
 	fi
 	fn_pass "1.1"

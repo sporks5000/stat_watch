@@ -6,7 +6,7 @@ function fn_test_33 {
 	if [[ "$1" == "--list" ]]; then
 		return
 	fi
-	source "$d_STATWATCH_TESTS"/tests_include.shf
+	source "$d_PROGRAM_TESTS"/tests_include.shf
 	fn_make_files_1
 
 	### How am I going to do this?

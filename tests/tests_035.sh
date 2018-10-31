@@ -5,18 +5,18 @@ function fn_test_35 {
 	if [[ "$1" == "--list" ]]; then
 		return
 	fi
-	source "$d_STATWATCH_TESTS"/tests_include.shf
+	source "$d_PROGRAM_TESTS"/tests_include.shf
 	fn_make_files_1
 
-	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_PROGRAM_TESTS_WORKING"/testing --output "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt
 	sleep 1.1
-	cp -a "$d_STATWATCH_TESTS_WORKING"/testing/subdir "$d_STATWATCH_TESTS_WORKING"/testing/subdir2
+	cp -a "$d_PROGRAM_TESTS_WORKING"/testing/subdir "$d_PROGRAM_TESTS_WORKING"/testing/subdir2
 	fn_change_files_1
-	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_STATWATCH_TESTS_WORKING"/testing --output "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt
-	"$f_STAT_WATCH" --config "$f_CONF" --diff "$d_STATWATCH_TESTS_WORKING"/testing2/report1.txt "$d_STATWATCH_TESTS_WORKING"/testing2/report2.txt --backup -i <( echo -e "BackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackupR \.php$" ) > /dev/null
+	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_PROGRAM_TESTS_WORKING"/testing --output "$d_PROGRAM_TESTS_WORKING"/testing2/report2.txt
+	"$f_STAT_WATCH" --config "$f_CONF" --diff "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt "$d_PROGRAM_TESTS_WORKING"/testing2/report2.txt --backup -i <( echo -e "BackupD $d_PROGRAM_TESTS_WORKING/testing2/backup\nBackupR \.php$" ) > /dev/null
 
 	### check to make sure that all of the files are there
-	d_BACKUP="$d_STATWATCH_TESTS_WORKING"/testing2/backup/"$d_STATWATCH_TESTS_WORKING"/testing
+	d_BACKUP="$d_PROGRAM_TESTS_WORKING"/testing2/backup/"$d_PROGRAM_TESTS_WORKING"/testing
 	if [[ $( \ls -1 "$d_BACKUP" | egrep -c "^123Ͼ456.php_[0-9]+$" ) -ne 1 || $( \ls -1 "$d_BACKUP/subdir" | egrep -c "^456.php_[0-9]+$" ) -ne 1 || $( \ls -1 "$d_BACKUP/subdir2" | egrep -c "^123.php_[0-9]+$" ) -ne 1 ]]; then
 		fn_fail "35.1"
 	fi
@@ -42,7 +42,7 @@ function fn_test_35 {
 	### If the main directory has a prune rules file, are those rules being followed instead of rules given at the command line
 	sleep 1.1
 	echo -n "4:4" > "$d_BACKUP"/__prune_rules
-	"$f_STAT_WATCH" --config "$f_CONF" --prune -i <( echo -e "BackupMC 6\nBackupMD 6\nBackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackupR \.php$" ) > /dev/null
+	"$f_STAT_WATCH" --config "$f_CONF" --prune -i <( echo -e "BackupMC 6\nBackupMD 6\nBackupD $d_PROGRAM_TESTS_WORKING/testing2/backup\nBackupR \.php$" ) > /dev/null
 	if [[ $( \ls -1 "$d_BACKUP" | egrep -c "^123Ͼ456.php_[0-9]+$" ) -ne 4 || $( \ls -1 "$d_BACKUP/subdir" | egrep -c "^456.php_[0-9]+$" ) -ne 4 || $( \ls -1 "$d_BACKUP/subdir2" | egrep -c "^123.php_[0-9]+$" ) -ne 4 ]]; then
 		fn_fail "35.3"
 	fi
@@ -52,7 +52,7 @@ function fn_test_35 {
 	rm -rf "$d_BACKUP"
 	cp -a "$d_BACKUP"_ "$d_BACKUP"
 	echo -n "4:4" > "$d_BACKUP"/subdir/__prune_rules
-	"$f_STAT_WATCH" --config "$f_CONF" --prune -i <( echo -e "BackupMC 6\nBackupMD 6\nBackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackupR \.php$" ) > /dev/null
+	"$f_STAT_WATCH" --config "$f_CONF" --prune -i <( echo -e "BackupMC 6\nBackupMD 6\nBackupD $d_PROGRAM_TESTS_WORKING/testing2/backup\nBackupR \.php$" ) > /dev/null
 	if [[ $( \ls -1 "$d_BACKUP" | egrep -c "^123Ͼ456.php_[0-9]+$" ) -ne 6 || $( \ls -1 "$d_BACKUP/subdir" | egrep -c "^456.php_[0-9]+$" ) -ne 4 || $( \ls -1 "$d_BACKUP/subdir2" | egrep -c "^123.php_[0-9]+$" ) -ne 6 ]]; then
 		fn_fail "35.4"
 	fi
@@ -63,7 +63,7 @@ function fn_test_35 {
 	cp -a "$d_BACKUP"_ "$d_BACKUP"
 	echo -n "4:4" > "$d_BACKUP"/__prune_rules
 	echo -n "5:5" > "$d_BACKUP"/subdir/__prune_rules
-	"$f_STAT_WATCH" --config "$f_CONF" --prune -i <( echo -e "BackupMC 6\nBackupMD 6\nBackupD $d_STATWATCH_TESTS_WORKING/testing2/backup\nBackupR \.php$" ) > /dev/null
+	"$f_STAT_WATCH" --config "$f_CONF" --prune -i <( echo -e "BackupMC 6\nBackupMD 6\nBackupD $d_PROGRAM_TESTS_WORKING/testing2/backup\nBackupR \.php$" ) > /dev/null
 	if [[ $( \ls -1 "$d_BACKUP" | egrep -c "^123Ͼ456.php_[0-9]+$" ) -ne 4 || $( \ls -1 "$d_BACKUP/subdir" | egrep -c "^456.php_[0-9]+$" ) -ne 5 || $( \ls -1 "$d_BACKUP/subdir2" | egrep -c "^123.php_[0-9]+$" ) -ne 4 ]]; then
 		fn_fail "35.5"
 	fi
