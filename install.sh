@@ -14,18 +14,45 @@ fi
 d_PROGRAM="$( cd -P "$( dirname "$f_PROGRAM" )" && pwd )"
 d_WORKING="$d_PROGRAM"/.stat_watch
 
-### An optional command line argument can be given to install this elsewhere
 d_INST="/usr/local/stat_watch"
-if [[ -n "$1" && "${1:0:1}" == "/" ]]; then
-	### Make sure it's an absolute path
-	d_INST="$1"
-elif [[ -n "$1" ]]; then
-	echo "Must provide a full path to the installation directory"
-	exit 1
+d_INST_FINAL=
+a_ARGS=( "$@" )
+for (( c=0; c<=$(( ${#a_ARGS[@]} - 1 )); c++ )); do
+	v_ARG="${a_ARGS[$c]}"
+	if [[ -n "$v_ARG" && ${v_ARG:0:1} == "/" ]]; then
+		### If an argument is given that appears to be a path, assume that that's the installation path
+		d_INST="$v_ARG"
+	elif [[ "$v_ARG" == "--final" && -n ${a_ARGS[$c+1]} && "${a_ARGS[c+1]:0:1}" == "/" ]]; then
+		### The user can specify a final location, if there are circumstances that will cause the original installation path to later be inaccurate (such as building this into an RPM)
+		c=$(( c + 1 ))
+		d_INST_FINAL="${a_ARGS[$c]}"
+	else
+		echo "I don't understand the argument '$v_ARG'"
+		exit 1
+	fi
+done
+if [[ -z "$d_INST_FINAL" ]]; then
+	d_INST_FINAL="$d_INST"
 fi
+
+### We don't want a trailing slash here
 if [[ "${d_INST: -1}" == "/" ]]; then
 	### Make sure it does not end in a slash
 	d_INST="${d_INST:0:${#d_INST}-1}"
+fi
+if [[ "${d_INST_FINAL: -1}" == "/" ]]; then
+	### Make sure it does not end in a slash
+	d_INST_FINAL="${d_INST_FINAL:0:${#d_INST_FINAL}-1}"
+fi
+
+### Make sure that the parent directory exists
+d_INST_HEAD="$( echo "$d_INST" | rev | cut -d "/" -f2- | rev )"
+if [[ ! -d "$d_INST_HEAD" ]]; then
+	echo "'$d_INST_HEAD' does not exist. Please create it first"
+	exit 1
+elif [[ -e "$d_INST" && ! -d "$d_INST" ]]; then
+	echo "'$d_INST' alreay appears to exist, but is not a directory"
+	exit 1
 fi
 
 ### Test that all of the variables are populated
@@ -103,6 +130,13 @@ else
 			echo "Failed to remove previous install"
 			exit 1
 		fi
+	else
+		if [[ ! -f "$d_PROGRAM"/stat_watch.conf ]]; then
+			source "$d_PROGRAM"/includes/variables.shf
+			fn_conf_defaults
+			fn_write_conf2
+			fn_make_conf
+		fi
 	fi
 
 	### Move the directory we're installing into place
@@ -115,13 +149,16 @@ else
 		exit 1
 	fi
 fi
+if [[ ! -d "$d_INST"/.stat_watch ]]; then
+	mkdir -p "$d_INST"/.stat_watch
+fi
 
 ### Set the installation directory in the executable files
-sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST@" "$d_INST"/stat_watch_wrap.sh 2> "$v_OUT" || v_FAIL=true
-sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST@" "$d_INST"/stat_watch.pl 2> "$v_OUT" || v_FAIL=true
-sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST@" "$d_INST"/scripts/fold_out.pl 2> "$v_OUT" || v_FAIL=true
-sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST@" "$d_INST"/scripts/escape.pl 2> "$v_OUT" || v_FAIL=true
-sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST@" "$d_INST"/tests/test.sh 2> "$v_OUT" || v_FAIL=true
+sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST_FINAL@" "$d_INST"/stat_watch_wrap.sh 2> "$v_OUT" || v_FAIL=true
+sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST_FINAL@" "$d_INST"/stat_watch.pl 2> "$v_OUT" || v_FAIL=true
+sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST_FINAL@" "$d_INST"/scripts/fold_out.pl 2> "$v_OUT" || v_FAIL=true
+sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST_FINAL@" "$d_INST"/scripts/escape.pl 2> "$v_OUT" || v_FAIL=true
+sed -i "s@####INSTALLATION_DIRECTORY####@$d_INST_FINAL@" "$d_INST"/tests/test.sh 2> "$v_OUT" || v_FAIL=true
 if [[ "$v_FAIL" == true ]]; then
 	echo "Failed correctly set the installation directory for executable files"
 	exit 1
@@ -134,6 +171,8 @@ chmod 700 "$d_INST"/scripts/fold_out.pl 2> "$v_OUT" || v_FAIL=true
 chmod 700 "$d_INST"/scripts/escape.pl 2> "$v_OUT" || v_FAIL=true
 chmod 700 "$d_INST"/scripts/db_watch.sh 2> "$v_OUT" || v_FAIL=true
 chmod 700 "$d_INST"/tests/test.sh 2> "$v_OUT" || v_FAIL=true
+chmod 700 "$d_INST"/.stat_watch 2> "$v_OUT" || v_FAIL=true
+chmod 600 "$d_INST"/stat_watch.conf 2> "$v_OUT" || v_FAIL=true
 chown -R root:root "$d_INST" 2> "$v_OUT" || v_FAIL=true
 if [[ "$v_FAIL" == true ]]; then
 	echo "Failed ensure that all the files had the correct ownership and permissions"

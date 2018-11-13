@@ -21,9 +21,9 @@ if [[ ${d_PROGRAM:0:1} != "/" ]]; then
 	fn_locate
 else
 	### If any of the arguments say that we can't trust the hard-coded location, find it manually
-	a_CL_ARGUMENTS=( "$@" )
-	for (( c=0; c<=$(( ${#a_CL_ARGUMENTS[@]} - 1 )); c++ )); do
-		v_ARG="${a_CL_ARGUMENTS[$c]}"
+	a_ARGS=( "$@" )
+	for (( c=0; c<=$(( ${#a_ARGS[@]} - 1 )); c++ )); do
+		v_ARG="${a_ARGS[$c]}"
 		if [[ "$v_ARG" == "--locate" ]]; then
 			fn_locate
 			break
@@ -52,32 +52,32 @@ fn_perl_args
 f_JOBS="$d_WORKING"/wrap_jobs_created
 
 ### If any of the arguments are asking for help, output help and exit
-a_CL_ARGUMENTS=( "$@" )
-for (( c=0; c<=$(( ${#a_CL_ARGUMENTS[@]} - 1 )); c++ )); do
-	v_ARG="${a_CL_ARGUMENTS[$c]}"
+a_ARGS=( "$@" )
+for (( c=0; c<=$(( ${#a_ARGS[@]} - 1 )); c++ )); do
+	v_ARG="${a_ARGS[$c]}"
 	if [[ "$v_ARG" == "-h" || "$v_ARG" == "--help" ]]; then
-		if [[ "${a_CL_ARGUMENTS[$c + 1]}" == "--locate" ]]; then
+		if [[ "${a_ARGS[$c + 1]}" == "--locate" ]]; then
 			c=$(( c + 1 ));
 		fi
-		if [[ "${a_CL_ARGUMENTS[$c + 1]}" == "use-cases" ]]; then
+		if [[ "${a_ARGS[$c + 1]}" == "use-cases" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_usage.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_CL_ARGUMENTS[$c + 1]}" == "flags" ]]; then
+		elif [[ "${a_ARGS[$c + 1]}" == "flags" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_flags.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_CL_ARGUMENTS[$c + 1]}" == "job" ]]; then
+		elif [[ "${a_ARGS[$c + 1]}" == "job" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_job_file.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_CL_ARGUMENTS[$c + 1]}" == "backups" ]]; then
+		elif [[ "${a_ARGS[$c + 1]}" == "backups" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_backups.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_CL_ARGUMENTS[$c + 1]}" == "job-files" ]]; then
+		elif [[ "${a_ARGS[$c + 1]}" == "job-files" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_job_files.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_CL_ARGUMENTS[$c + 1]}" == "files" ]]; then
+		elif [[ "${a_ARGS[$c + 1]}" == "files" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_files.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_CL_ARGUMENTS[$c + 1]}" == "tests" ]]; then
+		elif [[ "${a_ARGS[$c + 1]}" == "tests" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_tests.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_CL_ARGUMENTS[$c + 1]}" == "assume" ]]; then
+		elif [[ "${a_ARGS[$c + 1]}" == "assume" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_assume.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_CL_ARGUMENTS[$c + 1]}" == "conf" ]]; then
+		elif [[ "${a_ARGS[$c + 1]}" == "conf" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_conf.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_CL_ARGUMENTS[$c + 1]}" == "db_watch" ]]; then
+		elif [[ "${a_ARGS[$c + 1]}" == "db_watch" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_db_watch.txt "$d_PROGRAM"/texts/help_feedback.txt
 		else
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_basic.txt "$d_PROGRAM"/texts/help_feedback.txt
