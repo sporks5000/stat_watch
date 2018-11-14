@@ -43,7 +43,7 @@ function fn_test_7 {
 		fn_make_files_1
 		chmod 000 "$d_PROGRAM_TESTS_WORKING"/testing/123.php
 		"$f_STAT_WATCH" --config "$f_CONF" --record "$d_PROGRAM_TESTS_WORKING"/testing --output "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt --md5
-		if [[ $( cat "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt | awk -F" -- " '{print $8}' | egrep -c "^[0-9a-f]{32}$" ) -ne 14 ]]; then
+		if [[ $( cat "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt | awk -F" -- " '{print $8}' | egrep -c "^[0-9a-f]{32}$" ) -ne 15 ]]; then
 			fn_fail "7.4"
 		fi
 		fn_pass "7.4"
@@ -51,7 +51,7 @@ function fn_test_7 {
 		### Test again, but this time not with the root user
 		fn_make_user
 		sudo -u "$v_USER" "$d_USER_STATWATCH"/stat_watch_wrap.sh --record --locate "$d_USER_STATWATCH"/tests/working/testing --output "$d_USER_STATWATCH"/tests/working/testing2/report1.txt --md5
-		if [[ $( cat "$d_USER_STATWATCH"/tests/working/testing2/report1.txt | awk -F" -- " '{print $8}' | egrep -c "^[0-9a-f]{32}$" ) -ne 13 ]]; then
+		if [[ $( cat "$d_USER_STATWATCH"/tests/working/testing2/report1.txt | awk -F" -- " '{print $8}' | egrep -c "^[0-9a-f]{32}$" ) -ne 14 ]]; then
 			fn_fail "7.5.1"
 		fi
 		### And verify that not getting it doesn't throw the formatting of the report file off
