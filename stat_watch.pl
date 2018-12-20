@@ -607,48 +607,50 @@ sub fn_diff_lines {
 ### $_[4] is the directory that we're currently processing; $_[5] is the error message to give if things are wrong
 	my ($v_line, $re_multiline, $v_timestamp1, $v_timestamp2, $v_processing, $v_prune, $v_error) = @_;
 	chomp($v_line);
-	my $v_start = substr($v_line, 0, $v_prune);
-	$v_line = substr($v_line, $v_prune);
-	if ( $v_line =~ m/^Processing:/ ) {
-		### Each time we see a processing line, we have to re-do the ignore strings to make sure that we're not ignoring something we shouldn't
-		$v_processing = (split( m/'/, $v_line, 2 ))[1];
-		### Trade timestamps
-		$v_timestamp2 = $v_timestamp1;
-		$v_timestamp1 = $v_processing;
-		$v_timestamp1 =~ s/^.*\s([0-9]+)$/$1/;
-		### create the regex for the multi-line
-		$re_multiline = qr/_mlfn_(\Q$v_timestamp1\E|\Q$v_timestamp2\E)/;
-		if ( $v_timestamp2 eq '' ) {
-			$re_multiline = qr/_mlfn_\Q$v_timestamp1\E/;
-		}
-		$v_processing =~ s/' - [0-9]+$//;
-		### Check to see if anything needs to be ignored
-		fn_check_strings( $v_processing );
-		$v_line = 0;
-	} elsif ( substr( $v_line, 0, 2 ) eq "'/" || $v_line =~ m/^Maximum depth reached at '/ ) {
-		### If we've reached a normal line before we reached a processing line, there's a problem
-		if ( ! $v_processing ) {
-			print STDERR $v_error;
-			exit 1;
-		}
-		my @v_line = split( m/'/, $v_line );
-		$v_line = pop(@v_line);
-		### Special capturing steps if it's a max depth line
-		if ( $v_line[0] eq 'Maximum depth reached at ' ) {
-			$v_start .= shift(@v_line);
-		} else {
-			### regular lines would have begun with a single quote, so the split means that there's an empty string at the beginning of the array. Get rid of it.
-			shift(@v_line);
-		}
-		my $v_file = join( "'", @v_line );
-		if ( $v_file =~ m/$re_multiline/ ) {
-			$v_file =~ s/$re_multiline/\n/g;
-		}
-		### Check to see if there's any reason for the file to be excluded. If not, output it
-		if ( fn_check_file($v_file) ) {
-			$v_line = $v_start . "'" . $v_file . "'" . $v_line;
-		} else {
+	if ( length($v_line) > $v_prune ) {
+		my $v_start = substr($v_line, 0, $v_prune);
+		$v_line = substr($v_line, $v_prune);
+		if ( $v_line =~ m/^Processing:/ ) {
+			### Each time we see a processing line, we have to re-do the ignore strings to make sure that we're not ignoring something we shouldn't
+			$v_processing = (split( m/'/, $v_line, 2 ))[1];
+			### Trade timestamps
+			$v_timestamp2 = $v_timestamp1;
+			$v_timestamp1 = $v_processing;
+			$v_timestamp1 =~ s/^.*\s([0-9]+)$/$1/;
+			### create the regex for the multi-line
+			$re_multiline = qr/_mlfn_(\Q$v_timestamp1\E|\Q$v_timestamp2\E)/;
+			if ( $v_timestamp2 eq '' ) {
+				$re_multiline = qr/_mlfn_\Q$v_timestamp1\E/;
+			}
+			$v_processing =~ s/' - [0-9]+$//;
+			### Check to see if anything needs to be ignored
+			fn_check_strings( $v_processing );
 			$v_line = 0;
+		} elsif ( substr( $v_line, 0, 2 ) eq "'/" || $v_line =~ m/^Maximum depth reached at '/ ) {
+			### If we've reached a normal line before we reached a processing line, there's a problem
+			if ( ! $v_processing ) {
+				print STDERR $v_error;
+				exit 1;
+			}
+			my @v_line = split( m/'/, $v_line );
+			$v_line = pop(@v_line);
+			### Special capturing steps if it's a max depth line
+			if ( $v_line[0] eq 'Maximum depth reached at ' ) {
+				$v_start .= shift(@v_line);
+			} else {
+				### regular lines would have begun with a single quote, so the split means that there's an empty string at the beginning of the array. Get rid of it.
+				shift(@v_line);
+			}
+			my $v_file = join( "'", @v_line );
+			if ( $v_file =~ m/$re_multiline/ ) {
+				$v_file =~ s/$re_multiline/\n/g;
+			}
+			### Check to see if there's any reason for the file to be excluded. If not, output it
+			if ( fn_check_file($v_file) ) {
+				$v_line = $v_start . "'" . $v_file . "'" . $v_line;
+			} else {
+				$v_line = 0;
+			}
 		}
 	}
 	return( $v_line, $re_multiline, $v_timestamp1, $v_timestamp2, $v_processing );

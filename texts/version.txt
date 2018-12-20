@@ -1,5 +1,10 @@
 
-Current Version: 1.7.3
+Current Version: 1.7.4
+
+Version 1.7.4 (2018-12-20) -
+    - Fixed a bug where trying to run a command in a a top level directory would result in an infinite loop
+    - Fixed a bug where fold_out.pl might not know what directory it is located in
+    - Fixed a bug where processing diff output could potentially result in error output
 
 Version 1.7.3 (2018-10-24) -
     - Removed the options for searching for symlinks and files with new line characters

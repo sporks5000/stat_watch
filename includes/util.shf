@@ -14,8 +14,13 @@ function fn_file_path {
 	### Find the length of the path
 	local v_DIR_LEN=$(( ${#v_FILE} - ${#s_FILE} - 1 ))
 	if [[ "$v_DIR_LEN" -le 0 ]]; then
-		### If no path was given, let's find it
-		s_DIR="$( pwd )"
+		if [[ "${v_FILE:0:1}" == "/" ]]; then
+			### if we were given a full path and the dir length is zero, the parent must be "/"
+			s_DIR="/"
+		else
+			### If no path was given, let's find it
+			s_DIR="$( pwd )"
+		fi
 	else
 		### If a path was given, we'll find out what it really is
 		s_DIR="${v_FILE:0:$v_DIR_LEN}"

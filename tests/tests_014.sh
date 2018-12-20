@@ -172,6 +172,7 @@ function fn_test_14_3 {
 	fn_pass "14.3.4"
 
 	### And again
+	sleep 1.1
 	"$f_STAT_WATCH" --config "$f_CONF" --record "$d_PROGRAM_TESTS_WORKING"/testing -i <( echo "* $d_PROGRAM_TESTS_WORKING"/testing/sub ) --output "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt
 	if [[ $( "$f_STAT_WATCH" --config "$f_CONF" --diff "$d_PROGRAM_TESTS_WORKING"/testing2/report1.txt "$d_PROGRAM_TESTS_WORKING"/testing2/report2.txt -i <( echo "* $d_PROGRAM_TESTS_WORKING"/testing/sub ) | egrep -c "sub" ) -ne 0 ]]; then
 		fn_fail "14.3.5"

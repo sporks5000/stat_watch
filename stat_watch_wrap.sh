@@ -10,7 +10,7 @@ f_PROGRAM="stat_watch_wrap.sh"
 
 function fn_locate {
 	f_PROGRAM="$( readlink "${BASH_SOURCE[0]}" )"
-	if [[ -z $f_PROGRAM ]]; then
+	if [[ -z "$f_PROGRAM" ]]; then
 		f_PROGRAM="${BASH_SOURCE[0]}"
 	fi
 	d_PROGRAM="$( cd -P "$( dirname "$f_PROGRAM" )" && pwd )"

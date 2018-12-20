@@ -12,7 +12,7 @@ function fn_find_pwd {
 function fn_find_assume {
 ### Find if this directory is part of an assumption
 	local d_CUR="$( cd "$1" && pwd -P )"
-	if [[ "${d_CUR: -1}" == "/" ]]; then
+	if [[ "${d_CUR: -1}" == "/" && "$d_CUR" != "/" ]]; then
 		### Remove a trailing slash
 		d_CUR="${d_CUR:0:${#d_CUR}-1}"
 	fi
@@ -23,6 +23,10 @@ function fn_find_assume {
 	local v_LINE="$( grep -nEao "^$d_SAN_CUR." "$d_WORKING"/assumptions 2> /dev/null | grep -Pa "\x0$" | tail -n1 | cut -d ":" -f1 )"
 	local v_RETURN=
 	if [[ -z "$v_LINE" ]]; then
+		if [[ "$d_CUR" == "/" ]]; then
+			echo -n "$v_RETURN"
+			return
+		fi
 		fn_file_path "$d_CUR"; local d_PARENT="$s_DIR"
 		if [[ -n "$d_PARENT" ]]; then
 			if [[ $( echo "$d_PARENT" | egrep -c "^$d_SAN_CUR/" ) -gt 0 ]]; then
