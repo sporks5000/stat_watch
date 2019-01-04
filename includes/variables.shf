@@ -184,6 +184,7 @@ function fn_write_conf2 {
 	echo "v_DEFAULT_JOB_DIRECTORY=\"$v_DEFAULT_JOB_DIRECTORY\"" >> "$f_CONF2"
 	echo "v_PARTIAL_SECONDS=\"$v_PARTIAL_SECONDS\"" >> "$f_CONF2"
 	echo "v_MAX_DEPTH=\"$v_MAX_DEPTH\"" >> "$f_CONF2"
+	chmod 644 "$f_CONF2"
 }
 
 function fn_make_conf {
@@ -203,4 +204,5 @@ function fn_make_conf {
 	sed -i "s@####DEFAULT_JOB_DIRECTORY####@$v_DEFAULT_JOB_DIRECTORY@" "$f_CONF"
 	sed -i "s@####PARTIAL_SECONDS####@$v_PARTIAL_SECONDS@" "$f_CONF"
 	sed -i "s@####MAX_DEPTH####@$v_MAX_DEPTH@" "$f_CONF"
+	chmod 644 "$f_CONF"
 }
